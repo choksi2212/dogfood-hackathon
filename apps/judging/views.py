@@ -364,6 +364,17 @@ class CSVExportView(APIView):
                     status=403,
                 )
         else:
+            # Organizer check first — non-organizers get 403, not 422.
+            if not is_admin and organizer_events.count() == 0:
+                return Response(
+                    {
+                        "error": {
+                            "code": "forbidden",
+                            "message": "Only organizers can export CSV.",
+                        }
+                    },
+                    status=403,
+                )
             if is_admin:
                 event = Event.objects.order_by("-created_at").first()
             elif organizer_events.count() == 1:
