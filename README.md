@@ -99,6 +99,7 @@ acceptance mechanism (40%) and `docker compose up` (20%) are graded there.
 | G6 (H+56) | Sep 29 02:00 UTC | **PASS** — Bradley-Terry MM with phantom prior 0.5; ranking recovered from synthetic ballots |
 | G7 (H+62) | Sep 29 08:00 UTC | **PASS** — certificates, widget.js, webhooks, OpenAPI 3 spec published |
 | G8 (H+66) | Sep 29 12:00 UTC | **PASS** — THREAT-MODEL.md shipped; all 4 bonuses defended (+16) |
+| G9 (H+70) | Sep 29 16:00 UTC | _pending_ — clean-machine verification |
 | G9 (H+70) | Sep 29 16:00 UTC | _pending_ |
 
 ### G1 verification log
