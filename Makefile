@@ -1,4 +1,4 @@
-.PHONY: up up-detached down down-clean logs shell web-shell db-shell migrate reset build accept accept-fresh
+.PHONY: up up-detached down down-clean logs shell web-shell db-shell migrate reset build seed seed-fresh accept accept-fresh
 
 COMPOSE ?= docker compose
 PYTHON  ?= python3
@@ -30,6 +30,9 @@ db-shell:
 migrate:
 	$(COMPOSE) exec web python manage.py migrate
 
+seed:
+	$(COMPOSE) exec -T web python manage.py seed_fixtures
+
 reset:
 	$(COMPOSE) down -v
 	$(COMPOSE) up --build
@@ -37,9 +40,12 @@ reset:
 build:
 	$(COMPOSE) build
 
-# Wired up at G2 once acceptance.py exists.
+# Run the seven-check acceptance suite. Writes acceptance-report.txt and
+# pipes it to stdout so you see the result immediately.
 accept:
-	@echo "acceptance target pending G2 — acceptance.py is published alongside run.py"
+	$(COMPOSE) exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
 
-accept-fresh:
-	@echo "acceptance target pending G2"
+# Like accept, but also re-seeds first so the report reflects a known
+# fresh state. Useful right before a submission.
+accept-fresh: seed
+	$(COMPOSE) exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt

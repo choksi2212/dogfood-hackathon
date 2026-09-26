@@ -78,7 +78,7 @@ acceptance mechanism (40%) and `docker compose up` (20%) are graded there.
 | Gate | Time | Outcome |
 |---|---|---|
 | G1 (H+3) | Sep 26 21:00 UTC | **PASS** — `docker compose up` green; `/healthz` 200; migrations applied |
-| G2 (H+20) | Sep 27 14:00 UTC | _pending_ |
+| G2 (H+20) | Sep 27 14:00 UTC | **PASS** — T1 green; gallery 200, fixture present, submit-after-deadline 422 |
 | G3 (H+34) | Sep 28 04:00 UTC | _pending_ |
 | G4 (H+40) | Sep 28 10:00 UTC | _pending_ |
 | G5 (H+48) | Sep 28 18:00 UTC | _pending_ |

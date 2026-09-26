@@ -1,7 +1,7 @@
 """Django settings for the DOGFOOD 2026 portal.
 
-All config is env-driven so the same image runs in dev, CI, and the judge's
-machine. Defaults are dev-safe; production must override via env.
+All config is env-driven so the same image runs in dev, CI, and the
+judge's machine. Defaults are dev-safe; production must override via env.
 """
 import os
 from pathlib import Path
@@ -32,16 +32,39 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    # Local apps
+    "apps.accounts.apps.AccountsConfig",
+    "apps.audit.apps.AuditConfig",
+    "apps.events.apps.EventsConfig",
+    "apps.teams.apps.TeamsConfig",
+    "apps.submissions.apps.SubmissionsConfig",
+    "apps.api.apps.ApiConfig",
     "apps.health.apps.HealthConfig",
 ]
 
+# Custom user model
+AUTH_USER_MODEL = "accounts.User"
+
+# Middleware order matters:
+#   1. SecurityMiddleware — sets headers
+#   2. Django's SessionMiddleware — needed by django.contrib.messages
+#   3. CommonMiddleware — normalizes URLs
+#   4. CsrfViewMiddleware — CSRF tokens
+#   5. Our SessionMiddleware — resolves cookie → request.user via the
+#      hash-stored Session row. Must run AFTER the standard one because it
+#      doesn't create request.session.
+#   6. MessageMiddleware — flash messages
+#   7. AuditMiddleware — appends 401/403 responses to the audit log
+#   8. RateLimitMiddleware — last because it short-circuits before view
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    "apps.accounts.middleware.SessionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "apps.accounts.middleware.AuditMiddleware",
+    "apps.accounts.middleware.RateLimitMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -64,10 +87,6 @@ TEMPLATES = [
 ]
 
 # --- Database ----------------------------------------------------------------
-#
-# Single source of truth for the connection string. Comes from env so the same
-# image points at the compose DB by default and can be repointed at any other
-# Postgres without code changes.
 
 DATABASES = {
     "default": {
@@ -96,26 +115,22 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # --- DRF ---------------------------------------------------------------------
-#
-# No auth/permission defaults — each viewset declares its own. This is on
-# purpose: the spec wants the role isolation matrix provable by curl, and the
-# only safe way to do that is to require an explicit permission class on every
-# endpoint.
 
 REST_FRAMEWORK = {
+    # CookieSessionAuthentication reads request.user that the
+    # SessionMiddleware already populated; without it, DRF's request
+    # wrapper would store _user=None and crash on .is_authenticated.
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
+        "apps.accounts.authentication.CookieSessionAuthentication",
     ],
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
-    ],
-    "DEFAULT_RENDERER_CLASSES": [
-        "rest_framework.renderers.JSONRenderer",
-    ],
-    "DEFAULT_PARSER_CLASSES": [
-        "rest_framework.parsers.JSONParser",
-    ],
+    # No default permission — every view declares its own. The role
+    # isolation matrix is provable precisely because we never inherit
+    # "IsAuthenticated" implicitly.
+    "DEFAULT_PERMISSION_CLASSES": [],
+    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+    "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
     "UNAUTHENTICATED_USER": None,
+    "EXCEPTION_HANDLER": "apps.api.exceptions.custom_exception_handler",
 }
 
 # --- Logging -----------------------------------------------------------------
