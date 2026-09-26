@@ -22,4 +22,13 @@ export const routes = {
     `/api/events/${slug}/pairwise/ballots`,
   pairwiseRanking: (slug: string = EVENT_SLUG) =>
     `/api/events/${slug}/pairwise/ranking`,
+  // Organizer dashboard (apps/events, apps/judging, apps/normalization).
+  eventDetail: (slug: string = EVENT_SLUG) => `/api/events/${slug}/`,
+  memberships: (slug: string = EVENT_SLUG) =>
+    `/api/events/${slug}/memberships`,
+  bulkInviteJudges: (slug: string = EVENT_SLUG) =>
+    `/api/events/${slug}/judges/bulk-invite`,
+  assignmentsRun: (slug: string = EVENT_SLUG) =>
+    `/api/events/${slug}/assignments/run`,
+  normalize: (slug: string = EVENT_SLUG) => `/api/events/${slug}/normalize`,
 } as const;

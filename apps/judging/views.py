@@ -54,8 +54,12 @@ class BatchInviteView(APIView):
             email = (email or "").strip().lower()
             if not email:
                 continue
+            # AbstractUser requires a non-empty unique username; use the
+            # email as the username so login-by-email continues to work.
+            # Same fix as apps.accounts.management.commands.seed_fixtures
+            # ._ensure_user — this call site just hadn't been hit yet.
             user, _ = User.objects.get_or_create(
-                email=email, defaults={"is_active": True}
+                email=email, defaults={"username": email, "is_active": True}
             )
             Membership.objects.get_or_create(
                 user=user,
@@ -364,6 +368,17 @@ class CSVExportView(APIView):
                     status=403,
                 )
         else:
+            # Organizer check first — non-organizers get 403, not 422.
+            if not is_admin and organizer_events.count() == 0:
+                return Response(
+                    {
+                        "error": {
+                            "code": "forbidden",
+                            "message": "Only organizers can export CSV.",
+                        }
+                    },
+                    status=403,
+                )
             if is_admin:
                 event = Event.objects.order_by("-created_at").first()
             elif organizer_events.count() == 1:

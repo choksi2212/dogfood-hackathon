@@ -118,6 +118,74 @@ export type PairwiseRankingResponse = {
   ranking: PairwiseRankingEntry[];
 };
 
+// Matches apps/events/serializers.py EventSerializer.
+export type EventDetail = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  open_at: string;
+  submissions_close_at: string;
+  judging_open_at: string;
+  judging_close_at: string;
+  results_at: string | null;
+  voting_mode: "simple" | "quadratic";
+  pairwise_enabled: boolean;
+  tracks: { id: string; name: string; slug: string; description: string; order: number }[];
+  prizes: { id: string; name: string; value: string; track: string | null; order: number }[];
+  rubric: {
+    id: string;
+    name: string;
+    criteria: {
+      id: string;
+      name: string;
+      description: string;
+      weight: string;
+      min: number;
+      max: number;
+      order: number;
+    }[];
+  } | null;
+  state: string;
+};
+
+// Matches apps/events/serializers.py MembershipSerializer.
+export type Membership = {
+  id: string;
+  user: string;
+  user_email: string;
+  user_name: string;
+  role: "organizer" | "judge" | "participant" | "admin";
+  created_at: string;
+};
+
+// Matches apps/judging/views.py BatchInviteView.
+export type BulkInviteResponse = {
+  invited: number;
+};
+
+// Matches apps/judging/assignment.py run_assignment's return dict.
+export type AssignmentRunResponse = {
+  batch_id: string;
+  n_assignments: number;
+  judges_with_zero_projects: string[];
+  seed_used: number;
+  attempts: number;
+};
+
+// Matches apps/normalization/views.py NormalizeView response.
+export type NormalizeResponse = {
+  run_id: string;
+  raw_sigma: number;
+  normalized_sigma: number;
+  is_connected: boolean;
+  iterations: number;
+  n_projects: number;
+  n_judges: number;
+  n_reviews: number;
+  proof: string;
+};
+
 export class ApiError extends Error {
   code: string;
   status: number;

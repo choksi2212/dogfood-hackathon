@@ -92,8 +92,16 @@ def run_assignment(
                 )
                 break
 
-            # Prefer least-loaded, then most-diverse-by-track.
-            candidates.sort(key=lambda j: (judge_load[j], -len(judge_track_set[j])))
+            # Prefer least-loaded, then most-diverse-by-track. Use the
+            # RNG as a final tie-breaker so different seeds produce
+            # different picks when load + track-diversity are equal.
+            candidates.sort(
+                key=lambda j: (
+                    judge_load[j],
+                    -len(judge_track_set[j]),
+                    rng.random(),
+                ),
+            )
             for judge_id in candidates[:reviews_per_project]:
                 assignments.append((judge_id, project.id))
                 judge_load[judge_id] += 1
