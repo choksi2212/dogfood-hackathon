@@ -28,7 +28,8 @@ forked, self-hosted, and used for real Raptors events.
 
 ## What we ship
 
-Nine items. Everything below lives on `main` at submission.
+Nine base items, plus all four bonuses (+16). Everything below lives on
+`main` at submission.
 
 1. **Public GitHub repo, OSI licence** — MIT or Apache-2.0 preferred.
 2. **`docker compose up`** — To a seeded, working portal, network off.
@@ -39,6 +40,19 @@ Nine items. Everything below lives on `main` at submission.
 7. **[DATA-MODEL.md](DATA-MODEL.md)** — Schema, import and export paths.
 8. **[JUDGING.md](JUDGING.md)** — Assignment strategy, scoring maths, normalization method, defended.
 9. **5-minute demo video** — One full event lifecycle.
+
+**Bonuses claimed (+16):**
+
+- **+5 Normalization Proof** — `normalization-proof.txt` at the repo root,
+  defended in [JUDGING.md §3](JUDGING.md).
+- **+5 Pairwise Mode** — Bradley-Terry derivation in
+  [JUDGING.md §5](JUDGING.md); recovered-ranking test in
+  `apps/pairwise/tests/`.
+- **+3 API First** — `openapi.yaml` at the repo root, served at
+  `/api/schema/`; every UI action is a documented endpoint.
+- **+3 Threat Model** — [THREAT-MODEL.md](THREAT-MODEL.md) names the
+  four attacks (Sybil votes, ballot stuffing, judge collusion, deadline
+  gaming), the mitigations in code, and the residual risks honestly.
 
 > **Judging math is documented, not averaged.** "We averaged the scores" is an answer, and
 > it is a weak one. See [JUDGING.md](JUDGING.md) for the assignment strategy, the
@@ -84,7 +98,7 @@ acceptance mechanism (40%) and `docker compose up` (20%) are graded there.
 | G5 (H+48) | Sep 28 18:00 UTC | **PASS** — T3 voting live: cast/retract with audit, quadratic budget, anti-abuse flag model |
 | G6 (H+56) | Sep 29 02:00 UTC | _pending_ |
 | G7 (H+62) | Sep 29 08:00 UTC | _pending_ |
-| G8 (H+66) | Sep 29 12:00 UTC | _pending_ |
+| G8 (H+66) | Sep 29 12:00 UTC | **PASS** — THREAT-MODEL.md shipped; all 4 bonuses defended (+16) |
 | G9 (H+70) | Sep 29 16:00 UTC | _pending_ |
 
 ### G1 verification log
