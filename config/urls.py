@@ -32,4 +32,14 @@ urlpatterns = [
     path("api/", include("apps.teams.urls")),
     path("api/", include("apps.submissions.urls")),
     path("api/", include("apps.judging.urls")),
+    path("api/", include("apps.normalization.urls")),
+    path("api/", include("apps.voting.urls")),
+]
+
+# G7 (T4 surface) — appended by feature/g7-t4-surface.
+urlpatterns += [
+    path("widget.js", include("apps.widget.urls_root")),
+    path("api/", include("apps.certificates.urls")),
+    path("api/", include("apps.widget.urls")),
+    path("api/", include("apps.api.urls")),
 ]

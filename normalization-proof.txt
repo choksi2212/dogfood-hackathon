@@ -1,0 +1,104 @@
+DOGFOOD normalization proof
+event: sample-hack-2026
+method: two-way additive, alternating means
+created_at: 2026-09-26T19:17:59.224875+00:00
+raw_sigma: 0.20
+normalized_sigma: 0.20
+is_connected: True
+convergence_iterations: 2
+n_reviews: 30
+
+Rank movement (top 10 by |delta|):
+project_id  raw_rank  adj_rank  delta
+b3e85fe9-e560-48d5-b144-275cff7b7317  2  2  = 0
+02b6cdd5-cf4d-4f8c-a35a-25639d052076  9  9  = 0
+4b4aae1e-059b-4e66-a261-5f798138b171  3  3  = 0
+d8ed4761-b7b7-466f-9af8-72a94fa01a10  5  5  = 0
+6baeadb5-933d-416e-966a-9be288773f38  10  10  = 0
+fa865be8-3a1e-4a0d-a0df-a83f639a0f02  1  1  = 0
+00f8d512-a818-462e-af4b-6c47812fef40  6  6  = 0
+246085e6-1c5f-4854-8d8e-9c69dbc4490e  4  4  = 0
+35db643c-b7db-4fde-99c9-d268db93d597  7  7  = 0
+add55ab4-4634-4c57-95b2-268e7103c496  8  8  = 0
+
+per-project:
+  project_id: 00f8d512-a818-462e-af4b-6c47812fef40
+    raw_mean: 0.667
+    adjusted: 1.367
+    rank_before: 6
+    rank_after: 6
+    rank_movement: 0
+  project_id: 02b6cdd5-cf4d-4f8c-a35a-25639d052076
+    raw_mean: 0.417
+    adjusted: 1.117
+    rank_before: 9
+    rank_after: 9
+    rank_movement: 0
+  project_id: 246085e6-1c5f-4854-8d8e-9c69dbc4490e
+    raw_mean: 0.833
+    adjusted: 1.533
+    rank_before: 4
+    rank_after: 4
+    rank_movement: 0
+  project_id: 35db643c-b7db-4fde-99c9-d268db93d597
+    raw_mean: 0.667
+    adjusted: 1.367
+    rank_before: 7
+    rank_after: 7
+    rank_movement: 0
+  project_id: 4b4aae1e-059b-4e66-a261-5f798138b171
+    raw_mean: 0.833
+    adjusted: 1.533
+    rank_before: 3
+    rank_after: 3
+    rank_movement: 0
+  project_id: 6baeadb5-933d-416e-966a-9be288773f38
+    raw_mean: 0.417
+    adjusted: 1.117
+    rank_before: 10
+    rank_after: 10
+    rank_movement: 0
+  project_id: add55ab4-4634-4c57-95b2-268e7103c496
+    raw_mean: 0.583
+    adjusted: 1.283
+    rank_before: 8
+    rank_after: 8
+    rank_movement: 0
+  project_id: b3e85fe9-e560-48d5-b144-275cff7b7317
+    raw_mean: 0.917
+    adjusted: 1.617
+    rank_before: 2
+    rank_after: 2
+    rank_movement: 0
+  project_id: d8ed4761-b7b7-466f-9af8-72a94fa01a10
+    raw_mean: 0.667
+    adjusted: 1.367
+    rank_before: 5
+    rank_after: 5
+    rank_movement: 0
+  project_id: fa865be8-3a1e-4a0d-a0df-a83f639a0f02
+    raw_mean: 1.000
+    adjusted: 1.700
+    rank_before: 1
+    rank_after: 1
+    rank_movement: 0
+
+per-judge:
+  judge_id: 16e43d6c-951d-4d0b-bf87-d2e7b053e47f
+    bias: -0.075
+    n_reviews: 10
+    leverage: 0.333
+  judge_id: 1d0619fc-c8d8-4b25-9677-d79b2193dbfc
+    bias: 0.050
+    n_reviews: 10
+    leverage: 0.333
+  judge_id: 2657d5e4-2c24-46d6-ae0f-f6123322a00b
+    bias: 0.025
+    n_reviews: 10
+    leverage: 0.333
+
+Method:
+y_ij = mu + b_j + q_i + epsilon_ij
+fit: alternating means until convergence (max change < 1e-9)
+connectivity: required; reported
+z-score: rejected (divides by zero on sigma=0 raters)
