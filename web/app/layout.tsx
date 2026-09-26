@@ -21,7 +21,9 @@ export default function RootLayout({
             <nav className={styles.nav}>
               <a href="/gallery">Gallery</a>
               <a href="/submit">Submit</a>
+              <a href="/vote">Vote</a>
               <a href="/judge">Judge</a>
+              <a href="/pairwise">Pairwise</a>
               <a href="/organizer">Organizer</a>
               <a href="/login">Log in</a>
             </nav>

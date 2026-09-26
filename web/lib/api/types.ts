@@ -71,6 +71,53 @@ export type User = {
   memberships: { event: string; role: string }[];
 };
 
+// Matches apps/voting/views.py VoteView.post response.
+export type VoteResponse = {
+  vote_id: string;
+  votes: number;
+  mode: "simple" | "quadratic";
+  spent_credits: number | null;
+};
+
+export type RetractVoteResponse = {
+  retracted: boolean;
+  vote_id?: string;
+  already?: boolean;
+};
+
+// Matches apps/pairwise/views.py.
+export type PairwiseWinner = "left" | "right" | "tie";
+
+export type PairwiseBallotPayload = {
+  left_id: string;
+  right_id: string;
+  winner: PairwiseWinner;
+};
+
+export type PairwiseBallotResponse = {
+  ballot_id: string;
+  created: boolean;
+  winner: PairwiseWinner;
+};
+
+export type PairwiseRankingEntry = {
+  project_id: string;
+  theta: number;
+  rank: number;
+  wins: number;
+  losses: number;
+  ties: number;
+};
+
+export type PairwiseRankingResponse = {
+  run_id: string;
+  event_slug: string;
+  n_ballots: number;
+  iterations: number;
+  converged: boolean;
+  ranking: PairwiseRankingEntry[];
+};
+
 export class ApiError extends Error {
   code: string;
   status: number;
