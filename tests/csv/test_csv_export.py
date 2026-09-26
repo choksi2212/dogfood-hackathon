@@ -241,12 +241,12 @@ def test_unicode_arrow_in_project_name(
     response = auth_client["organizer"].get(CSV_URL)
     assert response.status_code == 200
 
-    body = _read_streaming(response)
+    # streaming_content is a single-shot iterator; drain it once and
+    # keep the raw bytes so we can assert the UTF-8 encoding without
+    # exhausting the iterator prematurely.
+    raw_bytes = b"".join(response.streaming_content)
+    body = raw_bytes.decode("utf-8")
     assert "Project → Forward" in body
-
-    # The encoding is UTF-8 (no BOM, no escape sequences).
-    raw = response.streaming_content
-    raw_bytes = b"".join(raw)
     assert "→".encode("utf-8") in raw_bytes
 
 
