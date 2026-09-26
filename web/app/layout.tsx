@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import "./globals.css";
 import styles from "./layout.module.css";
 
@@ -19,13 +20,13 @@ export default function RootLayout({
           <header className={styles.header}>
             <span className={styles.brand}>Dogfood Portal</span>
             <nav className={styles.nav}>
-              <a href="/gallery">Gallery</a>
-              <a href="/submit">Submit</a>
-              <a href="/vote">Vote</a>
-              <a href="/judge">Judge</a>
-              <a href="/pairwise">Pairwise</a>
-              <a href="/organizer">Organizer</a>
-              <a href="/login">Log in</a>
+              <Link href="/gallery">Gallery</Link>
+              <Link href="/submit">Submit</Link>
+              <Link href="/vote">Vote</Link>
+              <Link href="/judge">Judge</Link>
+              <Link href="/pairwise">Pairwise</Link>
+              <Link href="/organizer">Organizer</Link>
+              <Link href="/login">Log in</Link>
             </nav>
           </header>
           <main className={styles.main}>{children}</main>

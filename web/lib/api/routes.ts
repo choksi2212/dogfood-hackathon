@@ -31,4 +31,11 @@ export const routes = {
   assignmentsRun: (slug: string = EVENT_SLUG) =>
     `/api/events/${slug}/assignments/run`,
   normalize: (slug: string = EVENT_SLUG) => `/api/events/${slug}/normalize`,
+  // Judge console (apps/judging) — real names, not the raw
+  // project_id/criterion_id pairs from GET /api/judge/scores.
+  meBatch: (slug: string = EVENT_SLUG) => `/api/events/${slug}/me/batch`,
+  scoreSave: (projectId: string, slug: string = EVENT_SLUG) =>
+    `/api/events/${slug}/me/batch/${projectId}/scores`,
+  scoreSubmit: (projectId: string, slug: string = EVENT_SLUG) =>
+    `/api/events/${slug}/me/batch/${projectId}/submit`,
 } as const;
