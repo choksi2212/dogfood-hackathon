@@ -11,4 +11,8 @@ export const routes = {
   judgeScores: () => "/api/judge/scores",
   peerScores: (judge: string) => `/api/judge/peer-scores?judge=${judge}`,
   csvExport: () => "/api/csv_export",
+  // Not part of the five acceptance routes, but a real documented
+  // endpoint (apps/accounts) — needed to get the session cookie the
+  // other four routes require.
+  login: () => "/api/login",
 } as const;

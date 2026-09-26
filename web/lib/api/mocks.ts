@@ -1,8 +1,10 @@
 import type {
   GalleryResponse,
   JudgeScoresResponse,
+  LoginPayload,
   SubmitPayload,
   SubmitResponse,
+  User,
 } from "./types";
 
 const MOCK_SUBMISSIONS: GalleryResponse["items"] = [
@@ -27,15 +29,13 @@ const MOCK_SUBMISSIONS: GalleryResponse["items"] = [
 ];
 
 const MOCK_JUDGE_SCORES: JudgeScoresResponse = {
-  judge: "judge_a",
+  judge_id: "mock-judge-a",
   scores: [
     {
-      submission_id: "mock-1",
-      submission_name: "Quokka",
-      criterion: "Adoptability",
-      score: 4,
-      max_score: 5,
-      comment: null,
+      project_id: "mock-1",
+      criterion_id: "mock-criterion-innovation",
+      value: 4,
+      updated_at: "2026-09-27T00:00:00Z",
     },
   ],
 };
@@ -75,4 +75,14 @@ export async function mockSubmit(
 
 export async function mockJudgeScores(): Promise<JudgeScoresResponse> {
   return MOCK_JUDGE_SCORES;
+}
+
+export async function mockLogin(payload: LoginPayload): Promise<User> {
+  return {
+    id: "mock-user",
+    email: payload.email,
+    name: "Mock User",
+    is_active: true,
+    memberships: [{ event: "sample-hack-2026", role: "participant" }],
+  };
 }

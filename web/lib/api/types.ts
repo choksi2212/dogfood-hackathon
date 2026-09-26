@@ -36,17 +36,18 @@ export type SubmitResponse = Submission & {
   updated_at: string;
 };
 
+// Matches apps/judging/views.py JudgeScoresView — raw per-criterion
+// values, no denormalized names. The console resolves project/criterion
+// names once batch endpoints (MyBatchView) are wired in.
 export type JudgeScore = {
-  submission_id: string;
-  submission_name: string;
-  criterion: string;
-  score: number;
-  max_score: number;
-  comment: string | null;
+  project_id: string;
+  criterion_id: string;
+  value: number;
+  updated_at: string;
 };
 
 export type JudgeScoresResponse = {
-  judge: string;
+  judge_id: string;
   scores: JudgeScore[];
 };
 
@@ -55,6 +56,19 @@ export type ApiErrorBody = {
     code: string;
     message: string;
   };
+};
+
+export type LoginPayload = {
+  email: string;
+  password: string;
+};
+
+export type User = {
+  id: string;
+  email: string;
+  name: string;
+  is_active: boolean;
+  memberships: { event: string; role: string }[];
 };
 
 export class ApiError extends Error {
