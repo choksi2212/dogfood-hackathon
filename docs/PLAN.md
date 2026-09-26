@@ -285,13 +285,13 @@ tuning prompts. **Illegal:** any project code committed before kickoff = disqual
 |---|---|---|
 | ~~Sep 13–15~~ *(past)* | Discord. Read all 15 references. Study Gavel/Crowd-BT. | Discord. Study Devpost + Devfolio judge consoles as a user. |
 | ~~Sep 16–18~~ *(past)* | Schema on paper. Role matrix. Derive normalization maths. | Wireframe judge console + gallery. Draft threat model. |
-| ~~Sep 19–21~~ *(past)* | Draft `openapi.yaml` on paper. Stack fluency in a **throwaway repo**. | Next.js fluency in a **throwaway repo**. Component inventory. |
+| ~~Sep 19–21~~ *(past)* | Draft `openapi.yaml` on paper. Stack fluency via local practice. | Next.js fluency via local practice. Component inventory. |
 | ~~Sep 23~~ *(past)* | Spec dropped a day early — re-reading §1–§11, recalibrating this plan. | Same. Re-reading against Mihir's build. Updating §1.4 of the partner doc. |
 | ~~Sep 24~~ *(past)* | Re-read spec. Pre-pull base images for confirmed stack. Rehearse `docker compose` cold. | Final pre-kickoff pass. Pre-pull. |
 | ~~Sep 25~~ *(past)* | Re-read spec once more separately. Reconcile at 22:00. Pre-pull base images. | Final pre-kickoff pass. |
 | **Sep 26 ← we are here** | **KICKOFF. `fixtures.json` + `run.py` released. Build begins.** | **Build.** |
 
-> **Nothing from a throwaway repo is copied into the submission.** We rebuild from empty
+> **Nothing from prior practice is copied into the submission.** We rebuild from empty
 > at kickoff. Fluency carries over; code does not.
 
 ### 8.1 What the spec told us (Sep 23, a day early)

@@ -2220,7 +2220,7 @@ We will not:
 |---|---|---|
 | Sep 13–15 | Discord, references, Devpost/Devfolio study | Done |
 | Sep 16–18 | Schema on paper, role matrix, normalize maths, threat model | Done |
-| Sep 19–21 | Stack fluency, Next.js components, throwaway repos | Done |
+| Sep 19–21 | Stack fluency, Next.js components, local practice | Done |
 | Sep 22 | Pre-pull base images (Sep 23 update: pulled today) | Done |
 | Sep 23 | **spec dropped a day early**; re-plan against the real spec | Done |
 | Sep 24 | Re-read spec separately; reconcile; final pre-kickoff pass | Pending |
