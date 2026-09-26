@@ -51,6 +51,14 @@ paths:
       responses:
         "200": {description: OK}
         "503": {description: Degraded}
+  /api/schema/:
+    get:
+      summary: This OpenAPI 3 spec as JSON
+      responses:
+        "200":
+          description: OpenAPI document
+          content:
+            application/json: {}
   /api/gallery:
     get:
       summary: Public gallery of submitted projects
@@ -65,6 +73,208 @@ paths:
                   items:
                     type: array
                     items: {$ref: "#/components/schemas/Submission"}
+  /api/register:
+    post:
+      summary: Create a new user account and start a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: {type: string, format: email}
+                password: {type: string}
+                name: {type: string}
+      responses:
+        "201":
+          description: User created; session cookie set
+        "400":
+          description: Validation failed
+  /api/login:
+    post:
+      summary: Authenticate with email + password; sets session cookie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: {type: string, format: email}
+                password: {type: string}
+      responses:
+        "200":
+          description: Authenticated; session cookie set
+        "401":
+          description: Invalid credentials
+  /api/logout:
+    post:
+      summary: End the current session
+      security: [{cookie: []}]
+      responses:
+        "204":
+          description: Session ended; cookie cleared
+  /api/me:
+    get:
+      summary: Current authenticated user profile
+      security: [{cookie: []}]
+      responses:
+        "200":
+          description: User profile
+  /api/events/:
+    post:
+      summary: Create a new event (organizer only)
+      security: [{cookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "201":
+          description: Event created
+        "400":
+          description: Validation failed
+  /api/events/{slug}/:
+    get:
+      summary: Retrieve event details
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Event detail
+    put:
+      summary: Update an event (organizer only)
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Event updated
+    patch:
+      summary: Partial update of an event (organizer only)
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Event updated
+  /api/events/{slug}/tracks:
+    post:
+      summary: Add a track to an event (organizer only)
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "201":
+          description: Track created
+  /api/events/{slug}/rubric:
+    post:
+      summary: Define the rubric for an event (organizer only)
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "201":
+          description: Rubric created
+  /api/events/{slug}/memberships:
+    get:
+      summary: List memberships for an event (organizer only)
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: List of memberships
+  /api/events/{slug}/judges/bulk-invite:
+    post:
+      summary: Bulk-invite judges by email (organizer only)
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Invitations dispatched
+  /api/events/{slug}/assignments/run:
+    post:
+      summary: Run the bipartite assignment algorithm (organizer only)
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Assignment batch metadata
+  /api/events/{slug}/me/batch:
+    get:
+      summary: Judge's assigned projects for the current batch
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Batch contents + progress counts
+  /api/events/{slug}/me/batch/{project_id}/scores:
+    put:
+      summary: Save per-criterion scores for an assigned project
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+        - name: project_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        "200":
+          description: Scores saved
+  /api/events/{slug}/me/batch/{project_id}/submit:
+    post:
+      summary: Finalize and submit scores for an assigned project
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+        - name: project_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        "200":
+          description: Scores submitted
   /api/events/{slug}/submit:
     post:
       summary: Submit (or re-submit) a project
@@ -93,6 +303,96 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
+  /api/events/{slug}/normalize:
+    post:
+      summary: Run the additive alternating-means fit on the event's scores
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Normalization run metadata
+        "422":
+          description: Bipartite graph disconnected
+  /api/events/{slug}/pairwise/ballots:
+    post:
+      summary: Submit a Bradley-Terry ballot
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                left_id: {type: string, format: uuid}
+                right_id: {type: string, format: uuid}
+                winner:
+                  type: string
+                  enum: [left, right, tie]
+      responses:
+        "201": {description: Ballot recorded}
+        "404": {description: Event or submission not found}
+  /api/events/{slug}/pairwise/ranking:
+    get:
+      summary: Recovered ranking from all ballots
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Projects ranked by recovered theta
+  /api/events/{slug}/submissions/{id}/vote:
+    post:
+      summary: Cast a vote on a submission
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                votes: {type: integer, default: 1}
+      responses:
+        "201": {description: Vote recorded}
+        "403": {description: Self-vote not allowed}
+        "404": {description: Event or submission not found}
+    delete:
+      summary: Retract a vote
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        "200": {description: Retracted}
+        "404": {description: No ballot to retract or event/submission not found}
   /api/judge/scores:
     get:
       summary: Authenticated judge's own scores
@@ -136,7 +436,7 @@ paths:
           content:
             text/csv: {}
         "403": {description: Not an organizer of this event}
-  /api/certificates/{public_id}:
+  /api/{public_id}:
     get:
       summary: Public, HMAC-signed certificate for a submission
       parameters:
@@ -203,17 +503,9 @@ paths:
       responses:
         "201":
           description: Webhook created (secret returned ONCE)
-  /api/schema/:
-    get:
-      summary: This OpenAPI 3 spec as JSON
-      responses:
-        "200":
-          description: OpenAPI document
-          content:
-            application/json: {}
-  /api/events/{slug}/normalize:
+  /api/{slug}/teams:
     post:
-      summary: Run the additive alternating-means fit on the event's scores
+      summary: Create a team in an event (participant only)
       security: [{cookie: []}]
       parameters:
         - name: slug
@@ -221,48 +513,11 @@ paths:
           required: true
           schema: {type: string}
       responses:
-        "200":
-          description: Normalization run metadata
-        "422":
-          description: Bipartite graph disconnected
-  /api/events/{slug}/pairwise/ballots:
+        "201":
+          description: Team created
+  /api/{slug}/teams/{id}/invite:
     post:
-      summary: Submit a Bradley-Terry ballot
-      security: [{cookie: []}]
-      parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                left_id: {type: string, format: uuid}
-                right_id: {type: string, format: uuid}
-                winner:
-                  type: string
-                  enum: [left, right, tie]
-      responses:
-        "201": {description: Ballot recorded}
-  /api/events/{slug}/pairwise/ranking:
-    get:
-      summary: Recovered ranking from all ballots
-      security: [{cookie: []}]
-      parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
-      responses:
-        "200":
-          description: Projects ranked by recovered theta
-  /api/events/{slug}/submissions/{id}/vote:
-    post:
-      summary: Cast a vote on a submission
+      summary: Issue a team invite (captain only)
       security: [{cookie: []}]
       parameters:
         - name: slug
@@ -273,6 +528,13 @@ paths:
           in: path
           required: true
           schema: {type: string, format: uuid}
+      responses:
+        "201":
+          description: Invite issued
+  /api/teams/join:
+    post:
+      summary: Accept a team invite token
+      security: [{cookie: []}]
       requestBody:
         required: true
         content:
@@ -280,12 +542,7 @@ paths:
             schema:
               type: object
               properties:
-                votes: {type: integer, default: 1}
+                token: {type: string}
       responses:
-        "201": {description: Vote recorded}
-        "403": {description: Self-vote not allowed}
-    delete:
-      summary: Retract a vote
-      security: [{cookie: []}]
-      responses:
-        "200": {description: Retracted}
+        "200":
+          description: Joined
