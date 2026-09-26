@@ -23,6 +23,26 @@ forked, self-hosted, and used for real Raptors events.
 | `docs/TRD.md` | Technical Requirements — stack, components, API, data flow |
 | `docs/ARCHITECTURE.md` | System Architecture — high-level, request flows, DB design |
 | `docs/BACKEND-IMPL.md` | Backend Implementation — exactly what to type |
+| [JUDGING.md](JUDGING.md) | Assignment strategy, scoring maths, normalization method — defended |
+| [DATA-MODEL.md](DATA-MODEL.md) | Schema, import and export paths |
+
+## What we ship
+
+Nine items. Everything below lives on `main` at submission.
+
+1. **Public GitHub repo, OSI licence** — MIT or Apache-2.0 preferred.
+2. **`docker compose up`** — To a seeded, working portal, network off.
+3. **`.dogfood.toml` at the repo root** — Honest tier claims.
+4. **`acceptance-report.txt` committed** — Whatever it says.
+5. **README.md** — What it does, how to run it, honest limits.
+6. **`ARCHITECTURE.md`** — The shape of the system and why.
+7. **[DATA-MODEL.md](DATA-MODEL.md)** — Schema, import and export paths.
+8. **[JUDGING.md](JUDGING.md)** — Assignment strategy, scoring maths, normalization method, defended.
+9. **5-minute demo video** — One full event lifecycle.
+
+> **Judging math is documented, not averaged.** "We averaged the scores" is an answer, and
+> it is a weak one. See [JUDGING.md](JUDGING.md) for the assignment strategy, the
+> scoring model, and the defended normalization method.
 
 ## The acceptance mechanism
 
