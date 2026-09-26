@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "apps.accounts.apps.AccountsConfig",
     "apps.audit.apps.AuditConfig",
     "apps.events.apps.EventsConfig",
+    "apps.judging.apps.JudgingConfig",
     "apps.teams.apps.TeamsConfig",
     "apps.submissions.apps.SubmissionsConfig",
     "apps.api.apps.ApiConfig",
