@@ -1,0 +1,25 @@
+DOGFOOD role-isolation matrix
+=============================
+Generated against http://localhost:8000
+Config: .dogfood.toml
+Actor count: 6
+
+actor        | own_scores   | peer_scores  | csv_export   | gallery      | submit      
+-+--+--+--+--+--+-
+organizer | 403          | 403          | 200          | 200          | 403         
+judge_a | 200          | 403          | 422          | 200          | 403         
+judge_b | 200          | 403          | 422          | 200          | 403         
+judge_c | 200          | 403          | 422          | 200          | 403         
+participant | 403          | 403          | 422          | 200          | 422         
+anonymous | 401          | 401          | 401          | 200          | 401         
+
+Legend:
+  200 = allowed
+  401/403 = denied (role isolation enforced)
+  4xx-deadline = deadline-gated
+  0 = route did not respond (not implemented)
+  other = unexpected (audit-worthy)
+
+Expected vs actual:
+
+Mismatches: 0
