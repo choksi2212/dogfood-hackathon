@@ -49,3 +49,17 @@ accept:
 # fresh state. Useful right before a submission.
 accept-fresh: seed
 	$(COMPOSE) exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
+
+# Test suite — 15 categories, each with its own subdirectory + docs.
+# conftest.py + pytest.ini are shared (read-only).
+test:
+	$(COMPOSE) exec -T web pytest tests/ -v
+
+# Single category: make test-smoke, make test-auth, make test-roles, ...
+test-%:
+	$(COMPOSE) exec -T web pytest tests/$*/ -v
+
+# Coverage report (HTML into reports/).
+test-cov:
+	$(COMPOSE) exec -T web pytest tests/ --cov=apps --cov-report=html --cov-report=term-missing
+	@echo "HTML coverage: reports/htmlcov/index.html"
