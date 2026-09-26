@@ -45,16 +45,8 @@ and it is where the Normalization Proof bonus is won or lost. In the last event 
 3. **Zero errors, zero warnings.** Root cause only. No `# noqa`, no bare `except`, no
    `# type: ignore` in shipped code.
 4. **Commit after every change. Explicit paths. Never `git add .`**
-
-   ```bash
- 
-   ```
-   Must print `0`.
-6. **Nothing is committed to the repo before Sep 26 18:00 UTC.** Rule 04 — that is
+5. **Nothing is committed to the repo before Sep 26 18:00 UTC.** Rule 04 — that is
    disqualification, not a deduction.
-
-
-
 
 ---
 

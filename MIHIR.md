@@ -69,15 +69,7 @@ That rule has no exceptions, including at hour 70, especially at hour 70.
 3. **Never force-push a shared branch.**
 4. **Never commit on `main` directly.** You work on `mihir`, Manas works on `manas`.
 5. **Pull before you push, every time.**
-
-
-
-
-   ```bash
-
-   ```
-   Must print `0`.
-7. **Nothing is pushed to `dogfood-hackathon` before Sep 26 18:00 UTC.** Rule 04 of the hackathon:
+6. **Nothing is pushed to `dogfood-hackathon` before Sep 26 18:00 UTC.** Rule 04 of the hackathon:
    any project code committed before kickoff is **disqualification**, not a penalty. Practice
    work lives in a separate throwaway repo that never gets pushed there.
 
