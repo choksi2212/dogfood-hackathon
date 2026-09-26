@@ -34,13 +34,36 @@ class RegisterView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        # Validate required fields up-front so a missing/invalid payload
+        # is rejected with 422 *before* a User row gets created.
+        email = (request.data.get("email") or "").strip()
+        password = request.data.get("password") or ""
+
+        field_errors: dict[str, str] = {}
+        if not email:
+            field_errors["email"] = "Email is required."
+        if not password:
+            field_errors["password"] = "Password is required."
+        elif len(password) < 8:
+            field_errors["password"] = "Password must be at least 8 characters."
+
+        if field_errors:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_failed",
+                        "message": "Invalid registration payload.",
+                        "fields": field_errors,
+                    }
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
         serializer = UserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        password = request.data.get("password")
         user = serializer.save()
-        if password:
-            user.set_password(password)
-            user.save()
+        user.set_password(password)
+        user.save()
         ip, ua = _client_meta(request)
         _, token = Session.create(user, label="", ip=ip, user_agent=ua)
         response = Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
