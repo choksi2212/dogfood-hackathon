@@ -6,11 +6,14 @@ import type {
   JudgeScoresResponse,
   LoginPayload,
   Membership,
+  MyBatchResponse,
   NormalizeResponse,
   PairwiseBallotPayload,
   PairwiseBallotResponse,
   PairwiseRankingResponse,
   RetractVoteResponse,
+  ScoreSaveResponse,
+  ScoreSubmitResponse,
   SubmitPayload,
   SubmitResponse,
   User,
@@ -207,6 +210,24 @@ export async function mockNormalize(): Promise<NormalizeResponse> {
     n_reviews: 30,
     proof: "mock proof text",
   };
+}
+
+export async function mockMyBatch(): Promise<MyBatchResponse> {
+  return {
+    projects: [
+      { id: "mock-1", name: "Quokka", tagline: "A tiny, friendly submission platform.", submitted: true, reviewed: false },
+      { id: "mock-2", name: "Wombat Watch", tagline: "Uptime monitoring with a marsupial mascot.", submitted: true, reviewed: true },
+    ],
+    progress: { scored: 1, total: 2 },
+  };
+}
+
+export async function mockScoreSave(): Promise<ScoreSaveResponse> {
+  return { saved: true };
+}
+
+export async function mockScoreSubmit(): Promise<ScoreSubmitResponse> {
+  return { submitted_at: new Date().toISOString() };
 }
 
 export async function mockPairwiseRanking(): Promise<PairwiseRankingResponse> {

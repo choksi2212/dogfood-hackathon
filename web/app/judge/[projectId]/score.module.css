@@ -1,0 +1,118 @@
+.tagline {
+  color: var(--muted);
+  margin-top: var(--space-1);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  max-width: 560px;
+}
+
+.criterion {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+}
+
+.criterionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.criterionName {
+  font-weight: 600;
+}
+
+.criterionWeight {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.criterionDescription {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-top: var(--space-1);
+}
+
+.slider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.slider input {
+  flex: 1;
+}
+
+.sliderValue {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  min-width: 3.5em;
+  text-align: right;
+}
+
+.commentField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.commentField textarea {
+  font: inherit;
+  color: var(--foreground);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.saveButton,
+.submitButton {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.saveButton {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--foreground);
+}
+
+.submitButton {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.saveButton:disabled,
+.submitButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.savedHint {
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+.done {
+  margin-top: var(--space-4);
+  color: var(--accent);
+  font-weight: 600;
+}

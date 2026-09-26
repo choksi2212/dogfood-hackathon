@@ -1,3 +1,8 @@
+.progress {
+  color: var(--muted);
+  margin-top: var(--space-1);
+}
+
 .list {
   list-style: none;
   margin-top: var(--space-4);
@@ -8,20 +13,44 @@
 
 .row {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-3);
+}
+
+.link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
 }
 
 .name {
   font-weight: 600;
 }
 
-.criterion {
+.tagline {
   color: var(--muted);
+  font-size: 0.9rem;
 }
 
-.score {
-  font-variant-numeric: tabular-nums;
+.badgeDone,
+.badgePending {
+  font-size: 0.75rem;
+  padding: var(--space-1) var(--space-2);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.badgeDone {
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.badgePending {
+  color: var(--muted);
+  border: 1px solid var(--border);
 }

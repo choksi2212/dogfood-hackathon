@@ -7,10 +7,13 @@ import {
   mockJudgeScores,
   mockLogin,
   mockMemberships,
+  mockMyBatch,
   mockNormalize,
   mockPairwiseBallot,
   mockPairwiseRanking,
   mockRetractVote,
+  mockScoreSave,
+  mockScoreSubmit,
   mockSubmit,
   mockVote,
 } from "./mocks";
@@ -24,11 +27,15 @@ import {
   type JudgeScoresResponse,
   type LoginPayload,
   type Membership,
+  type MyBatchResponse,
   type NormalizeResponse,
   type PairwiseBallotPayload,
   type PairwiseBallotResponse,
   type PairwiseRankingResponse,
   type RetractVoteResponse,
+  type ScoreSavePayload,
+  type ScoreSaveResponse,
+  type ScoreSubmitResponse,
   type SubmitPayload,
   type SubmitResponse,
   type User,
@@ -204,6 +211,33 @@ export const api = {
     return USE_MOCKS
       ? mockNormalize()
       : request(routes.normalize(slug), { method: "POST" });
+  },
+
+  // Judge console — real project names/tagline, unlike judgeScores()
+  // above which only has bare UUIDs.
+  meBatch(slug?: string, cookieHeader?: string): Promise<MyBatchResponse> {
+    return USE_MOCKS
+      ? mockMyBatch()
+      : request(routes.meBatch(slug), cookieInit(cookieHeader));
+  },
+
+  saveScore(
+    projectId: string,
+    payload: ScoreSavePayload,
+    slug?: string,
+  ): Promise<ScoreSaveResponse> {
+    return USE_MOCKS
+      ? mockScoreSave()
+      : request(routes.scoreSave(projectId, slug), {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+  },
+
+  submitScore(projectId: string, slug?: string): Promise<ScoreSubmitResponse> {
+    return USE_MOCKS
+      ? mockScoreSubmit()
+      : request(routes.scoreSubmit(projectId, slug), { method: "POST" });
   },
 
   // CSV export is a file download the browser navigates to directly

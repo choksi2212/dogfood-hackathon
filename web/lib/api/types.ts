@@ -186,6 +186,35 @@ export type NormalizeResponse = {
   proof: string;
 };
 
+// Matches apps/judging/views.py MyBatchView response — real names,
+// unlike GET /api/judge/scores which returns bare project/criterion
+// UUIDs.
+export type BatchProject = {
+  id: string;
+  name: string;
+  tagline: string;
+  submitted: boolean;
+  reviewed: boolean;
+};
+
+export type MyBatchResponse = {
+  projects: BatchProject[];
+  progress: { scored: number; total: number };
+};
+
+export type ScoreSavePayload = {
+  scores: { criterion_id: string; value: number }[];
+  comment?: string;
+};
+
+export type ScoreSaveResponse = {
+  saved: boolean;
+};
+
+export type ScoreSubmitResponse = {
+  submitted_at: string;
+};
+
 export class ApiError extends Error {
   code: string;
   status: number;
