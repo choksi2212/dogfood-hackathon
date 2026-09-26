@@ -66,17 +66,12 @@ Mihir is the sole integrator: `manas → mihir → main`. We integrate to `main`
 every gate G2–G7, not once at the end, because judges clone `main` and the
 acceptance mechanism (40%) and `docker compose up` (20%) are graded there.
 
+## Working agreement
 
-
-
-  ```bash
-
-  ```
-  Must print `0`.
-- **Zero errors, zero warnings.** Root cause only.
-- **Commit after every change.** Explicit paths; never `git add .`.
-- **Adversarial testing.** Worst-case edge cases.
-- **No scope cutting.** All four tiers + all four bonuses — see [docs/PRD.md](docs/PRD.md) §1.4.
+- Zero errors, zero warnings. Root cause only.
+- Commit after every change. Explicit paths; never `git add .`.
+- Adversarial testing. Worst-case edge cases.
+- No scope cutting. All four tiers + all four bonuses — see [docs/PRD.md](docs/PRD.md) §1.4.
 
 ## Status (live)
 

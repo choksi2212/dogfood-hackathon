@@ -106,11 +106,6 @@ Postgres + Next.js on Sep 13 because we know it. We are not changing it.
 
 ### 1.4 What the spec requires that earlier reading missed
 
-
-
-
-
-
 - **The checker never logs in.** Instead, the seed script prints four pre-baked session
   headers when the portal boots. Those go straight into `.dogfood.toml`'s `[auth]`
   block. No login flow, no credential exchange — just attach the right header.
@@ -409,8 +404,7 @@ the hours saved.
 - **Effort ≠ score** — revenant took 3rd with 14 commits. Volume is not the currency.
 - **The video is the one deliverable with no partial credit**
 
-
-
+**Working agreement:**
 - Zero errors, zero warnings, fixed at root cause — never suppressed
 - Commit after every change
 - Never `git add .` / `git add -A` — explicit paths only
