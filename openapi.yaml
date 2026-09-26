@@ -1,0 +1,291 @@
+openapi: 3.0.3
+info:
+  title: DOGFOOD Hackathon Portal API
+  version: "1.0.0"
+  description: |
+    Submission and judging portal for the DOGFOOD 2026 hackathon. Five spec
+    routes drive acceptance: gallery, submit, judge_scores, peer_scores,
+    csv_export. Public surface for integrators; protected surfaces for
+    organizers, judges, and participants via cookie session.
+servers:
+  - url: /
+components:
+  securitySchemes:
+    cookie:
+      type: apiKey
+      in: cookie
+      name: session
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: {type: string}
+            message: {type: string}
+            detail: {type: object}
+    Submission:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        tagline: {type: string}
+        track_slug: {type: string}
+        status:
+          type: string
+          enum: [draft, submitted, locked, withdrawn]
+    Certificate:
+      type: object
+      properties:
+        public_id: {type: string}
+        submission_id: {type: string, format: uuid}
+        signed_payload: {type: object}
+        signature: {type: string}
+        signature_algorithm: {type: string, example: HMAC-SHA256}
+        issued_at: {type: string, format: date-time}
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe — DB roundtrip
+      responses:
+        "200": {description: OK}
+        "503": {description: Degraded}
+  /api/gallery:
+    get:
+      summary: Public gallery of submitted projects
+      responses:
+        "200":
+          description: List of submissions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/Submission"}
+  /api/events/{slug}/submit:
+    post:
+      summary: Submit (or re-submit) a project
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+                tagline: {type: string}
+                description: {type: string}
+                track_slug: {type: string}
+      responses:
+        "201": {description: Submission created}
+        "403": {description: Not a participant of this event}
+        "422":
+          description: Deadline passed or validation failed
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /api/judge/scores:
+    get:
+      summary: Authenticated judge's own scores
+      security: [{cookie: []}]
+      responses:
+        "200":
+          description: List of (project_id, criterion_id, value)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  judge_id: {type: string, format: uuid}
+                  scores:
+                    type: array
+                    items:
+                      type: object
+        "403": {description: Not a judge}
+  /api/judge/peer-scores:
+    get:
+      summary: Always 403 (graded cell — cross-judge reads denied by URL design)
+      security: [{cookie: []}]
+      responses:
+        "403":
+          description: Cross-judge score read denied
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /api/csv_export:
+    get:
+      summary: Organizer-only CSV of all scores across the event
+      security: [{cookie: []}]
+      parameters:
+        - name: event_slug
+          in: query
+          required: false
+          schema: {type: string, default: sample-hack-2026}
+      responses:
+        "200":
+          description: CSV body with header row
+          content:
+            text/csv: {}
+        "403": {description: Not an organizer of this event}
+  /api/certificates/{public_id}:
+    get:
+      summary: Public, HMAC-signed certificate for a submission
+      parameters:
+        - name: public_id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Certificate payload + signature
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Certificate"}
+        "404": {description: Not found}
+  /widget.js:
+    get:
+      summary: Embeddable gallery widget script (CORS open)
+      responses:
+        "200":
+          description: JavaScript shim that fetches /api/widget/gallery
+          content:
+            application/javascript: {}
+  /api/widget/gallery:
+    get:
+      summary: JSON feed consumed by the widget
+      parameters:
+        - name: event
+          in: query
+          required: false
+          schema: {type: string}
+      responses:
+        "200":
+          description: Items list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/Submission"}
+  /api/webhooks:
+    get:
+      summary: List webhooks (organizer only)
+      security: [{cookie: []}]
+      responses:
+        "200":
+          description: List of webhook subscriptions
+    post:
+      summary: Create a webhook (organizer only)
+      security: [{cookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event_slug: {type: string}
+                url: {type: string}
+                events:
+                  type: array
+                  items: {type: string}
+      responses:
+        "201":
+          description: Webhook created (secret returned ONCE)
+  /api/schema/:
+    get:
+      summary: This OpenAPI 3 spec as JSON
+      responses:
+        "200":
+          description: OpenAPI document
+          content:
+            application/json: {}
+  /api/events/{slug}/normalize:
+    post:
+      summary: Run the additive alternating-means fit on the event's scores
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Normalization run metadata
+        "422":
+          description: Bipartite graph disconnected
+  /api/events/{slug}/pairwise/ballots:
+    post:
+      summary: Submit a Bradley-Terry ballot
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                left_id: {type: string, format: uuid}
+                right_id: {type: string, format: uuid}
+                winner:
+                  type: string
+                  enum: [left, right, tie]
+      responses:
+        "201": {description: Ballot recorded}
+  /api/events/{slug}/pairwise/ranking:
+    get:
+      summary: Recovered ranking from all ballots
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Projects ranked by recovered theta
+  /api/events/{slug}/submissions/{id}/vote:
+    post:
+      summary: Cast a vote on a submission
+      security: [{cookie: []}]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {type: string}
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                votes: {type: integer, default: 1}
+      responses:
+        "201": {description: Vote recorded}
+        "403": {description: Self-vote not allowed}
+    delete:
+      summary: Retract a vote
+      security: [{cookie: []}]
+      responses:
+        "200": {description: Retracted}

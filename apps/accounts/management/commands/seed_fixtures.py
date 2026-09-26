@@ -274,10 +274,13 @@ class Command(BaseCommand):
 
     @staticmethod
     def _ensure_user(email: str, name: str) -> User:
+        # AbstractUser requires a non-empty unique username. We use the
+        # email as the username so login-by-email continues to work.
         user, _ = User.objects.get_or_create(
             email=email,
-            defaults={"name": name, "is_active": True},
+            defaults={"username": email, "name": name, "is_active": True},
         )
+        user.username = email
         user.name = name
         user.is_active = True
         user.set_password(DEMO_PASSWORD)

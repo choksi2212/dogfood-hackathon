@@ -39,6 +39,12 @@ INSTALLED_APPS = [
     "apps.judging.apps.JudgingConfig",
     "apps.teams.apps.TeamsConfig",
     "apps.submissions.apps.SubmissionsConfig",
+    "apps.normalization.apps.NormalizationConfig",
+    "apps.pairwise.apps.PairwiseConfig",
+    "apps.voting.apps.VotingConfig",
+    "apps.abuse.apps.AbuseConfig",
+    "apps.certificates.apps.CertificatesConfig",
+    "apps.widget.apps.WidgetConfig",
     "apps.api.apps.ApiConfig",
     "apps.health.apps.HealthConfig",
 ]
