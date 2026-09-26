@@ -23,6 +23,7 @@ export default function RootLayout({
               <a href="/submit">Submit</a>
               <a href="/judge">Judge</a>
               <a href="/organizer">Organizer</a>
+              <a href="/login">Log in</a>
             </nav>
           </header>
           <main className={styles.main}>{children}</main>
