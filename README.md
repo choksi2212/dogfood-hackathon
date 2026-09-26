@@ -1,0 +1,83 @@
+# DOGFOOD 2026
+
+**Build the platform that will judge you.** Hackathon Raptors, Sep 26–29, 2026.
+
+This repo is the competition submission for the [DOGFOOD Hackathon](https://dogfoodhack.com).
+The portal we build here is a hackathon submission-and-judging platform; the winner gets
+forked, self-hosted, and used for real Raptors events.
+
+## The build
+
+- **Window:** Sep 26 18:00 UTC → Sep 29 18:00 UTC, 2026 (72h)
+- **Team:** Manas (`choksi2212`) + Mihir (`Mihir-Rabari`)
+- **Stack:** Django 5 + Django REST Framework + PostgreSQL 16 + Next.js 15, all in `docker compose up`
+- **Spec:** https://dogfoodhack.com/spec (live Sep 23, 2026)
+
+## What this repo contains
+
+| Path | What |
+|---|---|
+| [LICENSE](LICENSE) | MIT (or Apache-2.0) |
+| `docs/PLAN.md` | Strategic overview — gates, kickoff hour discipline, schedule |
+| `docs/PRD.md` | Product Requirements — features, user scenarios, screen walkthroughs |
+| `docs/TRD.md` | Technical Requirements — stack, components, API, data flow |
+| `docs/ARCHITECTURE.md` | System Architecture — high-level, request flows, DB design |
+| `docs/BACKEND-IMPL.md` | Backend Implementation — exactly what to type |
+
+## The acceptance mechanism
+
+`run.py` (provided in the spec) makes seven HTTP checks against the portal at
+`base_url` from `.dogfood.toml`. The output is `acceptance-report.txt`, which we
+commit. All seven must pass for the 40% Tier Completion criterion.
+
+```bash
+make accept   # python3 run.py .dogfood.toml > acceptance-report.txt
+```
+
+## Branch flow
+
+```
+main    ← LICENSE + README + docs/ + (after G2) full integration
+mihir   ← frontend + threat model + integration. Sole integrator.
+manas   ← backend + data + maths
+```
+
+Mihir is the sole integrator: `manas → mihir → main`. We integrate to `main` at
+every gate G2–G7, not once at the end, because judges clone `main` and the
+acceptance mechanism (40%) and `docker compose up` (20%) are graded there.
+
+
+
+
+  ```bash
+
+  ```
+  Must print `0`.
+- **Zero errors, zero warnings.** Root cause only.
+- **Commit after every change.** Explicit paths; never `git add .`.
+- **Adversarial testing.** Worst-case edge cases.
+- **No scope cutting.** All four tiers + all four bonuses — see [docs/PRD.md](docs/PRD.md) §1.4.
+
+## Status (live)
+
+| Gate | Time | Outcome |
+|---|---|---|
+| G1 (H+3) | Sep 26 21:00 UTC | _pending_ |
+| G2 (H+20) | Sep 27 14:00 UTC | _pending_ |
+| G3 (H+34) | Sep 28 04:00 UTC | _pending_ |
+| G4 (H+40) | Sep 28 10:00 UTC | _pending_ |
+| G5 (H+48) | Sep 28 18:00 UTC | _pending_ |
+| G6 (H+56) | Sep 29 02:00 UTC | _pending_ |
+| G7 (H+62) | Sep 29 08:00 UTC | _pending_ |
+| G8 (H+66) | Sep 29 12:00 UTC | _pending_ |
+| G9 (H+70) | Sep 29 16:00 UTC | _pending_ |
+
+(Updated continuously as the build progresses.)
+
+## Companion repos
+
+- **Planning repo (private, internal):** https://github.com/choksi2212/dogfood-docs — the source of truth for the planning docs in `docs/`. Updated continuously.
+
+## Acknowledgements
+
+Two builders. One brief. One spec. 72 hours. The portal that judges the build is the portal we built.
