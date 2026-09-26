@@ -74,10 +74,6 @@ acceptance mechanism (40%) and `docker compose up` (20%) are graded there.
 
 (Updated continuously as the build progresses.)
 
-## Companion repos
-
-- **Planning repo (private, internal):** https://github.com/choksi2212/dogfood-docs — the source of truth for the planning docs in `docs/`. Updated continuously.
-
 ## Acknowledgements
 
 Two builders. One brief. One spec. 72 hours. The portal that judges the build is the portal we built.
