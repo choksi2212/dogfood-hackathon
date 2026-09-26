@@ -61,7 +61,7 @@ and it is where the Normalization Proof bonus is won or lost. In the last event 
 ## 3. Pre-kickoff paper work (Sep 13 → Sep 24)
 
 Legal: designing, deriving, reading, sketching. Illegal: committing project code.
-**Everything in this section is paper or a throwaway repo you never push to `dogfood-hackathon`.**
+**Everything in this section is paper work or local practice you never push to `dogfood-hackathon`.**
 
 ### 3.1 The schema, on paper
 
@@ -203,9 +203,9 @@ this at H+20, so the design must already exist in your head. Freeze the error en
 { "error": { "code": "forbidden_role", "message": "...", "detail": {} } }
 ```
 
-### 3.6 Fluency, in a throwaway repo
+### 3.6 Fluency, in local practice
 
-`N:\dog-food\scratch\` — **never** pushed to `dogfood-hackathon`, never copied in.
+Local practice — never pushed to `dogfood-hackathon`, never copied in.
 Rehearse until each is boring: DRF permission classes, `drf-spectacular` output, a
 Postgres+Django `docker-compose.yml` that comes up cold, `pytest` + factory fixtures.
 At kickoff you retype it from memory. Fluency crosses the line; files do not.
