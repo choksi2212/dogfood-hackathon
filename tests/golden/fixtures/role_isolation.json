@@ -1,0 +1,49 @@
+{
+  "actors": [
+    "organizer",
+    "judge_a",
+    "judge_b",
+    "judge_c",
+    "participant",
+    "anonymous"
+  ],
+  "cells": [
+    "own_scores",
+    "peer_scores",
+    "csv_export",
+    "gallery",
+    "submit"
+  ],
+  "status": {
+    "anonymous|1": 401,
+    "anonymous|2": 401,
+    "anonymous|3": 401,
+    "anonymous|4": 200,
+    "anonymous|5": 401,
+    "judge_a|1": 200,
+    "judge_a|2": 403,
+    "judge_a|3": 422,
+    "judge_a|4": 200,
+    "judge_a|5": 403,
+    "judge_b|1": 200,
+    "judge_b|2": 403,
+    "judge_b|3": 422,
+    "judge_b|4": 200,
+    "judge_b|5": 403,
+    "judge_c|1": 200,
+    "judge_c|2": 403,
+    "judge_c|3": 422,
+    "judge_c|4": 200,
+    "judge_c|5": 403,
+    "organizer|1": 403,
+    "organizer|2": 403,
+    "organizer|3": 200,
+    "organizer|4": 200,
+    "organizer|5": 403,
+    "participant|1": 403,
+    "participant|2": 403,
+    "participant|3": 422,
+    "participant|4": 200,
+    "participant|5": 422
+  }
+}

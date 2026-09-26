@@ -48,6 +48,17 @@ def _event_windows(now):
     }
 
 
+@pytest.fixture(autouse=True)
+def _enable_db(db):
+    """Auto-enable DB access for every test in this directory tree.
+    Each agent's test file references fixtures below (sample_event,
+    organizer, etc.) which need DB, but pytest-django only grants DB
+    access when `db` is in the dependency chain. This autouse fixture
+    forces `db` for every test in tests/, so agents don't have to
+    remember @pytest.mark.django_db on every function."""
+    return db
+
+
 @pytest.fixture
 def now():
     return _now()
