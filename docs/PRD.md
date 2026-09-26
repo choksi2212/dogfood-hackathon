@@ -4,7 +4,6 @@
 **Window:** Sep 26 18:00 UTC → Sep 29 18:00 UTC, 2026 (72h)
 **Team:** Manas (`choksi2212`) + Mihir (`Mihir-Rabari`)
 **Repo:** `https://github.com/choksi2212/dogfood-hackathon`
-**Internal planning repo (this one):** `https://github.com/choksi2212/dogfood-docs`
 **Spec:** live Sep 23, 2026 — `https://dogfoodhack.com/spec`
 **Stack:** Django 5 + Django REST Framework + PostgreSQL 16 + Next.js 15, all in one `docker compose up`
 
@@ -3467,9 +3466,9 @@ it doesn't (out-of-scope, deployment topology, error envelope).
 The PRD will not change during the build. If reality diverges, reality wins and
 the PRD gets a footnote. There are no footnote-worthy divergences expected.
 
-The companion docs (TRD, Architecture, Backend Impl) are also frozen at H+0.
-Changes during the build are local to a feature and do not affect the cross-
-feature structure.
+The other docs in this repo (TRD, Architecture, Backend Impl) are also
+frozen at H+0. Changes during the build are local to a feature and do not
+affect the cross-feature structure.
 
 This is the plan. We execute it.
 
