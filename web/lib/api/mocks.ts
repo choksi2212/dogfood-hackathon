@@ -2,9 +2,14 @@ import type {
   GalleryResponse,
   JudgeScoresResponse,
   LoginPayload,
+  PairwiseBallotPayload,
+  PairwiseBallotResponse,
+  PairwiseRankingResponse,
+  RetractVoteResponse,
   SubmitPayload,
   SubmitResponse,
   User,
+  VoteResponse,
 } from "./types";
 
 const MOCK_SUBMISSIONS: GalleryResponse["items"] = [
@@ -84,5 +89,58 @@ export async function mockLogin(payload: LoginPayload): Promise<User> {
     name: "Mock User",
     is_active: true,
     memberships: [{ event: "sample-hack-2026", role: "participant" }],
+  };
+}
+
+export async function mockVote(projectId: string): Promise<VoteResponse> {
+  return {
+    vote_id: `mock-vote-${projectId}`,
+    votes: 1,
+    mode: "simple",
+    spent_credits: null,
+  };
+}
+
+export async function mockRetractVote(
+  projectId: string,
+): Promise<RetractVoteResponse> {
+  return { retracted: true, vote_id: `mock-vote-${projectId}` };
+}
+
+export async function mockPairwiseBallot(
+  payload: PairwiseBallotPayload,
+): Promise<PairwiseBallotResponse> {
+  return {
+    ballot_id: "mock-ballot",
+    created: true,
+    winner: payload.winner,
+  };
+}
+
+export async function mockPairwiseRanking(): Promise<PairwiseRankingResponse> {
+  return {
+    run_id: "mock-run",
+    event_slug: "sample-hack-2026",
+    n_ballots: 2,
+    iterations: 5,
+    converged: true,
+    ranking: [
+      {
+        project_id: "mock-1",
+        theta: 0.8,
+        rank: 1,
+        wins: 2,
+        losses: 0,
+        ties: 0,
+      },
+      {
+        project_id: "mock-2",
+        theta: -0.2,
+        rank: 2,
+        wins: 0,
+        losses: 2,
+        ties: 0,
+      },
+    ],
   };
 }

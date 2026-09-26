@@ -48,7 +48,7 @@ def _voter_key(request, event) -> str:
     (shared NAT, library Wi-Fi) but cheap and well-bounded for the
     hackathon threat model.
     """
-    if request.user.is_authenticated:
+    if request.user and request.user.is_authenticated:
         return f"user:{request.user.id}"
     ip = request.META.get("REMOTE_ADDR", "")
     ua = request.headers.get("User-Agent", "")
@@ -87,8 +87,17 @@ class VoteView(APIView):
       and that FK must remain valid.
     """
 
+    # Public (AllowAny), but deliberately NOT authentication_classes=[]:
+    # this view's body reads request.user.is_authenticated (self-vote
+    # guard, voter_user attribution) to distinguish a real logged-in
+    # voter from an anonymous one. An empty authenticators list makes
+    # DRF set request.user = None unconditionally (see
+    # apps.accounts.authentication.CookieSessionAuthentication's
+    # docstring) — including for requests that DO have a valid session
+    # cookie — which would silently break that distinction. The default
+    # authenticator resolves real sessions correctly; every request.user
+    # access below is guarded for the remaining anonymous-None case.
     permission_classes = [AllowAny]
-    authentication_classes: list = []  # explicitly public — no session lookup
 
     @deadline_gated("submissions_close_at")
     def post(self, request, slug, id):
@@ -120,7 +129,7 @@ class VoteView(APIView):
 
         # Self-vote guard. Anonymous requests bypass this — the IP/UA
         # fingerprint has no link to a team.
-        if request.user.is_authenticated:
+        if request.user and request.user.is_authenticated:
             from apps.teams.models import TeamMember
 
             if TeamMember.objects.filter(
@@ -210,7 +219,7 @@ class VoteView(APIView):
                 voter_key=voter_key,
                 defaults={
                     "voter_user": request.user
-                    if request.user.is_authenticated
+                    if request.user and request.user.is_authenticated
                     else None,
                     "voter_email_hash": "",
                     "votes": n_votes,
@@ -226,7 +235,7 @@ class VoteView(APIView):
             )
 
         audit_log(
-            request.user if request.user.is_authenticated else None,
+            request.user if request.user and request.user.is_authenticated else None,
             "vote.cast",
             vote,
             request=request,
@@ -317,7 +326,7 @@ class VoteView(APIView):
             )
 
         audit_log(
-            request.user if request.user.is_authenticated else None,
+            request.user if request.user and request.user.is_authenticated else None,
             "vote.retract",
             vote,
             request=request,

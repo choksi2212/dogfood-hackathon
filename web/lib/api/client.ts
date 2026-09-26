@@ -1,14 +1,28 @@
 import { routes } from "./routes";
-import { mockGallery, mockJudgeScores, mockLogin, mockSubmit } from "./mocks";
+import {
+  mockGallery,
+  mockJudgeScores,
+  mockLogin,
+  mockPairwiseBallot,
+  mockPairwiseRanking,
+  mockRetractVote,
+  mockSubmit,
+  mockVote,
+} from "./mocks";
 import {
   ApiError,
   type ApiErrorBody,
   type GalleryResponse,
   type JudgeScoresResponse,
   type LoginPayload,
+  type PairwiseBallotPayload,
+  type PairwiseBallotResponse,
+  type PairwiseRankingResponse,
+  type RetractVoteResponse,
   type SubmitPayload,
   type SubmitResponse,
   type User,
+  type VoteResponse,
 } from "./types";
 
 // Flip NEXT_PUBLIC_USE_MOCKS=1 to develop screens before the backend
@@ -100,6 +114,42 @@ export const api = {
     return USE_MOCKS
       ? mockJudgeScores()
       : request(routes.peerScores(judge), cookieInit(cookieHeader));
+  },
+
+  // Casting is anonymous-friendly (AllowAny on the backend) — an
+  // authenticated voter is identified by session cookie same as
+  // everywhere else, an anonymous one by IP+UA fingerprint server-side.
+  vote(projectId: string, slug?: string): Promise<VoteResponse> {
+    return USE_MOCKS
+      ? mockVote(projectId)
+      : request(routes.vote(projectId, slug), { method: "POST" });
+  },
+
+  retractVote(projectId: string, slug?: string): Promise<RetractVoteResponse> {
+    return USE_MOCKS
+      ? mockRetractVote(projectId)
+      : request(routes.vote(projectId, slug), { method: "DELETE" });
+  },
+
+  pairwiseBallot(
+    payload: PairwiseBallotPayload,
+    slug?: string,
+  ): Promise<PairwiseBallotResponse> {
+    return USE_MOCKS
+      ? mockPairwiseBallot(payload)
+      : request(routes.pairwiseBallots(slug), {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+  },
+
+  pairwiseRanking(
+    slug?: string,
+    cookieHeader?: string,
+  ): Promise<PairwiseRankingResponse> {
+    return USE_MOCKS
+      ? mockPairwiseRanking()
+      : request(routes.pairwiseRanking(slug), cookieInit(cookieHeader));
   },
 
   // CSV export is a file download the browser navigates to directly

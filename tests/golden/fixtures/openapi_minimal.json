@@ -1,0 +1,58 @@
+{
+  "paths": [
+    "/api/certificates/{public_id}",
+    "/api/csv_export",
+    "/api/events/{slug}/normalize",
+    "/api/events/{slug}/pairwise/ballots",
+    "/api/events/{slug}/pairwise/ranking",
+    "/api/events/{slug}/submit",
+    "/api/gallery",
+    "/api/judge/peer-scores",
+    "/api/judge/scores",
+    "/api/webhooks",
+    "/api/widget/gallery",
+    "/widget.js"
+  ],
+  "responses": {
+    "GET /api/certificates/{public_id}": {
+      "200": "Certificate"
+    },
+    "GET /api/csv_export": {
+      "200": "CSV body"
+    },
+    "GET /api/events/{slug}/pairwise/ranking": {
+      "200": "Ranking"
+    },
+    "GET /api/gallery": {
+      "200": "List of submissions"
+    },
+    "GET /api/judge/peer-scores": {
+      "403": "Cross-judge read denied"
+    },
+    "GET /api/judge/scores": {
+      "200": "Scores list"
+    },
+    "GET /api/webhooks": {
+      "200": "List"
+    },
+    "GET /api/widget/gallery": {
+      "200": "Items list"
+    },
+    "GET /widget.js": {
+      "200": "JavaScript shim"
+    },
+    "POST /api/events/{slug}/normalize": {
+      "200": "Run metadata"
+    },
+    "POST /api/events/{slug}/pairwise/ballots": {
+      "201": "Created"
+    },
+    "POST /api/events/{slug}/submit": {
+      "201": "Submission created",
+      "403": "Deadline passed"
+    },
+    "POST /api/webhooks": {
+      "201": "Created"
+    }
+  }
+}
