@@ -3906,9 +3906,8 @@ Sep 26 18:00 UTC is disqualification.
 
 **Choice:** Obey the rule.
 
-**Reason:** Disqualification is not a deduction; it is binary. The internal
-planning repo (`dogfood-docs`) is separate from the competition repo
-(`dogfood-hackathon`). Practice work lives in a throwaway repo.
+**Reason:** Disqualification is not a deduction; it is binary. Practice work
+lives in a throwaway repo, separate from this competition repo.
 
 ---
 
