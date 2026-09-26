@@ -47,9 +47,15 @@ def _voter_key(request, event) -> str:
     ``fp:<sha256(ip + user_agent)[:32]>`` — collision-prone in theory
     (shared NAT, library Wi-Fi) but cheap and well-bounded for the
     hackathon threat model.
+
+    `request.user` may be ``None`` for unauthenticated DRF requests when
+    the project default ``UNAUTHENTICATED_USER=None`` is in effect
+    (the `VoteView` skips authentication entirely). Treat that the same
+    as anonymous.
     """
-    if request.user.is_authenticated:
-        return f"user:{request.user.id}"
+    user = getattr(request, "user", None)
+    if user is not None and getattr(user, "is_authenticated", False):
+        return f"user:{user.id}"
     ip = request.META.get("REMOTE_ADDR", "")
     ua = request.headers.get("User-Agent", "")
     digest = hashlib.sha256(f"{ip}{ua}".encode()).hexdigest()[:32]
@@ -120,11 +126,13 @@ class VoteView(APIView):
 
         # Self-vote guard. Anonymous requests bypass this — the IP/UA
         # fingerprint has no link to a team.
-        if request.user.is_authenticated:
+        user = getattr(request, "user", None)
+        user_is_authed = user is not None and getattr(user, "is_authenticated", False)
+        if user_is_authed:
             from apps.teams.models import TeamMember
 
             if TeamMember.objects.filter(
-                team=project.team, user=request.user
+                team=project.team, user=user
             ).exists():
                 return Response(
                     {
@@ -154,7 +162,7 @@ class VoteView(APIView):
                     },
                     status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 )
-            if n_votes < 1 or n_votes > MAX_QUADRATIC_BALLOT:
+            if n_votes < 1:
                 return Response(
                     {
                         "error": {
@@ -168,39 +176,50 @@ class VoteView(APIView):
                     status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 )
 
+        # Quadratic budget check happens BEFORE any side effects so a
+        # rejected ballot does NOT leave a VoteBudget row behind. We
+        # need to know what the ballot would cost (delta against any
+        # prior live vote) to decide if it fits in the 100-credit budget.
+        cost = 0
+        delta = 0
+        if event.voting_mode == "quadratic":
+            cost = n_votes * n_votes
+            previous = Vote.objects.filter(
+                event=event, project=project, voter_key=voter_key
+            ).first()
+            previous_cost = (
+                previous.votes * previous.votes
+                if previous and previous.retracted_at is None
+                else 0
+            )
+            delta = cost - previous_cost
+            spent = (
+                VoteBudget.objects.filter(
+                    event=event, voter_key=voter_key
+                )
+                .values_list("spent_credits", flat=True)
+                .first()
+                or 0
+            )
+            if spent + delta > QUADRATIC_BUDGET:
+                return Response(
+                    {
+                        "error": {
+                            "code": "validation_failed",
+                            "message": (
+                                f"Exceeds {QUADRATIC_BUDGET}-credit "
+                                "quadratic budget."
+                            ),
+                        }
+                    },
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+
         with transaction.atomic():
-            # Quadratic budget check. Cost depends on whether we are
-            # replacing a previously-retracted ballot (which already
-            # refunded its credits) or upgrading an existing live ballot.
-            cost = 0
             if event.voting_mode == "quadratic":
-                cost = n_votes * n_votes
                 budget, _ = VoteBudget.objects.select_for_update().get_or_create(
                     event=event, voter_key=voter_key
                 )
-                # If a previous live ballot exists, only charge the *delta*.
-                previous = Vote.objects.filter(
-                    event=event, project=project, voter_key=voter_key
-                ).first()
-                previous_cost = (
-                    previous.votes * previous.votes
-                    if previous and previous.retracted_at is None
-                    else 0
-                )
-                delta = cost - previous_cost
-                if budget.spent_credits + delta > QUADRATIC_BUDGET:
-                    return Response(
-                        {
-                            "error": {
-                                "code": "validation_failed",
-                                "message": (
-                                    f"Exceeds {QUADRATIC_BUDGET}-credit "
-                                    "quadratic budget."
-                                ),
-                            }
-                        },
-                        status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    )
                 budget.spent_credits += delta
                 budget.save(update_fields=["spent_credits", "updated_at"])
 
@@ -209,9 +228,7 @@ class VoteView(APIView):
                 project=project,
                 voter_key=voter_key,
                 defaults={
-                    "voter_user": request.user
-                    if request.user.is_authenticated
-                    else None,
+                    "voter_user": user if user_is_authed else None,
                     "voter_email_hash": "",
                     "votes": n_votes,
                     "retracted_at": None,
@@ -226,7 +243,7 @@ class VoteView(APIView):
             )
 
         audit_log(
-            request.user if request.user.is_authenticated else None,
+            user if user_is_authed else None,
             "vote.cast",
             vote,
             request=request,
