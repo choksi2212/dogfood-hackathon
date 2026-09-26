@@ -3907,7 +3907,7 @@ Sep 26 18:00 UTC is disqualification.
 **Choice:** Obey the rule.
 
 **Reason:** Disqualification is not a deduction; it is binary. Practice work
-lives in a throwaway repo, separate from this competition repo.
+happens locally and is never committed to this competition repo.
 
 ---
 
