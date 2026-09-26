@@ -145,8 +145,6 @@ treat every gate-hour thereafter as monotonic progress.
 - A frontend engineer who has never seen the codebase can ship a new screen against the
   API client in under an hour.
 
-  noise.
-
 ### 1.6 Glossary
 
 The brief uses some words loosely. We pin them down here so the docs do not drift.
@@ -3337,13 +3335,6 @@ If a merge conflict arises:
 
 A badly resolved conflict can silently delete work that was green.
 
-
-
-
-
-
-
-
 ### 17.7 The sleep protocol
 
 Sleep is scheduled, not skipped:
@@ -3456,13 +3447,6 @@ no code after H+62.
 
 Mitigation: feature freeze at H+62. Everything after is docs, video, and the
 final clean run.
-
-
-
-
-
-
-
 
 ---
 
