@@ -3570,6 +3570,18 @@ urlpatterns = [
 
 ### 12.6 The seed_fixtures command
 
+The kickoff deck (slide 7) says: *"Seed from the fixture event's own
+`submissions_close_date`. One of the checks depends on it."* Concretely: T1 check 3
+("POST `{submit}` as participant after deadline → 4xx") passes iff the seeded event's
+`submissions_close_at` is in the UTC past at the moment `make accept` runs. The seed
+command is *transparent* — it reads the field verbatim from `fixtures.json`. The
+fixtures author is responsible for shipping a past date. If a future date ships, T1
+fails; this is the contract, not a bug.
+
+The model field is `submissions_close_at` (`_at`, not the deck's prose `_date`). The
+JSON key is `submissions_close_at`. Do not "fix" the JSON to match the deck's prose —
+the deck is informal here, the code is the contract.
+
 ```python
 # apps/events/management/commands/seed_fixtures.py
 
