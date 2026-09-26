@@ -28,7 +28,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.audit.helpers import log as audit_log
-from apps.events.decorators import opens_after
+from apps.events.decorators import deadline_gated
 from apps.events.models import Event
 from apps.submissions.models import Submission
 
@@ -99,7 +99,7 @@ class VoteView(APIView):
     # access below is guarded for the remaining anonymous-None case.
     permission_classes = [AllowAny]
 
-    @opens_after("submissions_close_at")
+    @deadline_gated("submissions_close_at")
     def post(self, request, slug, id):
         try:
             event = Event.objects.get(slug=slug)
@@ -257,7 +257,7 @@ class VoteView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-    @opens_after("submissions_close_at")
+    @deadline_gated("submissions_close_at")
     def delete(self, request, slug, id):
         try:
             event = Event.objects.get(slug=slug)
