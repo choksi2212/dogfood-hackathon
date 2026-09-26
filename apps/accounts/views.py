@@ -1,0 +1,97 @@
+import secrets
+from datetime import timedelta
+
+from django.conf import settings
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from .models import Session, User
+from .serializers import UserSerializer
+
+
+def _set_session_cookie(response, token):
+    response.set_cookie(
+        "session",
+        token,
+        httponly=True,
+        samesite="Lax",
+        secure=not settings.DEBUG,
+        max_age=14 * 24 * 60 * 60,
+    )
+
+
+def _client_meta(request):
+    return (
+        request.META.get("REMOTE_ADDR"),
+        request.headers.get("User-Agent", "")[:255],
+    )
+
+
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = UserSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        password = request.data.get("password")
+        user = serializer.save()
+        if password:
+            user.set_password(password)
+            user.save()
+        ip, ua = _client_meta(request)
+        _, token = Session.create(user, label="", ip=ip, user_agent=ua)
+        response = Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+        _set_session_cookie(response, token)
+        return response
+
+
+class LoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = (request.data.get("email") or "").lower()
+        password = request.data.get("password") or ""
+
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            return Response(
+                {"error": {"code": "not_authenticated", "message": "Invalid credentials."}},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if not user.check_password(password):
+            return Response(
+                {"error": {"code": "not_authenticated", "message": "Invalid credentials."}},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        Session.objects.filter(user=user).delete()
+        ip, ua = _client_meta(request)
+        _, token = Session.create(user, label="login", ip=ip, user_agent=ua)
+
+        response = Response(UserSerializer(user).data)
+        _set_session_cookie(response, token)
+        return response
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        session = getattr(request, "session_obj", None)
+        if session is not None:
+            session.delete()
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        response.delete_cookie("session")
+        return response
+
+
+class MeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(UserSerializer(request.user).data)
