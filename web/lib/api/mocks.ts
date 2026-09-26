@@ -1,7 +1,12 @@
 import type {
+  AssignmentRunResponse,
+  BulkInviteResponse,
+  EventDetail,
   GalleryResponse,
   JudgeScoresResponse,
   LoginPayload,
+  Membership,
+  NormalizeResponse,
   PairwiseBallotPayload,
   PairwiseBallotResponse,
   PairwiseRankingResponse,
@@ -114,6 +119,93 @@ export async function mockPairwiseBallot(
     ballot_id: "mock-ballot",
     created: true,
     winner: payload.winner,
+  };
+}
+
+export async function mockEventDetail(): Promise<EventDetail> {
+  return {
+    id: "mock-event",
+    slug: "sample-hack-2026",
+    name: "Sample Hack 2026",
+    description: "Mock fixture standing in until the real event loads.",
+    open_at: "2026-09-20T00:00:00Z",
+    submissions_close_at: "2026-09-26T23:00:00Z",
+    judging_open_at: "2026-09-26T22:30:00Z",
+    judging_close_at: "2026-09-29T00:00:00Z",
+    results_at: "2026-09-30T00:00:00Z",
+    voting_mode: "simple",
+    pairwise_enabled: true,
+    tracks: [
+      { id: "t1", name: "Main", slug: "main", description: "", order: 0 },
+    ],
+    prizes: [],
+    rubric: {
+      id: "r1",
+      name: "Default",
+      criteria: [
+        {
+          id: "c1",
+          name: "Innovation",
+          description: "",
+          weight: "0.400",
+          min: 1,
+          max: 5,
+          order: 0,
+        },
+      ],
+    },
+    state: "judging",
+  };
+}
+
+export async function mockMemberships(): Promise<Membership[]> {
+  return [
+    {
+      id: "m1",
+      user: "u1",
+      user_email: "organizer@dogfood.local",
+      user_name: "Olivia Organizer",
+      role: "organizer",
+      created_at: "2026-09-20T00:00:00Z",
+    },
+    {
+      id: "m2",
+      user: "u2",
+      user_email: "judge_a@dogfood.local",
+      user_name: "Avery Alpha-Judge",
+      role: "judge",
+      created_at: "2026-09-20T00:00:00Z",
+    },
+  ];
+}
+
+export async function mockBulkInvite(
+  emails: string[],
+): Promise<BulkInviteResponse> {
+  return { invited: emails.filter((e) => e.trim()).length };
+}
+
+export async function mockAssignmentRun(): Promise<AssignmentRunResponse> {
+  return {
+    batch_id: "mock-batch",
+    n_assignments: 30,
+    judges_with_zero_projects: [],
+    seed_used: 42,
+    attempts: 1,
+  };
+}
+
+export async function mockNormalize(): Promise<NormalizeResponse> {
+  return {
+    run_id: "mock-norm-run",
+    raw_sigma: 1.42,
+    normalized_sigma: 0.31,
+    is_connected: true,
+    iterations: 12,
+    n_projects: 10,
+    n_judges: 4,
+    n_reviews: 30,
+    proof: "mock proof text",
   };
 }
 

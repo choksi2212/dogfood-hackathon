@@ -1,8 +1,13 @@
 import { routes } from "./routes";
 import {
+  mockAssignmentRun,
+  mockBulkInvite,
+  mockEventDetail,
   mockGallery,
   mockJudgeScores,
   mockLogin,
+  mockMemberships,
+  mockNormalize,
   mockPairwiseBallot,
   mockPairwiseRanking,
   mockRetractVote,
@@ -12,9 +17,14 @@ import {
 import {
   ApiError,
   type ApiErrorBody,
+  type AssignmentRunResponse,
+  type BulkInviteResponse,
+  type EventDetail,
   type GalleryResponse,
   type JudgeScoresResponse,
   type LoginPayload,
+  type Membership,
+  type NormalizeResponse,
   type PairwiseBallotPayload,
   type PairwiseBallotResponse,
   type PairwiseRankingResponse,
@@ -150,6 +160,50 @@ export const api = {
     return USE_MOCKS
       ? mockPairwiseRanking()
       : request(routes.pairwiseRanking(slug), cookieInit(cookieHeader));
+  },
+
+  // Organizer dashboard. eventDetail/memberships are read from a
+  // Server Component (cookie forwarded like judgeScores); the action
+  // endpoints are triggered from a Client Component so they need no
+  // explicit cookie (same-origin browser request, credentials:
+  // "include" on `request` covers it).
+  eventDetail(slug?: string, cookieHeader?: string): Promise<EventDetail> {
+    return USE_MOCKS
+      ? mockEventDetail()
+      : request(routes.eventDetail(slug), cookieInit(cookieHeader));
+  },
+
+  memberships(slug?: string, cookieHeader?: string): Promise<Membership[]> {
+    return USE_MOCKS
+      ? mockMemberships()
+      : request(routes.memberships(slug), cookieInit(cookieHeader));
+  },
+
+  bulkInviteJudges(emails: string[], slug?: string): Promise<BulkInviteResponse> {
+    return USE_MOCKS
+      ? mockBulkInvite(emails)
+      : request(routes.bulkInviteJudges(slug), {
+          method: "POST",
+          body: JSON.stringify({ emails }),
+        });
+  },
+
+  runAssignment(
+    payload: { seed?: number; reviews_per_project?: number } = {},
+    slug?: string,
+  ): Promise<AssignmentRunResponse> {
+    return USE_MOCKS
+      ? mockAssignmentRun()
+      : request(routes.assignmentsRun(slug), {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+  },
+
+  runNormalization(slug?: string): Promise<NormalizeResponse> {
+    return USE_MOCKS
+      ? mockNormalize()
+      : request(routes.normalize(slug), { method: "POST" });
   },
 
   // CSV export is a file download the browser navigates to directly

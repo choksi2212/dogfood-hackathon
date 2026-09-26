@@ -54,8 +54,12 @@ class BatchInviteView(APIView):
             email = (email or "").strip().lower()
             if not email:
                 continue
+            # AbstractUser requires a non-empty unique username; use the
+            # email as the username so login-by-email continues to work.
+            # Same fix as apps.accounts.management.commands.seed_fixtures
+            # ._ensure_user — this call site just hadn't been hit yet.
             user, _ = User.objects.get_or_create(
-                email=email, defaults={"is_active": True}
+                email=email, defaults={"username": email, "is_active": True}
             )
             Membership.objects.get_or_create(
                 user=user,
