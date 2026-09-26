@@ -440,6 +440,7 @@ def test_register_cookie_is_samesite_lax(client, password):
 
 
 @pytest.mark.django_db
+@override_settings(DEBUG=True)
 def test_login_cookie_is_not_secure_when_debug_true(participant, client):
     """DEBUG=True (the dev/test default) must NOT set Secure — otherwise the
     cookie would not be sent over plain-HTTP localhost during dev/acceptance."""
