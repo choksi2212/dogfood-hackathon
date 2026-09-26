@@ -82,7 +82,7 @@ acceptance mechanism (40%) and `docker compose up` (20%) are graded there.
 
 | Gate | Time | Outcome |
 |---|---|---|
-| G1 (H+3) | Sep 26 21:00 UTC | _pending_ |
+| G1 (H+3) | Sep 26 21:00 UTC | **PASS** — `docker compose up` green; `/healthz` 200; migrations applied |
 | G2 (H+20) | Sep 27 14:00 UTC | _pending_ |
 | G3 (H+34) | Sep 28 04:00 UTC | _pending_ |
 | G4 (H+40) | Sep 28 10:00 UTC | _pending_ |
@@ -91,6 +91,28 @@ acceptance mechanism (40%) and `docker compose up` (20%) are graded there.
 | G7 (H+62) | Sep 29 08:00 UTC | _pending_ |
 | G8 (H+66) | Sep 29 12:00 UTC | _pending_ |
 | G9 (H+70) | Sep 29 16:00 UTC | _pending_ |
+
+### G1 verification log
+
+```
+$ docker compose up --build -d
+... Container dogfood-portal-db-1   Healthy
+... Container dogfood-portal-web-1 Started
+
+$ curl -sS http://127.0.0.1:8001/healthz
+{"status":"ok","checks":{"app":"ok","db":"ok"},"db_ms":5}
+
+$ curl -sS http://127.0.0.1:8001/
+{"service":"dogfood-portal","stage":"G1","tiers_claimed":[]}
+
+$ docker compose exec web python manage.py showmigrations
+auth          [X] 0001_initial ... [X] 0012_alter_user_first_name_max_length
+contenttypes  [X] 0001_initial, [X] 0002_remove_content_type_name
+sessions      [X] 0001_initial
+```
+
+DB port not exposed per PLAN.md §10 trap; backend debug bound to
+`127.0.0.1:8001` only.
 
 (Updated continuously as the build progresses.)
 
