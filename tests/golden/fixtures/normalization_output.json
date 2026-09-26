@@ -1,0 +1,133 @@
+{
+  "b": {
+    "j0": -0.07499999999999998,
+    "j1": 0.05,
+    "j2": 0.024999999999999984
+  },
+  "biases": [
+    {
+      "bias": 0.024999999999999984,
+      "judge_id": "j2",
+      "leverage": 0.3333333333333333,
+      "n_reviews": 10
+    },
+    {
+      "bias": 0.05,
+      "judge_id": "j1",
+      "leverage": 0.3333333333333333,
+      "n_reviews": 10
+    },
+    {
+      "bias": -0.07499999999999998,
+      "judge_id": "j0",
+      "leverage": 0.3333333333333333,
+      "n_reviews": 10
+    }
+  ],
+  "is_connected": true,
+  "iterations": 2,
+  "leverage": {
+    "j0": 0.3333333333333333,
+    "j1": 0.3333333333333333,
+    "j2": 0.3333333333333333
+  },
+  "n_reviews": 30,
+  "normalized_sigma": 0.19709019367904745,
+  "q": {
+    "p0": 1.0,
+    "p1": 0.9170000000000001,
+    "p2": 0.8329999999999999,
+    "p3": 0.8329999999999999,
+    "p4": 0.6670000000000001,
+    "p5": 0.6670000000000001,
+    "p6": 0.6670000000000001,
+    "p7": 0.583,
+    "p8": 0.417,
+    "p9": 0.417
+  },
+  "raw_means": {
+    "p0": 1.0,
+    "p1": 0.9170000000000001,
+    "p2": 0.8330000000000001,
+    "p3": 0.8330000000000001,
+    "p4": 0.6670000000000001,
+    "p5": 0.6670000000000001,
+    "p6": 0.6670000000000001,
+    "p7": 0.5830000000000001,
+    "p8": 0.417,
+    "p9": 0.417
+  },
+  "raw_sigma": 0.1970901936790475,
+  "scores": [
+    {
+      "adjusted": 1.5331,
+      "project_id": "p2",
+      "rank_after": 3,
+      "rank_before": 3,
+      "raw_mean": 0.8330000000000001
+    },
+    {
+      "adjusted": 1.6171000000000002,
+      "project_id": "p1",
+      "rank_after": 2,
+      "rank_before": 2,
+      "raw_mean": 0.9170000000000001
+    },
+    {
+      "adjusted": 1.1171,
+      "project_id": "p9",
+      "rank_after": 9,
+      "rank_before": 9,
+      "raw_mean": 0.417
+    },
+    {
+      "adjusted": 1.7001,
+      "project_id": "p0",
+      "rank_after": 1,
+      "rank_before": 1,
+      "raw_mean": 1.0
+    },
+    {
+      "adjusted": 1.1171,
+      "project_id": "p8",
+      "rank_after": 10,
+      "rank_before": 10,
+      "raw_mean": 0.417
+    },
+    {
+      "adjusted": 1.3671000000000002,
+      "project_id": "p5",
+      "rank_after": 5,
+      "rank_before": 5,
+      "raw_mean": 0.6670000000000001
+    },
+    {
+      "adjusted": 1.3671000000000002,
+      "project_id": "p4",
+      "rank_after": 6,
+      "rank_before": 6,
+      "raw_mean": 0.6670000000000001
+    },
+    {
+      "adjusted": 1.3671000000000002,
+      "project_id": "p6",
+      "rank_after": 7,
+      "rank_before": 7,
+      "raw_mean": 0.6670000000000001
+    },
+    {
+      "adjusted": 1.2831000000000001,
+      "project_id": "p7",
+      "rank_after": 8,
+      "rank_before": 8,
+      "raw_mean": 0.5830000000000001
+    },
+    {
+      "adjusted": 1.5331,
+      "project_id": "p3",
+      "rank_after": 4,
+      "rank_before": 4,
+      "raw_mean": 0.8330000000000001
+    }
+  ]
+}

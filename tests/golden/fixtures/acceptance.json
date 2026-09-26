@@ -1,0 +1,53 @@
+{
+  "checks": [
+    {
+      "actual": "200",
+      "expected": "200",
+      "id": "T1.01",
+      "name": "GET /api/gallery (no auth) \u2192 200",
+      "ok": true
+    },
+    {
+      "actual": "yes",
+      "expected": "title present",
+      "id": "T1.02",
+      "name": "GET /api/gallery contains known fixture title",
+      "ok": true
+    },
+    {
+      "actual": "422",
+      "expected": "4xx",
+      "id": "T1.03",
+      "name": "POST /api/submit (participant, past deadline) \u2192 4xx",
+      "ok": true
+    },
+    {
+      "actual": "200",
+      "expected": "200",
+      "id": "T2.04",
+      "name": "GET /api/judge/scores (judge_a) \u2192 200",
+      "ok": true
+    },
+    {
+      "actual": "403",
+      "expected": "401/403",
+      "id": "T2.05",
+      "name": "GET /api/judge/peer-scores (judge_b) \u2192 401/403",
+      "ok": true
+    },
+    {
+      "actual": "403",
+      "expected": "401/403",
+      "id": "T2.06",
+      "name": "GET /api/judge/scores (participant) \u2192 401/403",
+      "ok": true
+    },
+    {
+      "actual": "200",
+      "expected": "200 + CSV",
+      "id": "T2.07",
+      "name": "GET /api/csv_export (organizer) \u2192 200 + CSV body",
+      "ok": true
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+event_slug,project_id,project_name,judge_email,criterion_name,score,weight
