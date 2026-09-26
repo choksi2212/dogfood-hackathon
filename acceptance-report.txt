@@ -1,0 +1,40 @@
+================================================================
+DOGFOOD acceptance report
+================================================================
+Config:       .dogfood.toml
+Base URL:     http://localhost:8000
+Event:        sample-hack-2026
+Tiers claimed: ['t1', 't2']
+Known title:  Quokka — a tiny, friendly submission platform.
+
+[PASS] T1.01  GET /api/gallery (no auth) → 200
+        expected: 200
+        actual:   200
+
+[PASS] T1.02  GET /api/gallery contains known fixture title
+        expected: title present
+        actual:   yes
+
+[PASS] T1.03  POST /api/submit (participant, past deadline) → 4xx
+        expected: 4xx
+        actual:   422
+
+[PASS] T2.04  GET /api/judge/scores (judge_a) → 200
+        expected: 200
+        actual:   200
+
+[PASS] T2.05  GET /api/judge/peer-scores (judge_b) → 401/403
+        expected: 401/403
+        actual:   403
+
+[PASS] T2.06  GET /api/judge/scores (participant) → 401/403
+        expected: 401/403
+        actual:   403
+
+[PASS] T2.07  GET /api/csv_export (organizer) → 200 + CSV body
+        expected: 200 + CSV
+        actual:   200
+
+================================================================
+Summary: 7 PASS / 0 FAIL / 7 total
+================================================================

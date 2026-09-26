@@ -1,0 +1,38 @@
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding-top: var(--space-5);
+}
+
+.hero h1 {
+  font-size: 2rem;
+}
+
+.lede {
+  color: var(--muted);
+  max-width: 40ch;
+}
+
+.links {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.primary,
+.secondary {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  font-weight: 600;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.secondary {
+  border: 1px solid var(--border);
+}
