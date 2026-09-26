@@ -125,6 +125,39 @@ DB port not exposed per PLAN.md §10 trap; backend debug bound to
 
 (Updated continuously as the build progresses.)
 
+## Test suite
+
+```bash
+make test                # all 15 categories
+make test-smoke          # boot + healthz + spec-route reachability
+make test-roles          # full 6x8 actor × route isolation matrix
+make test-cov            # HTML coverage into reports/htmlcov/
+```
+
+Fifteen categories, each owned by one of the parallel build agents and
+documented in its own file:
+
+| Category | Doc | What it covers |
+|---|---|---|
+| smoke | [docs/TESTING-SMOKE.md](docs/TESTING-SMOKE.md) | boot + healthz + spec-route reachability |
+| auth | [docs/TESTING-AUTH.md](docs/TESTING-AUTH.md) | session lifecycle + cookie tamper + sliding renewal |
+| roles | [docs/TESTING-ROLES.md](docs/TESTING-ROLES.md) | full 6 × 8 actor × route matrix + graded cell |
+| deadlines | [docs/TESTING-DEADLINES.md](docs/TESTING-DEADLINES.md) | boundary conditions on submissions / judging |
+| voting | [docs/TESTING-VOTING.md](docs/TESTING-VOTING.md) | T3 simple + quadratic + self-vote + retract + audit |
+| pairwise | [docs/TESTING-PAIRWISE.md](docs/TESTING-PAIRWISE.md) | BT synthetic rankings + ties + convergence |
+| normalization | [docs/TESTING-NORMALIZATION.md](docs/TESTING-NORMALIZATION.md) | zero-var + incomplete + duplicate + disconnected |
+| assignment | [docs/TESTING-ASSIGNMENT.md](docs/TESTING-ASSIGNMENT.md) | disjoint batches + COI + cap + retries |
+| csv | [docs/TESTING-CSV.md](docs/TESTING-CSV.md) | streaming + RFC 4180 + unicode + organizer-only |
+| certificates | [docs/TESTING-CERTIFICATES.md](docs/TESTING-CERTIFICATES.md) | HMAC sign + verify + tamper detection + canonical JSON |
+| widget | [docs/TESTING-WIDGET.md](docs/TESTING-WIDGET.md) | /widget.js + /api/widget/gallery + CORS + JSON shape |
+| schema | [docs/TESTING-SCHEMA.md](docs/TESTING-SCHEMA.md) | migrations present + UUID PKs + FK cascades + no cycles |
+| conformance | [docs/TESTING-CONFORMANCE.md](docs/TESTING-CONFORMANCE.md) | openapi.yaml matches /api/schema/ + path coverage |
+| concurrency | [docs/TESTING-CONCURRENCY.md](docs/TESTING-CONCURRENCY.md) | upsert idempotency + idempotent normalize + session rotation |
+| golden | [docs/TESTING-GOLDEN.md](docs/TESTING-GOLDEN.md) | algorithm output fixtures for normalize + BT + role-isolation |
+
+Shared fixtures live in [tests/conftest.py](tests/conftest.py) (read-only).
+Pytest config in [pytest.ini](pytest.ini) (read-only).
+
 ## Acknowledgements
 
 Two builders. One brief. One spec. 72 hours. The portal that judges the build is the portal we built.
