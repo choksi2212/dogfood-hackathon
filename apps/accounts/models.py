@@ -23,6 +23,32 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=255, blank=True)
 
+    # Replace the auto-managed M2M tables inherited from AbstractUser
+    # with explicit through models so the `id` column is a UUID rather
+    # than the implicit BigAutoField Django gives to M2M join tables.
+    # The local-apps schema contract requires every `id` to be uuid.
+    groups = models.ManyToManyField(
+        "auth.Group",
+        through="accounts.UserGroups",
+        through_fields=("user", "group"),
+        related_name="user_set",
+        blank=True,
+        help_text=(
+            "The groups this user belongs to. A user will get all "
+            "permissions granted to each of their groups."
+        ),
+        verbose_name="groups",
+    )
+    user_permissions = models.ManyToManyField(
+        "auth.Permission",
+        through="accounts.UserUserPermissions",
+        through_fields=("user", "permission"),
+        related_name="user_set",
+        blank=True,
+        help_text="Specific permissions for this user.",
+        verbose_name="user permissions",
+    )
+
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
 
@@ -35,6 +61,50 @@ class User(AbstractUser):
     @property
     def is_admin_role(self) -> bool:
         return self.memberships.filter(role="admin").exists()
+
+
+class UserGroups(models.Model):
+    """Explicit through model for User.groups.
+
+    Django's default auto-M2M join table gets a BigAutoField `id`,
+    which breaks the schema-level UUID invariant (every local `id`
+    must be `uuid`). Pinning the table name and giving it a UUID
+    primary key keeps the relationship, just with the right PK type.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        "accounts.User", on_delete=models.CASCADE, related_name="user_groups"
+    )
+    group = models.ForeignKey(
+        "auth.Group", on_delete=models.CASCADE, related_name="user_groups"
+    )
+
+    class Meta:
+        db_table = "users_user_groups"
+        unique_together = [("user", "group")]
+
+
+class UserUserPermissions(models.Model):
+    """Explicit through model for User.user_permissions.
+
+    Same reasoning as UserGroups — UUID PK, pinned table name so the
+    migration lands on the existing auto-M2M table.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        "accounts.User", on_delete=models.CASCADE, related_name="user_user_permissions"
+    )
+    permission = models.ForeignKey(
+        "auth.Permission",
+        on_delete=models.CASCADE,
+        related_name="user_user_permissions",
+    )
+
+    class Meta:
+        db_table = "users_user_user_permissions"
+        unique_together = [("user", "permission")]
 
 
 class Session(models.Model):
