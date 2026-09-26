@@ -73,16 +73,38 @@ That is the strategy: target the gaps, not the features.
 We have four weighted criteria (40% / 25% / 20% / 15%) plus four bonuses (+5/+5/+3/+3).
 Each goal below maps to one of those numbers — the goal without a number is decoration.
 
+**The kickoff deck restates the rubric:**
+
+- 40% — **Tier Completion & Correctness.** T1 is a *gate*, not a score. Above T1,
+  correctness beats breadth. A clean T2 outranks a T4 with three half-finished features.
+- 25% — **Judging Integrity.** Role isolation provable by curl, not template-hidden.
+  Defence lives in `JUDGING.md` — *"we averaged the scores"* is an answer, and a weak one.
+- 20% — **Adoptability & Operability.** `docker compose up` works cold, on any laptop,
+  with the network off. The README is part of the product.
+- 15% — **Code Quality & Innovation.** Readable enough to defend in writing.
+- Bonuses — break ties, do not change the weighted average. *"Pick one and nail it.
+  Do not half-do all four."* A half-finished bonus scores zero; a finished one scores its
+  full points. We target finished bonuses, not maximum line items.
+
+**Tier weighting inside the 40%.** T1 is binary — pass/fail to be judged at all. The
+remaining 40% is split among T2, T3, T4 with T2 carrying the most weight, since T2 is
+*"where the real engineering starts"*. A defensible weighting, given the deck's
+correctness-over-breadth framing: T2 = 20%, T3 = 12%, T4 = 8% (out of the 40% block).
+A submission that nails T2 and skips T4 outranks one that half-builds T4.
+
 | Goal | Rubric line | Where it lives in the PRD |
 |---|---|---|
-| T1, T2, T3, T4 all functional, end-to-end | 40% Tier Completion | §3.1, §3.2, §3.3, §3.4 |
-| Role isolation provable by curl, not template-hidden | 25% Judging Integrity | §3.2.3, §5 |
-| `docker compose up` works cold, on any laptop | 20% Adoptability | §4.7, §5 |
-| Code is readable enough to defend in writing | 15% Code Quality | §4, §6 |
-| Normalization is documented and provably correct | +5 Normalization Proof | §3.2.4 |
-| Pairwise mode produces recovered rankings | +5 Pairwise Mode | §3.5 |
-| Threat model written before any code is committed | +3 Threat Model | §3.6 |
-| Every UI action is a documented API endpoint | +3 API First | §4.5, §3.4 |
+| T1 clears the gate: auth, roles, event, teams, submission, deadline, gallery | 40% Tier Completion (gate) | §3.1 |
+| T2 — assignment, weighted rubric, backend role isolation, dashboard, cross-judge normalization, CSV | 40% Tier Completion (20% of block) | §3.2, `JUDGING.md` |
+| T3 — community voting, comments, hidden results, randomised ballots, anti-abuse + audit trail | 40% Tier Completion (12% of block) | §3.3 |
+| T4 — REST + webhooks, certificates, verifiable judge records, embeddable gallery, bulk I/O | 40% Tier Completion (8% of block) | §3.4, `openapi.yaml` |
+| Role isolation provable by curl, not template-hidden | 25% Judging Integrity | §3.2.3, §5, `JUDGING.md` |
+| `docker compose up` works cold, on any laptop, network off | 20% Adoptability & Operability | §4.7, §5, README |
+| Code is readable enough to defend in writing | 15% Code Quality & Innovation | §4, §6, ARCHITECTURE.md |
+| Normalization documented and provably correct | +5 Normalization Proof (tiebreak) | §3.2.4, `JUDGING.md`, `normalization-proof.txt` |
+| Pairwise mode produces recovered rankings | +5 Pairwise Mode (tiebreak) | §3.5, `JUDGING.md` |
+| Threat model names the four attacks | +3 Threat Model (tiebreak) | §3.6, `THREAT-MODEL.md` |
+| Every UI action is a documented API endpoint | +3 API First (tiebreak) | §4.5, §3.4, `openapi.yaml` |
 
 **No tier or bonus is claimed in `.dogfood.toml` unless it is complete and verifiable.**
 This is the discipline. A bonus at 90% is not claimed at 90% — it is finished or it is
@@ -90,9 +112,16 @@ not in the file. See §5.3.
 
 ### 1.5 Target metrics — what "winning" looks like
 
-The scoring is the weighted average of four criteria on a 1–5 scale, plus bonuses that
-break ties. The 40% Tier Completion criterion is graded by the seven-check acceptance
-mechanism (`run.py`). The other three are graded by humans reading documents.
+The scoring is the weighted average of four criteria on a 1–5 scale, **plus bonuses that
+break ties — they do not change the weighted average** (kickoff deck, slide 11). The 40%
+Tier Completion criterion is graded by the seven-check acceptance mechanism (`run.py`)
+for T1 and T2. T3 and T4 are graded by humans reading `ARCHITECTURE.md`, `JUDGING.md`,
+`THREAT-MODEL.md`, `DATA-MODEL.md`, the demo video, and the live portal. The other three
+criteria (25% / 20% / 15%) are graded by humans reading documents.
+
+**T1 is a gate, not a score.** If T1 fails the acceptance checks, the submission is not
+judged. Above T1, correctness beats breadth. We plan to clear T1 by H+8 (PLAN §3) and
+treat every gate-hour thereafter as monotonic progress.
 
 **Quantitative targets:**
 
