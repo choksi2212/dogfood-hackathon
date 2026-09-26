@@ -33,6 +33,8 @@ from django.utils import timezone
 
 from apps.accounts.models import Session, User
 from apps.events.models import Event, Membership, Rubric, RubricCriterion, Track
+from apps.judging.assignment import run_assignment
+from apps.judging.models import JudgeAssignment, JudgeBatch, Review, Score
 from apps.submissions.models import Submission
 from apps.teams.models import Team, TeamMember
 
@@ -41,6 +43,7 @@ DEMO_USERS = [
     ("organizer@dogfood.local", "Olivia Organizer", "organizer", "organizer"),
     ("judge_a@dogfood.local", "Avery Alpha-Judge", "judge", "judge_a"),
     ("judge_b@dogfood.local", "Bailey Beta-Judge", "judge", "judge_b"),
+    ("judge_c@dogfood.local", "Casey Gamma-Judge", "judge", "judge_c"),
     ("participant@dogfood.local", "Pranav Participant", "participant", "participant"),
 ]
 
@@ -200,13 +203,58 @@ class Command(BaseCommand):
                 submitted_at=now - timedelta(hours=2) if sub_status == "submitted" else None,
             )
 
+        # Assignment + sample scores (so T2 acceptance checks find data).
+        JudgeBatch.objects.filter(event=event).delete()
+        try:
+            assignment_result = run_assignment(
+                event=event,
+                seed=42,
+                reviews_per_project=3,
+                projects_per_judge=None,
+                created_by=organizer,
+            )
+        except Exception as exc:
+            self.stdout.write(f"# WARNING: assignment failed: {exc}")
+            assignment_result = None
+
+        if assignment_result:
+            self.stdout.write(
+                f"# assignment n_assignments = "
+                f"{assignment_result['n_assignments']}, "
+                f"judges_with_zero = "
+                f"{len(assignment_result['judges_with_zero_projects'])}, "
+                f"attempts = {assignment_result['attempts']}"
+            )
+
+            criteria = list(RubricCriterion.objects.filter(rubric=rubric))
+            if criteria:
+                import hashlib
+                for assignment in JudgeAssignment.objects.filter(
+                    batch_id=assignment_result["batch_id"]
+                ).select_related("judge"):
+                    seed_value = int(
+                        hashlib.sha256(
+                            f"{assignment.judge_id}-{assignment.project_id}".encode()
+                        ).hexdigest()[:8],
+                        16,
+                    )
+                    for i, criterion in enumerate(criteria):
+                        span = criterion.max - criterion.min
+                        offset = (seed_value + i) % (span + 1)
+                        Score.objects.update_or_create(
+                            assignment=assignment,
+                            criterion=criterion,
+                            defaults={"value": criterion.min + offset},
+                        )
+                    Review.objects.get_or_create(assignment=assignment)
+
         # Final output
         self.stdout.write("# DOGFOOD seed_fixtures output")
         self.stdout.write(f"# event_slug = {event_slug}")
         self.stdout.write(f"# known_title = {known_title}")
         self.stdout.write("# Paste the lines below into the [auth] block of .dogfood.toml:")
         self.stdout.write("")
-        for label in ("organizer", "judge_a", "judge_b", "participant"):
+        for label in ("organizer", "judge_a", "judge_b", "judge_c", "participant"):
             self.stdout.write(f'{label.upper()}_HEADER = "Cookie: session={headers[label]}"')
 
         self.stdout.write("")
