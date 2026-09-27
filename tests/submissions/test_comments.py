@@ -11,6 +11,7 @@ pin:
   * Hidden comments are not returned by GET (so a takedown is
     effective on the next request, no caching loophole).
 """
+
 from __future__ import annotations
 
 import json
@@ -51,9 +52,7 @@ def test_anon_cannot_post_comment(client, with_submission):
     assert resp.status_code == 401
 
 
-def test_authenticated_can_post_and_list_comment(
-    client, auth_client, participant, with_submission
-):
+def test_authenticated_can_post_and_list_comment(client, auth_client, participant, with_submission):
     """Logged-in participant can post a comment and read it back."""
     cookie = auth_client["participant"].cookies["session"].value
     slug = sample_submission_event_slug(with_submission)
@@ -76,9 +75,7 @@ def test_authenticated_can_post_and_list_comment(
     assert body["author_email_hash"] == expected_hash
 
     # Now read it back — the comment is visible to anyone (anon).
-    anon_read = client.get(
-        f"/api/events/{slug}/submissions/{with_submission.id}/comments"
-    )
+    anon_read = client.get(f"/api/events/{slug}/submissions/{with_submission.id}/comments")
     assert anon_read.status_code == 200
     listing = anon_read.json()
     assert len(listing) == 1
@@ -114,9 +111,7 @@ def test_oversize_body_rejected(client, auth_client, with_submission):
     assert resp.status_code == 422
 
 
-def test_organizer_can_hide_comment(
-    client, auth_client, participant, with_submission
-):
+def test_organizer_can_hide_comment(client, auth_client, participant, with_submission):
     """Organizer PATCH hides a comment from the public listing."""
     participant_cookie = auth_client["participant"].cookies["session"].value
     organizer_cookie = auth_client["organizer"].cookies["session"].value
@@ -129,9 +124,7 @@ def test_organizer_can_hide_comment(
         content_type="application/json",
         HTTP_COOKIE=f"session={participant_cookie}",
     )
-    listing = client.get(
-        f"/api/events/{slug}/submissions/{with_submission.id}/comments"
-    ).json()
+    listing = client.get(f"/api/events/{slug}/submissions/{with_submission.id}/comments").json()
     assert len(listing) == 1
     comment_id = listing[0]["id"]
 
@@ -145,9 +138,7 @@ def test_organizer_can_hide_comment(
     assert hide_resp.status_code == 200
 
     # Public listing now empty.
-    after = client.get(
-        f"/api/events/{slug}/submissions/{with_submission.id}/comments"
-    ).json()
+    after = client.get(f"/api/events/{slug}/submissions/{with_submission.id}/comments").json()
     assert after == []
 
 

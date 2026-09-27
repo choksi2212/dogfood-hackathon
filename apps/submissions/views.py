@@ -294,9 +294,7 @@ class CommentListCreateView(APIView):
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
-        comment = Comment.objects.create(
-            submission=submission, author=request.user, body=body
-        )
+        comment = Comment.objects.create(submission=submission, author=request.user, body=body)
         return Response(CommentSerializer(comment).data, status=status.HTTP_201_CREATED)
 
 
