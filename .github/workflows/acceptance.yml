@@ -124,15 +124,18 @@ jobs:
           original = pathlib.Path(".dogfood.toml").read_text(encoding="utf-8")
           out = original
           for label_upper, token in tokens.items():
+              # ``.dogfood.toml`` uses lowercase label keys
+              # (organizer_HEADER, judge_a_HEADER, ...), while the
+              # seed_fixtures output uses UPPERCASE. Normalize so
+              # the substitution matches both.
               label = label_upper.replace("_HEADER", "").lower()
-              # Replace whatever value is currently bound to that label.
               pattern = re.compile(
-                  rf'({re.escape(label.upper())}_HEADER\s*=\s*")[^"]*(")',
+                  rf'({re.escape(label)}_HEADER\s*=\s*")[^"]*(")',
                   re.MULTILINE,
               )
               new_line, n = pattern.subn(rf'\g<1>Cookie: session={token}\g<2>', out)
               if n == 0:
-                  print(f"WARNING: did not find {label.upper()}_HEADER in .dogfood.toml", file=sys.stderr)
+                  print(f"WARNING: did not find {label}_HEADER in .dogfood.toml", file=sys.stderr)
               out = new_line
 
           pathlib.Path(".dogfood.ci.toml").write_text(out, encoding="utf-8")
