@@ -4,7 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api/client";
 import { ErrorState } from "@/components/StateMessage";
-import styles from "../submit/submit.module.css";
+import { PageHeader } from "@/components/PageHeader";
+import { InputField } from "@/components/Field";
+import { Button } from "@/components/Button";
+import styles from "./login.module.css";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,33 +34,25 @@ export default function LoginPage() {
 
   return (
     <div>
-      <h1>Log in</h1>
+      <PageHeader title="Log in" />
       <form className={styles.form} onSubmit={handleSubmit}>
-        <label className={styles.field}>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </label>
-        <label className={styles.field}>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </label>
-        <button
-          className={styles.submitButton}
-          type="submit"
-          disabled={status === "loading"}
-        >
-          {status === "loading" ? "Logging in..." : "Log in"}
-        </button>
+        <InputField
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <InputField
+          label="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <Button type="submit" loading={status === "loading"} className={styles.submitButton}>
+          Log in
+        </Button>
         {status === "error" && errorMessage && (
           <ErrorState>{errorMessage}</ErrorState>
         )}

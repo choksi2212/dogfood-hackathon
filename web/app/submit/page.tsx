@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api/client";
 import { ErrorState } from "@/components/StateMessage";
+import { PageHeader } from "@/components/PageHeader";
+import { InputField, SelectField, TextareaField } from "@/components/Field";
+import { Button } from "@/components/Button";
 import styles from "./submit.module.css";
 
 type Status = "idle" | "loading" | "success" | "error";
@@ -75,14 +78,14 @@ export default function SubmitPage() {
         <h1 className={styles.gateTitle}>Sign in to submit</h1>
         <p className={styles.gateBody}>
           Submissions are tied to your account so the organizer can reach
-          you if there's a question about your entry.
+          you if there&apos;s a question about your entry.
         </p>
         <div className={styles.gateActions}>
-          <Link href="/login" className={styles.gatePrimary}>
-            Sign in
+          <Link href="/login">
+            <Button variant="primary">Sign in</Button>
           </Link>
-          <Link href="/register" className={styles.gateSecondary}>
-            Create an account
+          <Link href="/register">
+            <Button variant="secondary">Create an account</Button>
           </Link>
         </div>
       </div>
@@ -91,83 +94,68 @@ export default function SubmitPage() {
 
   return (
     <div>
-      <h1>Submit your project</h1>
+      <PageHeader
+        title="Submit your project"
+        description="Tell judges what you built — you can edit this until submissions close."
+      />
       <form className={styles.form} onSubmit={handleSubmit}>
-        <label className={styles.field}>
-          Project name
-          <input
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            maxLength={80}
-            required
-          />
-        </label>
-        <label className={styles.field}>
-          Tagline
-          <input
-            value={form.tagline}
-            onChange={(e) => setForm({ ...form, tagline: e.target.value })}
-            maxLength={140}
-            placeholder="One sentence — what's the hook?"
-          />
-        </label>
-        <label className={styles.field}>
-          Description
-          <textarea
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            rows={6}
-            maxLength={8000}
-          />
-        </label>
-        <label className={styles.field}>
-          Track
-          <select
-            value={form.track_slug}
-            onChange={(e) => setForm({ ...form, track_slug: e.target.value })}
-            required
-          >
-            {KNOWN_TRACKS.map((t) => (
-              <option key={t.slug} value={t.slug}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={styles.field}>
-          Source repo (optional)
-          <input
-            type="url"
-            value={form.repo_url}
-            onChange={(e) => setForm({ ...form, repo_url: e.target.value })}
-            placeholder="https://github.com/team/project"
-          />
-        </label>
-        <label className={styles.field}>
-          Live site (optional)
-          <input
-            type="url"
-            value={form.live_url}
-            onChange={(e) => setForm({ ...form, live_url: e.target.value })}
-            placeholder="https://example.com"
-          />
-        </label>
-        <label className={styles.field}>
-          Demo video (optional)
-          <input
-            type="url"
-            value={form.demo_video_url}
-            onChange={(e) => setForm({ ...form, demo_video_url: e.target.value })}
-            placeholder="https://youtu.be/…"
-          />
-        </label>
-        <button
-          className={styles.submitButton}
-          type="submit"
-          disabled={status === "loading"}
+        <InputField
+          label="Project name"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          maxLength={80}
+          required
+        />
+        <InputField
+          label="Tagline"
+          value={form.tagline}
+          onChange={(e) => setForm({ ...form, tagline: e.target.value })}
+          maxLength={140}
+          placeholder="One sentence — what's the hook?"
+        />
+        <TextareaField
+          label="Description"
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          rows={6}
+          maxLength={8000}
+        />
+        <SelectField
+          label="Track"
+          value={form.track_slug}
+          onChange={(e) => setForm({ ...form, track_slug: e.target.value })}
+          required
         >
-          {status === "loading" ? "Submitting..." : "Submit"}
-        </button>
+          {KNOWN_TRACKS.map((t) => (
+            <option key={t.slug} value={t.slug}>
+              {t.label}
+            </option>
+          ))}
+        </SelectField>
+        <InputField
+          label="Source repo (optional)"
+          type="url"
+          value={form.repo_url}
+          onChange={(e) => setForm({ ...form, repo_url: e.target.value })}
+          placeholder="https://github.com/team/project"
+        />
+        <InputField
+          label="Live site (optional)"
+          type="url"
+          value={form.live_url}
+          onChange={(e) => setForm({ ...form, live_url: e.target.value })}
+          placeholder="https://example.com"
+        />
+        <InputField
+          label="Demo video (optional)"
+          type="url"
+          value={form.demo_video_url}
+          onChange={(e) => setForm({ ...form, demo_video_url: e.target.value })}
+          placeholder="https://youtu.be/…"
+        />
+        <Button type="submit" loading={status === "loading"} className={styles.submitButton}>
+          Submit
+        </Button>
         {status === "error" && errorMessage && (
           <ErrorState>{errorMessage}</ErrorState>
         )}

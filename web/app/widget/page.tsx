@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api/client";
 import { EVENT_SLUG } from "@/lib/api/routes";
+import { PageHeader } from "@/components/PageHeader";
 import styles from "./widget.module.css";
 
 export default function WidgetPage() {
@@ -46,12 +47,16 @@ export default function WidgetPage() {
 
   return (
     <div>
-      <h1>Embeddable widget</h1>
-      <p className={styles.lede}>
-        Drop this on any page to show the live gallery — no auth, no
-        iframe, just a script tag and the public{" "}
-        <code>/api/widget/gallery</code> feed.
-      </p>
+      <PageHeader
+        title="Embeddable widget"
+        description={
+          <>
+            Drop this on any page to show the live gallery — no auth, no
+            iframe, just a script tag and the public{" "}
+            <code>/api/widget/gallery</code> feed.
+          </>
+        }
+      />
 
       <h2 className={styles.sectionTitle}>Embed snippet</h2>
       <pre className={styles.snippet}>{snippet}</pre>

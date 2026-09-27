@@ -3,36 +3,29 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-3);
-  padding-top: var(--space-5);
+  padding: var(--space-6) 0;
 }
 
-.hero h1 {
-  font-size: 2rem;
+.eyebrow {
+  color: var(--accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.title {
+  font-size: var(--font-size-3xl);
 }
 
 .lede {
   color: var(--muted);
-  max-width: 40ch;
+  font-size: var(--font-size-lg);
+  max-width: 48ch;
 }
 
 .links {
   display: flex;
   gap: var(--space-3);
   margin-top: var(--space-2);
-}
-
-.primary,
-.secondary {
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius);
-  font-weight: 600;
-}
-
-.primary {
-  background: var(--accent);
-  color: var(--accent-foreground);
-}
-
-.secondary {
-  border: 1px solid var(--border);
 }

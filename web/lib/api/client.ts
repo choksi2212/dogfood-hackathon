@@ -1,29 +1,5 @@
 import { routes } from "./routes";
 import {
-  mockAssignmentRun,
-  mockAuditLog,
-  mockBulkInvite,
-  mockCertificate,
-  mockEventDetail,
-  mockGallery,
-  mockJudgeScores,
-  mockLogin,
-  mockMe,
-  mockMemberships,
-  mockMyBatch,
-  mockNormalize,
-  mockPairwiseBallot,
-  mockPairwiseRanking,
-  mockRetractVote,
-  mockScoreSave,
-  mockScoreSubmit,
-  mockSubmissionDetail,
-  mockSubmit,
-  mockVote,
-  mockVoteResults,
-  mockWidgetGallery,
-} from "./mocks";
-import {
   ApiError,
   type ApiErrorBody,
   type AssignmentRunResponse,
@@ -52,11 +28,6 @@ import {
   type VoteResultsResponse,
   type WidgetGalleryResponse,
 } from "./types";
-
-// Flip NEXT_PUBLIC_USE_MOCKS=1 to develop screens before the backend
-// route exists or is reachable. Both adapters implement the same
-// interface below, so switching is not a component-level change.
-const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS === "1";
 
 // Server Components run on the Node server and can reach Django
 // directly — no browser involved, so no CORS concern. Client Components
@@ -111,35 +82,29 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   gallery(): Promise<GalleryResponse> {
-    return USE_MOCKS ? mockGallery() : request(routes.gallery());
+    return request(routes.gallery());
   },
 
   me(): Promise<User> {
-    return USE_MOCKS ? mockMe() : request(routes.me());
+    return request(routes.me());
   },
 
   submission(id: string): Promise<SubmissionDetail> {
-    return USE_MOCKS
-      ? mockSubmissionDetail(id)
-      : request(routes.submission(id));
+    return request(routes.submission(id));
   },
 
   submit(payload: SubmitPayload, slug?: string): Promise<SubmitResponse> {
-    return USE_MOCKS
-      ? mockSubmit(payload)
-      : request(routes.submit(slug), {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
+    return request(routes.submit(slug), {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 
   login(payload: LoginPayload): Promise<User> {
-    return USE_MOCKS
-      ? mockLogin(payload)
-      : request(routes.login(), {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
+    return request(routes.login(), {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 
   // `cookieHeader` is required when called from a Server Component —
@@ -148,54 +113,42 @@ export const api = {
   // callers can omit it; `credentials: "include"` on `request` handles
   // that case instead.
   judgeScores(cookieHeader?: string): Promise<JudgeScoresResponse> {
-    return USE_MOCKS
-      ? mockJudgeScores()
-      : request(routes.judgeScores(), cookieInit(cookieHeader));
+    return request(routes.judgeScores(), cookieInit(cookieHeader));
   },
 
   // Judge B's own console reuses judgeScores(); this is for the one
   // graded cross-judge cell (organizer/audit tooling), which the spec
   // expects to come back 401/403 for a judge peeking at another judge.
   peerScores(judge: string, cookieHeader?: string): Promise<JudgeScoresResponse> {
-    return USE_MOCKS
-      ? mockJudgeScores()
-      : request(routes.peerScores(judge), cookieInit(cookieHeader));
+    return request(routes.peerScores(judge), cookieInit(cookieHeader));
   },
 
   // Casting is anonymous-friendly (AllowAny on the backend) — an
   // authenticated voter is identified by session cookie same as
   // everywhere else, an anonymous one by IP+UA fingerprint server-side.
   vote(projectId: string, slug?: string): Promise<VoteResponse> {
-    return USE_MOCKS
-      ? mockVote(projectId)
-      : request(routes.vote(projectId, slug), { method: "POST" });
+    return request(routes.vote(projectId, slug), { method: "POST" });
   },
 
   retractVote(projectId: string, slug?: string): Promise<RetractVoteResponse> {
-    return USE_MOCKS
-      ? mockRetractVote(projectId)
-      : request(routes.vote(projectId, slug), { method: "DELETE" });
+    return request(routes.vote(projectId, slug), { method: "DELETE" });
   },
 
   pairwiseBallot(
     payload: PairwiseBallotPayload,
     slug?: string,
   ): Promise<PairwiseBallotResponse> {
-    return USE_MOCKS
-      ? mockPairwiseBallot(payload)
-      : request(routes.pairwiseBallots(slug), {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
+    return request(routes.pairwiseBallots(slug), {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 
   pairwiseRanking(
     slug?: string,
     cookieHeader?: string,
   ): Promise<PairwiseRankingResponse> {
-    return USE_MOCKS
-      ? mockPairwiseRanking()
-      : request(routes.pairwiseRanking(slug), cookieInit(cookieHeader));
+    return request(routes.pairwiseRanking(slug), cookieInit(cookieHeader));
   },
 
   // Organizer dashboard. eventDetail/memberships are read from a
@@ -204,50 +157,38 @@ export const api = {
   // explicit cookie (same-origin browser request, credentials:
   // "include" on `request` covers it).
   eventDetail(slug?: string, cookieHeader?: string): Promise<EventDetail> {
-    return USE_MOCKS
-      ? mockEventDetail()
-      : request(routes.eventDetail(slug), cookieInit(cookieHeader));
+    return request(routes.eventDetail(slug), cookieInit(cookieHeader));
   },
 
   memberships(slug?: string, cookieHeader?: string): Promise<Membership[]> {
-    return USE_MOCKS
-      ? mockMemberships()
-      : request(routes.memberships(slug), cookieInit(cookieHeader));
+    return request(routes.memberships(slug), cookieInit(cookieHeader));
   },
 
   bulkInviteJudges(emails: string[], slug?: string): Promise<BulkInviteResponse> {
-    return USE_MOCKS
-      ? mockBulkInvite(emails)
-      : request(routes.bulkInviteJudges(slug), {
-          method: "POST",
-          body: JSON.stringify({ emails }),
-        });
+    return request(routes.bulkInviteJudges(slug), {
+      method: "POST",
+      body: JSON.stringify({ emails }),
+    });
   },
 
   runAssignment(
     payload: { seed?: number; reviews_per_project?: number } = {},
     slug?: string,
   ): Promise<AssignmentRunResponse> {
-    return USE_MOCKS
-      ? mockAssignmentRun()
-      : request(routes.assignmentsRun(slug), {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
+    return request(routes.assignmentsRun(slug), {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 
   runNormalization(slug?: string): Promise<NormalizeResponse> {
-    return USE_MOCKS
-      ? mockNormalize()
-      : request(routes.normalize(slug), { method: "POST" });
+    return request(routes.normalize(slug), { method: "POST" });
   },
 
   // Judge console — real project names/tagline, unlike judgeScores()
   // above which only has bare UUIDs.
   meBatch(slug?: string, cookieHeader?: string): Promise<MyBatchResponse> {
-    return USE_MOCKS
-      ? mockMyBatch()
-      : request(routes.meBatch(slug), cookieInit(cookieHeader));
+    return request(routes.meBatch(slug), cookieInit(cookieHeader));
   },
 
   saveScore(
@@ -255,33 +196,26 @@ export const api = {
     payload: ScoreSavePayload,
     slug?: string,
   ): Promise<ScoreSaveResponse> {
-    return USE_MOCKS
-      ? mockScoreSave()
-      : request(routes.scoreSave(projectId, slug), {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        });
+    return request(routes.scoreSave(projectId, slug), {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
   },
 
   submitScore(projectId: string, slug?: string): Promise<ScoreSubmitResponse> {
-    return USE_MOCKS
-      ? mockScoreSubmit()
-      : request(routes.scoreSubmit(projectId, slug), { method: "POST" });
+    return request(routes.scoreSubmit(projectId, slug), { method: "POST" });
   },
 
   // Public, no auth — a certificate is a signed record anyone holding
   // the public_id can verify.
   certificate(publicId: string): Promise<CertificateResponse> {
-    return USE_MOCKS
-      ? mockCertificate(publicId)
-      : request(routes.certificate(publicId));
+    return request(routes.certificate(publicId));
   },
 
   // Widget preview data, fetched the same way a third-party embedder's
   // browser would (direct cross-origin GET, no cookies) — not proxied,
   // to demonstrate the real embed actually works standalone.
   widgetGallery(slug?: string): Promise<WidgetGalleryResponse> {
-    if (USE_MOCKS) return mockWidgetGallery();
     return fetch(`${WIDGET_BASE}${routes.widgetGallery(slug)}`, {
       credentials: "omit",
       cache: "no-store",
@@ -296,9 +230,7 @@ export const api = {
   // apps/voting only had cast/retract, and apps/audit had no HTTP
   // surface at all despite writing AuditEvent rows across the app.
   voteResults(slug?: string, cookieHeader?: string): Promise<VoteResultsResponse> {
-    return USE_MOCKS
-      ? mockVoteResults()
-      : request(routes.voteResults(slug), cookieInit(cookieHeader));
+    return request(routes.voteResults(slug), cookieInit(cookieHeader));
   },
 
   auditLog(
@@ -306,9 +238,7 @@ export const api = {
     limit?: number,
     cookieHeader?: string,
   ): Promise<AuditLogResponse> {
-    return USE_MOCKS
-      ? mockAuditLog()
-      : request(routes.auditLog(slug, limit), cookieInit(cookieHeader));
+    return request(routes.auditLog(slug, limit), cookieInit(cookieHeader));
   },
 
   // CSV export is a file download the browser navigates to directly

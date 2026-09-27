@@ -1,5 +1,7 @@
 import { api, ApiError } from "@/lib/api/client";
 import { ErrorState } from "@/components/StateMessage";
+import { PageHeader } from "@/components/PageHeader";
+import { Badge } from "@/components/Badge";
 import styles from "./certificate.module.css";
 
 export default async function CertificatePage({
@@ -13,8 +15,10 @@ export default async function CertificatePage({
     const cert = await api.certificate(publicId);
     return (
       <div>
-        <h1>Certificate verified</h1>
-        <p className={styles.badge}>✓ Signature valid ({cert.signature_algorithm})</p>
+        <PageHeader title="Certificate verified" />
+        <Badge tone="success" className={styles.badge}>
+          ✓ Signature valid ({cert.signature_algorithm})
+        </Badge>
         <dl className={styles.details}>
           <dt>Certificate ID</dt>
           <dd>{cert.public_id}</dd>
@@ -33,7 +37,7 @@ export default async function CertificatePage({
     if (err instanceof ApiError && err.status === 404) {
       return (
         <div>
-          <h1>Certificate not found</h1>
+          <PageHeader title="Certificate not found" />
           <ErrorState>No certificate exists with ID &quot;{publicId}&quot;.</ErrorState>
         </div>
       );
@@ -41,7 +45,7 @@ export default async function CertificatePage({
     if (err instanceof ApiError && err.code === "signature_invalid") {
       return (
         <div>
-          <h1>Certificate tampered</h1>
+          <PageHeader title="Certificate tampered" />
           <ErrorState>
             This certificate&apos;s signature does not match its payload —
             it may have been altered after issuance.

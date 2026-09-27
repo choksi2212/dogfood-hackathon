@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import { Nav } from "@/components/Nav";
 import styles from "./layout.module.css";
 
 export const metadata: Metadata = {
@@ -18,18 +19,10 @@ export default function RootLayout({
       <body>
         <div className={styles.shell}>
           <header className={styles.header}>
-            <span className={styles.brand}>Dogfood Portal</span>
-            <nav className={styles.nav}>
-              <Link href="/gallery">Gallery</Link>
-              <Link href="/submit">Submit</Link>
-              <Link href="/vote">Vote</Link>
-              <Link href="/judge">Judge</Link>
-              <Link href="/pairwise">Pairwise</Link>
-              <Link href="/certificates">Certificates</Link>
-              <Link href="/widget">Widget</Link>
-              <Link href="/organizer">Organizer</Link>
-              <Link href="/login">Log in</Link>
-            </nav>
+            <Link href="/gallery" className={styles.brand}>
+              Dogfood Portal
+            </Link>
+            <Nav />
           </header>
           <main className={styles.main}>{children}</main>
         </div>

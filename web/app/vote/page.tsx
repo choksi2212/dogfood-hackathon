@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api/client";
 import { EmptyState, ErrorState, LoadingState } from "@/components/StateMessage";
+import { PageHeader } from "@/components/PageHeader";
+import { Card } from "@/components/Card";
+import { Button } from "@/components/Button";
 import type { Submission } from "@/lib/api/types";
 import styles from "./vote.module.css";
 
@@ -68,7 +71,7 @@ export default function VotePage() {
 
   return (
     <div>
-      <h1>Vote</h1>
+      <PageHeader title="Vote" description="One vote per project — cast it, or take it back." />
       {items.length === 0 ? (
         <EmptyState>No projects to vote on yet.</EmptyState>
       ) : (
@@ -76,30 +79,31 @@ export default function VotePage() {
           {items.map((item) => {
             const state = voteState[item.id] ?? "idle";
             return (
-              <li key={item.id} className={styles.row}>
-                <div>
-                  <span className={styles.name}>{item.name}</span>
-                  <p className={styles.tagline}>{item.tagline}</p>
-                </div>
-                {state === "voted" ? (
-                  <button
-                    className={styles.retractButton}
-                    onClick={() => retractVote(item.id)}
-                  >
-                    Retract
-                  </button>
-                ) : (
-                  <button
-                    className={styles.voteButton}
-                    disabled={state === "pending"}
-                    onClick={() => castVote(item.id)}
-                  >
-                    {state === "pending" ? "..." : "Vote"}
-                  </button>
-                )}
-                {rowError[item.id] && (
-                  <p className={styles.rowError}>{rowError[item.id]}</p>
-                )}
+              <li key={item.id}>
+                <Card className={styles.row}>
+                  <div>
+                    <span className={styles.name}>{item.name}</span>
+                    <p className={styles.tagline}>{item.tagline}</p>
+                  </div>
+                  <div className={styles.rowEnd}>
+                    {state === "voted" ? (
+                      <Button variant="secondary" onClick={() => retractVote(item.id)}>
+                        Retract
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        loading={state === "pending"}
+                        onClick={() => castVote(item.id)}
+                      >
+                        Vote
+                      </Button>
+                    )}
+                    {rowError[item.id] && (
+                      <p className={styles.rowError}>{rowError[item.id]}</p>
+                    )}
+                  </div>
+                </Card>
               </li>
             );
           })}

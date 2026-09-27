@@ -5,30 +5,24 @@
 }
 
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--background) 88%, transparent);
+  backdrop-filter: blur(8px);
   padding: var(--space-3) var(--space-4);
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-
-.brand {
-  font-weight: 700;
-  font-size: 1.1rem;
-}
-
-.nav {
-  display: flex;
   gap: var(--space-4);
 }
 
-.nav a {
-  color: var(--muted);
-  font-size: 0.95rem;
-}
-
-.nav a:hover {
-  color: var(--foreground);
+.brand {
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-lg);
+  letter-spacing: -0.01em;
+  flex-shrink: 0;
 }
 
 .main {

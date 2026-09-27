@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { api } from "@/lib/api/client";
 import { EmptyState } from "@/components/StateMessage";
+import { PageHeader } from "@/components/PageHeader";
+import { Button } from "@/components/Button";
 import styles from "./results.module.css";
 
 export default async function VotingResultsPage() {
@@ -17,10 +19,14 @@ export default async function VotingResultsPage() {
 
   return (
     <div>
-      <div className={styles.header}>
-        <h1>Voting results &amp; audit log</h1>
-        <Link href="/organizer">Back to dashboard</Link>
-      </div>
+      <PageHeader
+        title="Voting results & audit log"
+        actions={
+          <Link href="/organizer">
+            <Button variant="secondary">Back to dashboard</Button>
+          </Link>
+        }
+      />
 
       <section>
         <h2 className={styles.sectionTitle}>Results</h2>

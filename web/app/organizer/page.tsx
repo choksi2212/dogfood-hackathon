@@ -3,6 +3,10 @@ import Link from "next/link";
 import { api, ApiError } from "@/lib/api/client";
 import { AssignmentPanel, BulkInvitePanel, NormalizationPanel } from "./actions";
 import { EmptyState, ErrorState } from "@/components/StateMessage";
+import { PageHeader } from "@/components/PageHeader";
+import { Card } from "@/components/Card";
+import { Badge } from "@/components/Badge";
+import { Button } from "@/components/Button";
 import styles from "./organizer.module.css";
 
 export default async function OrganizerPage() {
@@ -25,8 +29,8 @@ export default async function OrganizerPage() {
           <EmptyState>
             <h2>Sign in to access the dashboard</h2>
             <p>Only organizers can see this page.</p>
-            <Link href="/login" className={styles.signinLink}>
-              Sign in
+            <Link href="/login">
+              <Button variant="primary">Sign in</Button>
             </Link>
           </EmptyState>
         );
@@ -36,7 +40,7 @@ export default async function OrganizerPage() {
           <EmptyState>
             <h2>Organizer role required</h2>
             <p>
-              You're signed in, but this account isn't listed as an
+              You&apos;re signed in, but this account isn&apos;t listed as an
               organizer for this event. Ask the event owner to add you.
             </p>
           </EmptyState>
@@ -45,7 +49,7 @@ export default async function OrganizerPage() {
     }
     return (
       <ErrorState>
-        Couldn't load the dashboard:{" "}
+        Couldn&apos;t load the dashboard:{" "}
         {err instanceof Error ? err.message : "Unknown error."}
       </ErrorState>
     );
@@ -58,17 +62,17 @@ export default async function OrganizerPage() {
 
   return (
     <div>
-      <div className={styles.titleRow}>
-        <div>
-          <h1>{event.name}</h1>
-          <p className={styles.lede}>{event.description}</p>
-        </div>
-        <Link href="/organizer/results" className={styles.resultsLink}>
-          Voting results &amp; audit log →
-        </Link>
-      </div>
+      <PageHeader
+        title={event.name}
+        description={event.description}
+        actions={
+          <Link href="/organizer/results">
+            <Button variant="secondary">Voting results &amp; audit log →</Button>
+          </Link>
+        }
+      />
 
-      <div className={styles.overview}>
+      <Card className={styles.overview}>
         <div>
           <span className={styles.label}>State</span>
           <span>{event.state}</span>
@@ -88,15 +92,15 @@ export default async function OrganizerPage() {
           <span className={styles.label}>Voting mode</span>
           <span>{event.voting_mode}</span>
         </div>
-      </div>
+      </Card>
 
       <h2 className={styles.sectionTitle}>Membership</h2>
       <div className={styles.roleCounts}>
         {Object.entries(roleCounts).map(([role, count]) => (
-          <span key={role} className={styles.roleChip}>
+          <Badge key={role} tone="neutral">
             {count} {role}
             {count === 1 ? "" : "s"}
-          </span>
+          </Badge>
         ))}
       </div>
       <table className={styles.table}>
@@ -123,15 +127,17 @@ export default async function OrganizerPage() {
         <BulkInvitePanel />
         <AssignmentPanel />
         <NormalizationPanel />
-        <section className={styles.exportPanel}>
+        <Card className={styles.exportPanel}>
           <h2>Export</h2>
           <p className={styles.hint}>
             Download the current scores as CSV for offline review.
           </p>
-          <a className={styles.exportButton} href={api.csvExportUrl()} download>
-            Export scores (CSV)
+          <a href={api.csvExportUrl()} download>
+            <Button variant="primary" className={styles.exportButton}>
+              Export scores (CSV)
+            </Button>
           </a>
-        </section>
+        </Card>
       </div>
     </div>
   );

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api/client";
 import { ErrorState } from "@/components/StateMessage";
+import { Card } from "@/components/Card";
+import { Button } from "@/components/Button";
 import type { EventDetail } from "@/lib/api/types";
 import styles from "./score.module.css";
 
@@ -78,7 +80,7 @@ export function ScoreForm({
   return (
     <div className={styles.form}>
       {criteria.map((criterion) => (
-        <div key={criterion.id} className={styles.criterion}>
+        <Card key={criterion.id} className={styles.criterion}>
           <div className={styles.criterionHeader}>
             <span className={styles.criterionName}>{criterion.name}</span>
             <span className={styles.criterionWeight}>
@@ -104,7 +106,7 @@ export function ScoreForm({
               {values[criterion.id] ?? criterion.min} / {criterion.max}
             </span>
           </div>
-        </div>
+        </Card>
       ))}
 
       <label className={styles.commentField}>
@@ -117,20 +119,22 @@ export function ScoreForm({
       </label>
 
       <div className={styles.actions}>
-        <button
-          className={styles.saveButton}
+        <Button
+          variant="secondary"
           onClick={handleSave}
-          disabled={status === "saving" || status === "submitting"}
+          loading={status === "saving"}
+          disabled={status === "submitting"}
         >
-          {status === "saving" ? "Saving..." : "Save draft"}
-        </button>
-        <button
-          className={styles.submitButton}
+          Save draft
+        </Button>
+        <Button
+          variant="primary"
           onClick={handleSubmit}
-          disabled={status === "saving" || status === "submitting"}
+          loading={status === "submitting"}
+          disabled={status === "saving"}
         >
-          {status === "submitting" ? "Submitting..." : "Submit review"}
-        </button>
+          Submit review
+        </Button>
         {saved && status === "idle" && (
           <span className={styles.savedHint}>Saved.</span>
         )}

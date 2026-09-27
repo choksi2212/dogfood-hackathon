@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { api, ApiError } from "@/lib/api/client";
 import { ErrorState } from "@/components/StateMessage";
+import { Badge } from "@/components/Badge";
 import styles from "./detail.module.css";
 
 export default async function SubmissionDetailPage({
@@ -43,7 +44,9 @@ export default async function SubmissionDetailPage({
       </Link>
 
       <header className={styles.header}>
-        <div className={styles.eyebrow}>{submission.track_slug}</div>
+        <div className={styles.eyebrow}>
+          <Badge tone="accent">{submission.track_slug}</Badge>
+        </div>
         <h1 className={styles.title}>{submission.name}</h1>
         {submission.tagline && (
           <p className={styles.tagline}>{submission.tagline}</p>
@@ -53,7 +56,7 @@ export default async function SubmissionDetailPage({
           <span aria-hidden="true">·</span>
           <span>Submitted {submitted}</span>
           <span aria-hidden="true">·</span>
-          <span className={styles.status}>{submission.status}</span>
+          <Badge tone="success">{submission.status}</Badge>
         </div>
       </header>
 

@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { api } from "@/lib/api/client";
 import { ScoreForm } from "./ScoreForm";
-import styles from "./score.module.css";
+import { PageHeader } from "@/components/PageHeader";
 
 export default async function JudgeScorePage({
   params,
@@ -26,8 +26,7 @@ export default async function JudgeScorePage({
 
   return (
     <div>
-      <h1>{project.name}</h1>
-      <p className={styles.tagline}>{project.tagline}</p>
+      <PageHeader title={project.name} description={project.tagline} />
       <ScoreForm projectId={project.id} criteria={criteria} />
     </div>
   );

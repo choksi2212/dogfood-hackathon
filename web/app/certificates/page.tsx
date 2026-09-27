@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { PageHeader } from "@/components/PageHeader";
+import { InputField } from "@/components/Field";
+import { Button } from "@/components/Button";
 import styles from "./certificates.module.css";
 
 export default function CertificateLookupPage() {
@@ -16,22 +19,20 @@ export default function CertificateLookupPage() {
 
   return (
     <div>
-      <h1>Verify a certificate</h1>
-      <p className={styles.lede}>
-        Certificates are public, HMAC-signed records. Paste a certificate ID
-        to verify its signature and see what it attests.
-      </p>
+      <PageHeader
+        title="Verify a certificate"
+        description="Certificates are public, HMAC-signed records. Paste a certificate ID to verify its signature and see what it attests."
+      />
       <form className={styles.form} onSubmit={handleSubmit}>
-        <input
-          className={styles.input}
+        <InputField
+          label="Certificate ID"
           value={publicId}
           onChange={(e) => setPublicId(e.target.value)}
           placeholder="Certificate ID"
           required
+          className={styles.input}
         />
-        <button className={styles.button} type="submit">
-          Verify
-        </button>
+        <Button type="submit">Verify</Button>
       </form>
     </div>
   );

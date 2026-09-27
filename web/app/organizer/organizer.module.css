@@ -1,32 +1,7 @@
-.titleRow {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.resultsLink {
-  color: var(--accent);
-  font-size: 0.9rem;
-  white-space: nowrap;
-  margin-top: var(--space-2);
-}
-
-.lede {
-  color: var(--muted);
-  margin-top: var(--space-2);
-  max-width: 60ch;
-}
-
 .overview {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--space-3);
-  margin-top: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--space-4);
-  background: var(--surface);
 }
 
 .overview > div {
@@ -37,7 +12,7 @@
 
 .label {
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -53,14 +28,6 @@
   margin-bottom: var(--space-3);
 }
 
-.roleChip {
-  padding: var(--space-1) var(--space-3);
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -74,13 +41,17 @@
   text-align: left;
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--border);
-  font-size: 0.9rem;
+  font-size: var(--font-size-sm);
 }
 
 .table th {
   color: var(--muted);
-  font-weight: 600;
-  background: var(--surface);
+  font-weight: var(--font-weight-semibold);
+  background: var(--surface-2);
+}
+
+.table tr:last-child td {
+  border-bottom: none;
 }
 
 .actions {
@@ -90,24 +61,18 @@
 }
 
 .exportPanel {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--space-4);
-  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .hint {
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   margin-top: var(--space-1);
+  margin-bottom: var(--space-3);
 }
 
 .exportButton {
-  display: inline-block;
-  margin-top: var(--space-3);
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius);
-  background: var(--accent);
-  color: var(--accent-foreground);
-  font-weight: 600;
+  text-decoration: none;
 }

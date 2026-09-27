@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api, ApiError } from "@/lib/api/client";
 import { ErrorState, LoadingState } from "@/components/StateMessage";
+import { PageHeader } from "@/components/PageHeader";
+import { Button } from "@/components/Button";
 import type { PairwiseWinner, Submission } from "@/lib/api/types";
 import styles from "./pairwise.module.css";
 
@@ -103,13 +105,15 @@ export default function PairwisePage() {
 
   return (
     <div>
-      <div className={styles.header}>
-        <h1>Pairwise compare</h1>
-        <Link href="/pairwise/ranking">View ranking</Link>
-      </div>
-      <p className={styles.hint}>
-        ← left wins · → right wins · space / T tie · {count} compared this session
-      </p>
+      <PageHeader
+        title="Pairwise compare"
+        description={`← left wins · → right wins · space / T tie · ${count} compared this session`}
+        actions={
+          <Link href="/pairwise/ranking">
+            <Button variant="secondary">View ranking</Button>
+          </Link>
+        }
+      />
       {voteError && <ErrorState>{voteError}</ErrorState>}
       {pair && (
         <div className={styles.arena}>

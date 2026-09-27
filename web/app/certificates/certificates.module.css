@@ -1,32 +1,10 @@
-.lede {
-  color: var(--muted);
-  margin-top: var(--space-2);
-  max-width: 50ch;
-}
-
 .form {
   display: flex;
+  align-items: flex-end;
   gap: var(--space-2);
-  margin-top: var(--space-4);
   max-width: 480px;
 }
 
 .input {
   flex: 1;
-  font: inherit;
-  color: var(--foreground);
-  background: var(--background);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--space-2);
-}
-
-.button {
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius);
-  border: none;
-  background: var(--accent);
-  color: var(--accent-foreground);
-  font-weight: 600;
-  cursor: pointer;
 }

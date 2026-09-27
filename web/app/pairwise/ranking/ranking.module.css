@@ -1,44 +1,11 @@
-.header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.header a {
-  color: var(--accent);
-  font-size: 0.9rem;
-}
-
 .headerActions {
   display: flex;
   align-items: center;
   gap: var(--space-3);
 }
 
-.exportButton {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--foreground);
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.exportButton:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.meta {
-  color: var(--muted);
-  font-size: 0.85rem;
-  margin-top: var(--space-1);
-}
-
 .list {
   list-style: none;
-  margin-top: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -52,16 +19,21 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-3);
+  background: var(--surface);
 }
 
 .rank {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--accent);
+}
+
+.project {
+  font-weight: var(--font-weight-medium);
 }
 
 .record,
 .theta {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
-  font-size: 0.9rem;
+  font-size: var(--font-size-sm);
 }

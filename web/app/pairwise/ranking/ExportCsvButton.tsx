@@ -1,6 +1,6 @@
 "use client";
 
-import styles from "./ranking.module.css";
+import { Button } from "@/components/Button";
 
 type ExportRow = {
   rank: number;
@@ -50,8 +50,8 @@ export function ExportCsvButton({
   }
 
   return (
-    <button className={styles.exportButton} onClick={handleClick}>
+    <Button variant="secondary" onClick={handleClick}>
       Export CSV
-    </button>
+    </Button>
   );
 }

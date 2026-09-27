@@ -2,6 +2,10 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { api, ApiError } from "@/lib/api/client";
 import { EmptyState, ErrorState } from "@/components/StateMessage";
+import { PageHeader } from "@/components/PageHeader";
+import { Card } from "@/components/Card";
+import { Badge } from "@/components/Badge";
+import { Button } from "@/components/Button";
 import styles from "./judge.module.css";
 
 export default async function JudgePage() {
@@ -19,10 +23,10 @@ export default async function JudgePage() {
           <EmptyState>
             <h2>Sign in to see your batch</h2>
             <p>
-              Only assigned judges can see the projects they're scoring.
+              Only assigned judges can see the projects they&apos;re scoring.
             </p>
-            <Link href="/login" className={styles.signinLink}>
-              Sign in
+            <Link href="/login">
+              <Button variant="primary">Sign in</Button>
             </Link>
           </EmptyState>
         );
@@ -33,43 +37,48 @@ export default async function JudgePage() {
             <h2>No batch assigned</h2>
             <p>
               Judging assignments are issued per-judge by the organizer.
-              You're signed in, but you don't have one for this event.
+              You&apos;re signed in, but you don&apos;t have one for this event.
             </p>
           </EmptyState>
         );
       }
       return (
         <ErrorState>
-          Couldn't load your batch: {err.message}
+          Couldn&apos;t load your batch: {err.message}
         </ErrorState>
       );
     }
-    return <ErrorState>Couldn't load your batch.</ErrorState>;
+    return <ErrorState>Couldn&apos;t load your batch.</ErrorState>;
   }
+
+  // A judge can hold assignments across more than one batch (e.g. the
+  // organizer re-runs assignment), and meBatch() doesn't dedupe across
+  // them — collapse by project id so the same project never renders twice.
+  const projects = Array.from(
+    new Map(batch.projects.map((p) => [p.id, p])).values(),
+  );
 
   return (
     <div>
-      <h1>Your batch</h1>
-      <p className={styles.progress}>
-        {batch.progress.scored} of {batch.progress.total} reviewed
-      </p>
-      {batch.projects.length === 0 ? (
+      <PageHeader
+        title="Your batch"
+        description={`${batch.progress.scored} of ${batch.progress.total} reviewed`}
+      />
+      {projects.length === 0 ? (
         <EmptyState>No submissions assigned to you yet.</EmptyState>
       ) : (
         <ul className={styles.list}>
-          {batch.projects.map((project) => (
-            <li key={project.id} className={styles.row}>
-              <Link href={`/judge/${project.id}`} className={styles.link}>
-                <span className={styles.name}>{project.name}</span>
-                <span className={styles.tagline}>{project.tagline}</span>
-              </Link>
-              <span
-                className={
-                  project.reviewed ? styles.badgeDone : styles.badgePending
-                }
-              >
-                {project.reviewed ? "Reviewed" : "Pending"}
-              </span>
+          {projects.map((project) => (
+            <li key={project.id}>
+              <Card className={styles.row}>
+                <Link href={`/judge/${project.id}`} className={styles.link}>
+                  <span className={styles.name}>{project.name}</span>
+                  <span className={styles.tagline}>{project.tagline}</span>
+                </Link>
+                <Badge tone={project.reviewed ? "success" : "neutral"}>
+                  {project.reviewed ? "Reviewed" : "Pending"}
+                </Badge>
+              </Card>
             </li>
           ))}
         </ul>

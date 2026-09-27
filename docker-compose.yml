@@ -144,7 +144,6 @@ services:
       # port (see the nginx service below), not the internal service
       # name.
       NEXT_PUBLIC_WIDGET_BASE: http://localhost:8000
-      NEXT_PUBLIC_USE_MOCKS: ${NEXT_PUBLIC_USE_MOCKS:-0}
     volumes:
       - ./web:/app
       - /app/node_modules

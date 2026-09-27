@@ -1,19 +1,22 @@
 import Link from "next/link";
+import { Button } from "@/components/Button";
 import styles from "./page.module.css";
 
 export default function Home() {
   return (
     <div className={styles.hero}>
-      <h1>Dogfood Portal</h1>
+      <span className={styles.eyebrow}>Hackathon judging portal</span>
+      <h1 className={styles.title}>Dogfood Portal</h1>
       <p className={styles.lede}>
-        Submit a project, judge a batch, or browse what shipped.
+        Submit a project, judge a batch, cast a vote, or browse what shipped —
+        all in one place.
       </p>
       <div className={styles.links}>
-        <Link className={styles.primary} href="/gallery">
-          View gallery
+        <Link href="/gallery">
+          <Button variant="primary">View gallery</Button>
         </Link>
-        <Link className={styles.secondary} href="/submit">
-          Submit a project
+        <Link href="/submit">
+          <Button variant="secondary">Submit a project</Button>
         </Link>
       </div>
     </div>

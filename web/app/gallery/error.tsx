@@ -1,6 +1,7 @@
 "use client";
 
 import { ErrorState } from "@/components/StateMessage";
+import { Button } from "@/components/Button";
 
 export default function GalleryError({
   error,
@@ -12,7 +13,9 @@ export default function GalleryError({
   return (
     <ErrorState>
       <p>Could not load the gallery: {error.message}</p>
-      <button onClick={reset}>Try again</button>
+      <Button variant="secondary" onClick={reset}>
+        Try again
+      </Button>
     </ErrorState>
   );
 }

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { api } from "@/lib/api/client";
 import { EVENT_SLUG } from "@/lib/api/routes";
 import { EmptyState } from "@/components/StateMessage";
+import { PageHeader } from "@/components/PageHeader";
+import { Button } from "@/components/Button";
 import { ExportCsvButton } from "./ExportCsvButton";
 import styles from "./ranking.module.css";
 
@@ -24,19 +26,22 @@ export default async function PairwiseRankingPage() {
 
   return (
     <div>
-      <div className={styles.header}>
-        <h1>Pairwise ranking</h1>
-        <div className={styles.headerActions}>
-          {rows.length > 0 && (
-            <ExportCsvButton rows={rows} eventSlug={EVENT_SLUG} />
-          )}
-          <Link href="/pairwise">Back to compare</Link>
-        </div>
-      </div>
-      <p className={styles.meta}>
-        {data.n_ballots} ballots · {data.iterations} iterations ·{" "}
-        {data.converged ? "converged" : "not yet converged"}
-      </p>
+      <PageHeader
+        title="Pairwise ranking"
+        description={`${data.n_ballots} ballots · ${data.iterations} iterations · ${
+          data.converged ? "converged" : "not yet converged"
+        }`}
+        actions={
+          <div className={styles.headerActions}>
+            {rows.length > 0 && (
+              <ExportCsvButton rows={rows} eventSlug={EVENT_SLUG} />
+            )}
+            <Link href="/pairwise">
+              <Button variant="secondary">Back to compare</Button>
+            </Link>
+          </div>
+        }
+      />
       {rows.length === 0 ? (
         <EmptyState>No ballots cast yet.</EmptyState>
       ) : (
