@@ -23,3 +23,11 @@ JUDGING.md
 DATA-MODEL.md
 acceptance.py
 acceptance-report.txt
+
+# Manas-branch-only: the frontend is being rewritten end-to-end.
+# Untracked on this branch so Mihir's pull never carries the new
+# frontend across to main. Mihir's existing local files stay on
+# disk (they're just untracked now), the placeholder frontend in
+# main keeps shipping, and the docker frontend service continues
+# to run the legacy code without ever seeing the rewrite.
+frontend/
