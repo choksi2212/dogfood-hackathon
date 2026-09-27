@@ -238,6 +238,37 @@ export type WidgetGalleryResponse = {
   event: string;
 };
 
+// Matches apps/voting/views.py VoteResultsView.
+export type VoteResultRow = {
+  project_id: string;
+  project_name: string;
+  vote_count: number;
+  total_votes: number;
+};
+
+export type VoteResultsResponse = {
+  event_slug: string;
+  voting_mode: "simple" | "quadratic";
+  results_visible: boolean;
+  results: VoteResultRow[];
+};
+
+// Matches apps/audit/views.py AuditLogView.
+export type AuditLogEntry = {
+  id: string;
+  actor_email: string | null;
+  action: string;
+  target_type: string;
+  target_id: string | null;
+  result: "success" | "denied" | "error";
+  created_at: string;
+};
+
+export type AuditLogResponse = {
+  event_slug: string;
+  entries: AuditLogEntry[];
+};
+
 export class ApiError extends Error {
   code: string;
   status: number;

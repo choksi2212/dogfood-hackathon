@@ -1,6 +1,7 @@
 import { routes } from "./routes";
 import {
   mockAssignmentRun,
+  mockAuditLog,
   mockBulkInvite,
   mockCertificate,
   mockEventDetail,
@@ -17,12 +18,14 @@ import {
   mockScoreSubmit,
   mockSubmit,
   mockVote,
+  mockVoteResults,
   mockWidgetGallery,
 } from "./mocks";
 import {
   ApiError,
   type ApiErrorBody,
   type AssignmentRunResponse,
+  type AuditLogResponse,
   type BulkInviteResponse,
   type CertificateResponse,
   type EventDetail,
@@ -43,6 +46,7 @@ import {
   type SubmitResponse,
   type User,
   type VoteResponse,
+  type VoteResultsResponse,
   type WidgetGalleryResponse,
 } from "./types";
 
@@ -273,6 +277,25 @@ export const api = {
 
   widgetScriptUrl(): string {
     return `${WIDGET_BASE}/widget.js`;
+  },
+
+  // Organizer-only. Both endpoints were missing entirely until now —
+  // apps/voting only had cast/retract, and apps/audit had no HTTP
+  // surface at all despite writing AuditEvent rows across the app.
+  voteResults(slug?: string, cookieHeader?: string): Promise<VoteResultsResponse> {
+    return USE_MOCKS
+      ? mockVoteResults()
+      : request(routes.voteResults(slug), cookieInit(cookieHeader));
+  },
+
+  auditLog(
+    slug?: string,
+    limit?: number,
+    cookieHeader?: string,
+  ): Promise<AuditLogResponse> {
+    return USE_MOCKS
+      ? mockAuditLog()
+      : request(routes.auditLog(slug, limit), cookieInit(cookieHeader));
   },
 
   // CSV export is a file download the browser navigates to directly

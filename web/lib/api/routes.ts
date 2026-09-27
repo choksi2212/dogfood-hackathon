@@ -47,4 +47,10 @@ export const routes = {
   // NEXT_PUBLIC_WIDGET_BASE directly rather than the /api/* proxy.
   widgetGallery: (slug: string = EVENT_SLUG) =>
     `/api/widget/gallery?event=${slug}`,
+  // apps/voting + apps/audit — organizer-only. Added alongside the
+  // results/audit-log screen since neither endpoint existed before.
+  voteResults: (slug: string = EVENT_SLUG) =>
+    `/api/events/${slug}/votes/results`,
+  auditLog: (slug: string = EVENT_SLUG, limit = 100) =>
+    `/api/events/${slug}/audit-log?limit=${limit}`,
 } as const;

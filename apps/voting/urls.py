@@ -13,4 +13,9 @@ urlpatterns = [
         views.VoteView.as_view(),
         name="vote",
     ),
+    path(
+        "events/<slug:slug>/votes/results",
+        views.VoteResultsView.as_view(),
+        name="vote_results",
+    ),
 ]
