@@ -1,14 +1,19 @@
 openapi: 3.0.3
 info:
   title: DOGFOOD Hackathon Portal API
-  version: "1.0.0"
-  description: |
-    Submission and judging portal for the DOGFOOD 2026 hackathon. Five spec
+  version: 1.0.0
+  description: 'Submission and judging portal for the DOGFOOD 2026 hackathon. Five
+    spec
+
     routes drive acceptance: gallery, submit, judge_scores, peer_scores,
+
     csv_export. Public surface for integrators; protected surfaces for
+
     organizers, judges, and participants via cookie session.
+
+    '
 servers:
-  - url: /
+- url: /
 components:
   securitySchemes:
     cookie:
@@ -22,48 +27,75 @@ components:
         error:
           type: object
           properties:
-            code: {type: string}
-            message: {type: string}
-            detail: {type: object}
+            code:
+              type: string
+            message:
+              type: string
+            detail:
+              type: object
     Submission:
       type: object
       properties:
-        id: {type: string, format: uuid}
-        name: {type: string}
-        tagline: {type: string}
-        track_slug: {type: string}
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        tagline:
+          type: string
+        track_slug:
+          type: string
         status:
           type: string
-          enum: [draft, submitted, locked, withdrawn]
+          enum:
+          - draft
+          - submitted
+          - locked
+          - withdrawn
     Certificate:
       type: object
       properties:
-        public_id: {type: string}
-        submission_id: {type: string, format: uuid}
-        signed_payload: {type: object}
-        signature: {type: string}
-        signature_algorithm: {type: string, example: HMAC-SHA256}
-        issued_at: {type: string, format: date-time}
+        public_id:
+          type: string
+        submission_id:
+          type: string
+          format: uuid
+        signed_payload:
+          type: object
+        signature:
+          type: string
+        signature_algorithm:
+          type: string
+          example: HMAC-SHA256
+        issued_at:
+          type: string
+          format: date-time
 paths:
   /healthz:
     get:
-      summary: Liveness probe — DB roundtrip
+      summary: "Liveness probe \xE2\u20AC\u201D DB roundtrip"
       responses:
-        "200": {description: OK}
-        "503": {description: Degraded}
+        '200':
+          description: OK
+        '503':
+          description: Degraded
+        '429':
+          description: Rate limited
   /api/schema/:
     get:
       summary: This OpenAPI 3 spec as JSON
       responses:
-        "200":
+        '200':
           description: OpenAPI document
           content:
             application/json: {}
+        '429':
+          description: Rate limited
   /api/gallery:
     get:
       summary: Public gallery of submitted projects
       responses:
-        "200":
+        '200':
           description: List of submissions
           content:
             application/json:
@@ -72,7 +104,10 @@ paths:
                 properties:
                   items:
                     type: array
-                    items: {$ref: "#/components/schemas/Submission"}
+                    items:
+                      $ref: '#/components/schemas/Submission'
+        '429':
+          description: Rate limited
   /api/register:
     post:
       summary: Create a new user account and start a session
@@ -83,14 +118,22 @@ paths:
             schema:
               type: object
               properties:
-                email: {type: string, format: email}
-                password: {type: string}
-                name: {type: string}
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                name:
+                  type: string
       responses:
-        "201":
+        '201':
           description: User created; session cookie set
-        "400":
+        '400':
           description: Validation failed
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
   /api/login:
     post:
       summary: Authenticate with email + password; sets session cookie
@@ -101,31 +144,51 @@ paths:
             schema:
               type: object
               properties:
-                email: {type: string, format: email}
-                password: {type: string}
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
       responses:
-        "200":
+        '200':
           description: Authenticated; session cookie set
-        "401":
+        '401':
           description: Invalid credentials
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
   /api/logout:
     post:
       summary: End the current session
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       responses:
-        "204":
+        '204':
           description: Session ended; cookie cleared
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
   /api/me:
     get:
       summary: Current authenticated user profile
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       responses:
-        "200":
+        '200':
           description: User profile
+        '429':
+          description: Rate limited
+        '401':
+          description: Unauthenticated
   /api/events/:
     post:
       summary: Create a new event (organizer only)
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       requestBody:
         required: true
         content:
@@ -133,157 +196,251 @@ paths:
             schema:
               type: object
       responses:
-        "201":
+        '201':
           description: Event created
-        "400":
+        '400':
           description: Validation failed
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
   /api/events/{slug}/:
     get:
       summary: Retrieve event details
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        "200":
+        '200':
           description: Event detail
+        '429':
+          description: Rate limited
+        '401':
+          description: Unauthenticated
     put:
       summary: Update an event (organizer only)
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        "200":
+        '200':
           description: Event updated
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
     patch:
       summary: Partial update of an event (organizer only)
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        "200":
+        '200':
           description: Event updated
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
   /api/events/{slug}/tracks:
     post:
       summary: Add a track to an event (organizer only)
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        "201":
+        '201':
           description: Track created
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
   /api/events/{slug}/rubric:
     post:
       summary: Define the rubric for an event (organizer only)
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        "201":
+        '201':
           description: Rubric created
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
   /api/events/{slug}/memberships:
     get:
       summary: List memberships for an event (organizer only)
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        "200":
+        '200':
           description: List of memberships
+        '429':
+          description: Rate limited
+        '401':
+          description: Unauthenticated
   /api/events/{slug}/judges/bulk-invite:
     post:
       summary: Bulk-invite judges by email (organizer only)
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        "200":
+        '200':
           description: Invitations dispatched
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
   /api/events/{slug}/assignments/run:
     post:
       summary: Run the bipartite assignment algorithm (organizer only)
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        "200":
+        '200':
           description: Assignment batch metadata
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
   /api/events/{slug}/me/batch:
     get:
       summary: Judge's assigned projects for the current batch
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        "200":
+        '200':
           description: Batch contents + progress counts
+        '429':
+          description: Rate limited
+        '401':
+          description: Unauthenticated
   /api/events/{slug}/me/batch/{project_id}/scores:
     put:
       summary: Save per-criterion scores for an assigned project
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
-        - name: project_id
-          in: path
-          required: true
-          schema: {type: string, format: uuid}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
-        "200":
+        '200':
           description: Scores saved
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
   /api/events/{slug}/me/batch/{project_id}/submit:
     post:
       summary: Finalize and submit scores for an assigned project
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
-        - name: project_id
-          in: path
-          required: true
-          schema: {type: string, format: uuid}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
-        "200":
+        '200':
           description: Scores submitted
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
   /api/events/{slug}/submit:
     post:
       summary: Submit (or re-submit) a project
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
       requestBody:
         required: false
         content:
@@ -291,41 +448,64 @@ paths:
             schema:
               type: object
               properties:
-                name: {type: string}
-                tagline: {type: string}
-                description: {type: string}
-                track_slug: {type: string}
+                name:
+                  type: string
+                tagline:
+                  type: string
+                description:
+                  type: string
+                track_slug:
+                  type: string
       responses:
-        "201": {description: Submission created}
-        "403": {description: Not a participant of this event}
-        "422":
+        '201':
+          description: Submission created
+        '403':
+          description: Not a participant of this event
+        '422':
           description: Deadline passed or validation failed
           content:
             application/json:
-              schema: {$ref: "#/components/schemas/Error"}
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
   /api/events/{slug}/normalize:
     post:
       summary: Run the additive alternating-means fit on the event's scores
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        "200":
+        '200':
           description: Normalization run metadata
-        "422":
+        '422':
           description: Bipartite graph disconnected
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
   /api/events/{slug}/pairwise/ballots:
     post:
       summary: Submit a Bradley-Terry ballot
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
       requestBody:
         required: true
         content:
@@ -333,39 +513,64 @@ paths:
             schema:
               type: object
               properties:
-                left_id: {type: string, format: uuid}
-                right_id: {type: string, format: uuid}
+                left_id:
+                  type: string
+                  format: uuid
+                right_id:
+                  type: string
+                  format: uuid
                 winner:
                   type: string
-                  enum: [left, right, tie]
+                  enum:
+                  - left
+                  - right
+                  - tie
       responses:
-        "201": {description: Ballot recorded}
-        "404": {description: Event or submission not found}
+        '201':
+          description: Ballot recorded
+        '404':
+          description: Event or submission not found
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
   /api/events/{slug}/pairwise/ranking:
     get:
       summary: Recovered ranking from all ballots
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        "200":
+        '200':
           description: Projects ranked by recovered theta
+        '429':
+          description: Rate limited
+        '401':
+          description: Unauthenticated
   /api/events/{slug}/submissions/{id}/vote:
     post:
       summary: Cast a vote on a submission
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
-        - name: id
-          in: path
-          required: true
-          schema: {type: string, format: uuid}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       requestBody:
         required: true
         content:
@@ -373,102 +578,154 @@ paths:
             schema:
               type: object
               properties:
-                votes: {type: integer, default: 1}
+                votes:
+                  type: integer
+                  default: 1
       responses:
-        "201": {description: Vote recorded}
-        "403": {description: Self-vote not allowed}
-        "404": {description: Event or submission not found}
+        '201':
+          description: Vote recorded
+        '403':
+          description: Self-vote not allowed
+        '404':
+          description: Event or submission not found
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
     delete:
       summary: Retract a vote
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
-        - name: id
-          in: path
-          required: true
-          schema: {type: string, format: uuid}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
-        "200": {description: Retracted}
-        "404": {description: No ballot to retract or event/submission not found}
+        '200':
+          description: Retracted
+        '404':
+          description: No ballot to retract or event/submission not found
+        '429':
+          description: Rate limited
+        '401':
+          description: Unauthenticated
   /api/judge/scores:
     get:
       summary: Authenticated judge's own scores
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       responses:
-        "200":
+        '200':
           description: List of (project_id, criterion_id, value)
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  judge_id: {type: string, format: uuid}
+                  judge_id:
+                    type: string
+                    format: uuid
                   scores:
                     type: array
                     items:
                       type: object
-        "403": {description: Not a judge}
+        '403':
+          description: Not a judge
+        '429':
+          description: Rate limited
+        '401':
+          description: Unauthenticated
   /api/judge/peer-scores:
     get:
-      summary: Always 403 (graded cell — cross-judge reads denied by URL design)
-      security: [{cookie: []}]
+      summary: "Always 403 (graded cell \xE2\u20AC\u201D cross-judge reads denied\
+        \ by URL design)"
+      security:
+      - cookie: []
       responses:
-        "403":
+        '403':
           description: Cross-judge score read denied
           content:
             application/json:
-              schema: {$ref: "#/components/schemas/Error"}
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limited
+        '401':
+          description: Unauthenticated
   /api/csv_export:
     get:
       summary: Organizer-only CSV of all scores across the event
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: event_slug
-          in: query
-          required: false
-          schema: {type: string, default: sample-hack-2026}
+      - name: event_slug
+        in: query
+        required: false
+        schema:
+          type: string
+          default: sample-hack-2026
       responses:
-        "200":
+        '200':
           description: CSV body with header row
           content:
             text/csv: {}
-        "403": {description: Not an organizer of this event}
+        '403':
+          description: Not an organizer of this event
+        '429':
+          description: Rate limited
+        '401':
+          description: Unauthenticated
   /api/{public_id}:
     get:
       summary: Public, HMAC-signed certificate for a submission
       parameters:
-        - name: public_id
-          in: path
-          required: true
-          schema: {type: string}
+      - name: public_id
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        "200":
+        '200':
           description: Certificate payload + signature
           content:
             application/json:
-              schema: {$ref: "#/components/schemas/Certificate"}
-        "404": {description: Not found}
+              schema:
+                $ref: '#/components/schemas/Certificate'
+        '404':
+          description: Not found
+        '429':
+          description: Rate limited
   /widget.js:
     get:
       summary: Embeddable gallery widget script (CORS open)
       responses:
-        "200":
+        '200':
           description: JavaScript shim that fetches /api/widget/gallery
           content:
             application/javascript: {}
+        '429':
+          description: Rate limited
   /api/widget/gallery:
     get:
       summary: JSON feed consumed by the widget
       parameters:
-        - name: event
-          in: query
-          required: false
-          schema: {type: string}
+      - name: event
+        in: query
+        required: false
+        schema:
+          type: string
       responses:
-        "200":
+        '200':
           description: Items list
           content:
             application/json:
@@ -477,17 +734,52 @@ paths:
                 properties:
                   items:
                     type: array
-                    items: {$ref: "#/components/schemas/Submission"}
+                    items:
+                      $ref: '#/components/schemas/Submission'
+        '429':
+          description: Rate limited
+  /api/widget/gallery/:
+    get:
+      summary: Trailing-slash alias for /api/widget/gallery
+      description: |
+        Same handler as `/api/widget/gallery`. The widget embedder may
+        fetch either form; we accept both.
+      parameters:
+      - name: event
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Items list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Submission'
+        '429':
+          description: Rate limited
   /api/webhooks:
     get:
       summary: List webhooks (organizer only)
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       responses:
-        "200":
+        '200':
           description: List of webhook subscriptions
+        '429':
+          description: Rate limited
+        '401':
+          description: Unauthenticated
     post:
       summary: Create a webhook (organizer only)
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       requestBody:
         required: true
         content:
@@ -495,46 +787,74 @@ paths:
             schema:
               type: object
               properties:
-                event_slug: {type: string}
-                url: {type: string}
+                event_slug:
+                  type: string
+                url:
+                  type: string
                 events:
                   type: array
-                  items: {type: string}
+                  items:
+                    type: string
       responses:
-        "201":
+        '201':
           description: Webhook created (secret returned ONCE)
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
   /api/{slug}/teams:
     post:
       summary: Create a team in an event (participant only)
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        "201":
+        '201':
           description: Team created
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
   /api/{slug}/teams/{id}/invite:
     post:
       summary: Issue a team invite (captain only)
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: {type: string}
-        - name: id
-          in: path
-          required: true
-          schema: {type: string, format: uuid}
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
-        "201":
+        '201':
           description: Invite issued
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated
   /api/teams/join:
     post:
       summary: Accept a team invite token
-      security: [{cookie: []}]
+      security:
+      - cookie: []
       requestBody:
         required: true
         content:
@@ -542,7 +862,14 @@ paths:
             schema:
               type: object
               properties:
-                token: {type: string}
+                token:
+                  type: string
       responses:
-        "200":
+        '200':
           description: Joined
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
+        '401':
+          description: Unauthenticated

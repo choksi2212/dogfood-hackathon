@@ -24,7 +24,6 @@ from apps.events.models import (
     RubricCriterion,
     Track,
 )
-from apps.judging.assignment import run_assignment
 from apps.judging.models import JudgeAssignment
 from apps.submissions.models import Submission
 from apps.teams.models import Team, TeamMember
@@ -45,8 +44,8 @@ User = get_user_model()
 def _event_windows(now):
     return {
         "open_at": now - timedelta(days=7),
-        "submissions_close_at": now - timedelta(hours=1),
-        "judging_open_at": now - timedelta(hours=1, minutes=30),
+        "submissions_close_at": now + timedelta(days=1),
+        "judging_open_at": now + timedelta(days=1, minutes=30),
         "judging_close_at": now + timedelta(days=2),
         "results_at": now + timedelta(days=3),
     }
@@ -138,17 +137,22 @@ def build_event_with_two_projects(*, organizer, judges):
 
 def build_judge_assignment_for(*, event, judge, project):
     """Create a fresh batch containing only ``(judge, project)`` and
-    return the resulting ``JudgeAssignment``."""
-    batch_result = run_assignment(
-        event=event,
-        seed=42,
-        reviews_per_project=1,
-        projects_per_judge=1,
-        created_by=judge,
+    return the resulting ``JudgeAssignment``.
+
+    Skips ``run_assignment`` — the bipartite assignment may put
+    ``judge`` on the *other* project, which makes the score-save tests
+    flake. We construct the batch + assignment directly so the
+    ``(judge, project)`` pair is exactly what the test requested.
+    """
+    from apps.judging.models import JudgeBatch
+
+    batch = JudgeBatch.objects.create(
+        event=event, seed=42, created_by=judge,
     )
-    return JudgeAssignment.objects.get(
-        batch_id=batch_result["batch_id"], judge=judge, project=project,
+    assignment = JudgeAssignment.objects.create(
+        batch=batch, judge=judge, project=project,
     )
+    return assignment
 
 
 # ---------------------------------------------------------------------------
