@@ -56,7 +56,10 @@ class WebhookListCreateView(APIView):
             memberships__user=request.user,
             memberships__role="organizer",
         )
-        hooks = Webhook.objects.filter(event__in=events, is_active=True)
+        # ``select_related("event")`` collapses the per-row ``h.event.slug``
+        # access into a single LEFT JOIN. Without it, N hooks trigger N
+        # extra queries.
+        hooks = Webhook.objects.filter(event__in=events, is_active=True).select_related("event")
         return Response(
             [
                 {

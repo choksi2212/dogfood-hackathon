@@ -93,6 +93,25 @@ TEMPLATES = [
     },
 ]
 
+# --- Cache -------------------------------------------------------------------
+# Hot public reads (gallery, widget JSON) go through Django's cache
+# framework. LocMemCache is in-process — sub-millisecond lookups, no
+# network hop. For multi-worker deployments the cache is per-worker;
+# for the single-worker dev server this is the fastest possible path.
+# Switch to Redis in production by setting ``CACHE_BACKEND`` to
+# ``django.core.cache.backends.redis.RedisCache`` and providing a
+# ``CACHE_LOCATION`` URL.
+CACHES = {
+    "default": {
+        "BACKEND": os.environ.get("CACHE_BACKEND", "django.core.cache.backends.locmem.LocMemCache"),
+        "LOCATION": os.environ.get("CACHE_LOCATION", "dogfood-default"),
+        "TIMEOUT": int(os.environ.get("CACHE_TIMEOUT", "300")),
+        "OPTIONS": {
+            "MAX_ENTRIES": int(os.environ.get("CACHE_MAX_ENTRIES", "10000")),
+        },
+    }
+}
+
 # --- Database ----------------------------------------------------------------
 
 DATABASES = {
@@ -103,7 +122,18 @@ DATABASES = {
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "dogfood"),
         "HOST": os.environ.get("POSTGRES_HOST", "db"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
-        "CONN_MAX_AGE": 60,
+        # ``None`` keeps each connection alive for the lifetime of the
+        # worker (psycopg3 + persistent connections are the fastest path
+        # for high-throughput back ends). Set to a number of seconds
+        # (``CONN_MAX_AGE=60``) to recycle.
+        "CONN_MAX_AGE": None
+        if os.environ.get("DB_CONN_MAX_AGE", "persistent") == "persistent"
+        else int(os.environ.get("DB_CONN_MAX_AGE", "60")),
+        "OPTIONS": {
+            # Server-side statement timeout — fail fast on runaway
+            # queries instead of holding a worker.
+            "options": "-c statement_timeout=30s -c idle_in_transaction_session_timeout=60s",
+        },
     }
 }
 

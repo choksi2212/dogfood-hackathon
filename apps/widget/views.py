@@ -1,6 +1,7 @@
 """Widget endpoints: /widget.js (script shim) and /api/widget/gallery (JSON)."""
 
 from django.http import HttpResponse, JsonResponse
+from django.views.decorators.cache import cache_control
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
 
@@ -34,7 +35,9 @@ WIDGET_JS = """(function() {
 
 
 @require_GET
+@cache_control(public=True, max_age=3600)
 def widget_js(request):
+    """Static script — cacheable for an hour. Embedders can re-host it."""
     resp = HttpResponse(WIDGET_JS, content_type="application/javascript")
     resp["Access-Control-Allow-Origin"] = "*"
     return resp
@@ -43,13 +46,28 @@ def widget_js(request):
 @require_GET
 @csrf_exempt
 def widget_gallery(request):
+    from django.core.cache import cache
+
     event_slug = request.GET.get("event") or "sample-hack-2026"
+    cache_key = f"widget_gallery:{event_slug}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        resp = JsonResponse(cached)
+        resp["Access-Control-Allow-Origin"] = "*"
+        resp["Cache-Control"] = "public, max-age=60"
+        resp["X-Cache"] = "HIT"
+        return resp
+
     try:
         event = Event.objects.get(slug=event_slug)
     except Event.DoesNotExist:
         return JsonResponse({"items": []})
 
-    qs = Submission.objects.filter(event=event, status="submitted").order_by("track__order", "name")
+    qs = (
+        Submission.objects.filter(event=event, status="submitted")
+        .select_related("track")
+        .order_by("track__order", "name")
+    )
     items = [
         {
             "id": str(s.id),
@@ -59,6 +77,10 @@ def widget_gallery(request):
         }
         for s in qs[:24]
     ]
-    resp = JsonResponse({"items": items, "event": event_slug})
+    body = {"items": items, "event": event_slug}
+    cache.set(cache_key, body, timeout=60)
+    resp = JsonResponse(body)
     resp["Access-Control-Allow-Origin"] = "*"
+    resp["Cache-Control"] = "public, max-age=60"
+    resp["X-Cache"] = "MISS"
     return resp
