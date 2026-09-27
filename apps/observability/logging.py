@@ -7,6 +7,7 @@ can index them without grok rules.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Iterable
 
@@ -19,7 +20,7 @@ _RESERVED_RECORD_ATTRS = frozenset({
 })
 
 
-class JsonFormatter:
+class JsonFormatter(logging.Formatter):
     """Format ``LogRecord``s as one line of JSON.
 
     The ``fields`` argument controls which named ``extra`` keys make
@@ -28,10 +29,11 @@ class JsonFormatter:
     ``None`` default) so downstream consumers can rely on the schema.
     """
 
-    def __init__(self, fields: Iterable[str] = ()):
+    def __init__(self, fields: Iterable[str] = ()) -> None:
+        super().__init__()
         self._fields = tuple(fields)
 
-    def format(self, record) -> str:
+    def format(self, record: logging.LogRecord) -> str:
         payload: dict = {
             "ts": datetime.fromtimestamp(record.created, tz=timezone.utc)
                 .isoformat(timespec="milliseconds"),
@@ -57,7 +59,7 @@ class JsonFormatter:
         return json.dumps(payload, default=_safe, ensure_ascii=False)
 
 
-def _safe(value):
+def _safe(value: object) -> object:
     """Coerce unknown objects into JSON-safe primitives."""
     if value is None or isinstance(value, (bool, int, float, str)):
         return value

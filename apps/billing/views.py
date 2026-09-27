@@ -9,12 +9,19 @@ Routes (under /api/billing/):
 """
 from __future__ import annotations
 
+from datetime import timedelta
+from typing import TYPE_CHECKING
+
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+if TYPE_CHECKING:
+    from apps.events.models import Event
 
 from apps.events.models import Event
 from apps.events.permissions import IsOrganizer
@@ -26,9 +33,9 @@ from .quotas import seed_default_plans
 class PlanListView(APIView):
     """GET /api/billing/plans — public listing of all active plans."""
 
-    permission_classes = []
+    permission_classes: list = []
 
-    def get(self, _request):
+    def get(self, _request: Request) -> Response:
         plans = Plan.objects.filter(is_active=True).order_by("monthly_price_cents")
         return Response(
             [
@@ -52,7 +59,7 @@ class BillingAccountView(APIView):
 
     permission_classes = [IsAuthenticated, IsOrganizer]
 
-    def get(self, request, slug):
+    def get(self, request: Request, slug: str) -> Response:
         event = Event.objects.get(slug=slug)
         account = _ensure_account(event)
         return Response(
@@ -84,9 +91,11 @@ class UpgradePlanView(APIView):
     permission_classes = [IsAuthenticated, IsOrganizer]
 
     @transaction.atomic
-    def post(self, request, slug):
+    def post(self, request: Request, slug: str) -> Response:
         event = Event.objects.get(slug=slug)
-        plan_name = (request.data.get("plan_name") or "").strip()
+        # ``request.data`` is a dict for JSON requests; cast for mypy.
+        plan_name_raw = dict(request.data).get("plan_name")
+        plan_name = (str(plan_name_raw) if plan_name_raw else "").strip()
         if not plan_name:
             return Response(
                 {"error": {"code": "validation_failed", "message": "plan_name required."}},
@@ -118,7 +127,7 @@ class UpgradePlanView(APIView):
         account.plan = new_plan
         account.status = "active"
         account.current_period_start = now
-        account.current_period_end = now + timezone.timedelta(days=30)
+        account.current_period_end = now + timedelta(days=30)
         account.save()
 
         Invoice.objects.create(
@@ -126,7 +135,9 @@ class UpgradePlanView(APIView):
             kind="plan_change",
             amount_cents=new_plan.monthly_price_cents,
             description=f"Upgrade from {old_plan.name} to {new_plan.name}",
-            created_by=request.user,
+            # IsAuthenticated guarantees ``request.user`` is a real
+            # User at runtime; the cast appeases mypy.
+            created_by=request.user if request.user.is_authenticated else None,
         )
 
         return Response(
@@ -144,10 +155,14 @@ def _ensure_account(event: Event) -> BillingAccount:
     the free plan. Idempotent."""
     from .quotas import default_free_plan
 
-    try:
-        return event.billing
-    except BillingAccount.DoesNotExist:
-        pass
+    # ``BillingAccount.objects.filter(event=event).first()`` is the
+    # type-safe way to fetch a OneToOne — Django auto-creates the
+    # reverse attribute ``event.billing`` but django-stubs doesn't
+    # know about it. The explicit query works at runtime and at
+    # type-check time.
+    existing = BillingAccount.objects.filter(event=event).first()
+    if existing is not None:
+        return existing
 
     # Seed default plans lazily on first billing access. The seed is
     # idempotent so repeated calls are free.
@@ -161,5 +176,5 @@ def _ensure_account(event: Event) -> BillingAccount:
         plan=free,
         status="trial",
         current_period_start=now,
-        current_period_end=now + timezone.timedelta(days=14),
+        current_period_end=now + timedelta(days=14),
     )

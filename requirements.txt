@@ -11,3 +11,11 @@ pytest==8.3.3
 pytest-django==4.9.0
 factory-boy==3.3.1
 freezegun==1.5.1
+
+# Type safety (production hardening). mypy + django-stubs pin down
+# Django's loose types so we catch AttributeErrors at lint time.
+# Run with:  mypy apps/ --config-file mypy.ini
+mypy==1.13.0
+django-stubs==5.1.3
+django-stubs-ext==5.1.3
+types-requests==2.32.0.20240914
