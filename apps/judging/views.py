@@ -101,13 +101,17 @@ class MyBatchView(APIView):
                 status=403,
             )
 
+        # ``review`` is a OneToOne on JudgeAssignment — without it in the
+        # select_related, each iteration triggers a fresh query. With 30+
+        # assignments per judge this is a 30x slowdown on the dashboard
+        # render.
         assignments = JudgeAssignment.objects.filter(judge=request.user, batch__event=event).select_related(
-            "project__team", "project__track"
+            "project__team", "project__track", "review"
         )
 
         projects = []
         for a in assignments:
-            review = getattr(a, "review", None)
+            review = a.review if hasattr(a, "review") else None
             projects.append(
                 {
                     "id": str(a.project.id),
@@ -152,8 +156,10 @@ class JudgeScoresView(APIView):
         ):
             return Response(status=403)
 
-        assignments = JudgeAssignment.objects.filter(judge=judge)
-        scores = Score.objects.filter(assignment__in=assignments).select_related("criterion", "assignment__project")
+        # Direct join on judge avoids the ``__in`` subquery and lets
+        # PostgreSQL plan a single hash join on the (assignment.judge_id)
+        # index. With many assignments per judge this matters.
+        scores = Score.objects.filter(assignment__judge=judge).select_related("criterion", "assignment__project")
 
         return Response(
             {
@@ -225,7 +231,7 @@ class ScoreSaveView(APIView):
                         "error": {
                             "code": "validation_failed",
                             "message": (
-                                f"Score {value} for {criterion.name} outside " f"[{criterion.min}, {criterion.max}]."
+                                f"Score {value} for {criterion.name} outside [{criterion.min}, {criterion.max}]."
                             ),
                         }
                     },
@@ -309,7 +315,10 @@ class CSVExportView(APIView):
         # one; multi-event organizers must specify.
         event_slug = request.query_params.get("event_slug")
 
-        organizer_events = Membership.objects.filter(user=request.user, role="organizer").select_related("event")
+        # Cache once: the original code called .count() twice on the
+        # same queryset (lines 340 + 352 below) which is two round trips
+        # to PostgreSQL for the same answer. Materialize once.
+        organizer_events = list(Membership.objects.filter(user=request.user, role="organizer").select_related("event"))
         is_admin = getattr(request.user, "is_admin_role", False)
 
         if event_slug:
@@ -337,7 +346,7 @@ class CSVExportView(APIView):
                 )
         else:
             # Organizer check first — non-organizers get 403, not 422.
-            if not is_admin and organizer_events.count() == 0:
+            if not is_admin and len(organizer_events) == 0:
                 return Response(
                     {
                         "error": {
@@ -349,8 +358,8 @@ class CSVExportView(APIView):
                 )
             if is_admin:
                 event = Event.objects.order_by("-created_at").first()
-            elif organizer_events.count() == 1:
-                event = organizer_events.first().event
+            elif len(organizer_events) == 1:
+                event = organizer_events[0].event
             else:
                 return Response(
                     {
