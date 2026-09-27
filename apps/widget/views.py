@@ -1,6 +1,5 @@
 """Widget endpoints: /widget.js (script shim) and /api/widget/gallery (JSON)."""
 
-from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.cache import cache_control
 from django.views.decorators.csrf import csrf_exempt
