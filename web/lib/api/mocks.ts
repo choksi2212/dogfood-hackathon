@@ -16,6 +16,7 @@ import type {
   RetractVoteResponse,
   ScoreSaveResponse,
   ScoreSubmitResponse,
+  SubmissionDetail,
   SubmitPayload,
   SubmitResponse,
   User,
@@ -57,12 +58,43 @@ const MOCK_JUDGE_SCORES: JudgeScoresResponse = {
   ],
 };
 
+export async function mockMe(): Promise<User> {
+  // Default to "not logged in" — clients should treat a thrown
+  // ApiError as the auth gate signal. The /login flow replaces this
+  // with a real User.
+  throw Object.assign(new Error("not authenticated"), {
+    name: "ApiError",
+    code: "not_authenticated",
+    status: 401,
+  }) as Error & { code: string; status: number };
+}
+
 export async function mockGallery(): Promise<GalleryResponse> {
   return {
     total: MOCK_SUBMISSIONS.length,
     page: 1,
     page_size: 24,
     items: MOCK_SUBMISSIONS,
+  };
+}
+
+export async function mockSubmissionDetail(id: string): Promise<SubmissionDetail> {
+  // Find the matching mock row, or fall back to the first one so the
+  // /gallery/[id] page still renders for unknown IDs in mock mode.
+  const row = MOCK_SUBMISSIONS.find((s) => s.id === id) ?? MOCK_SUBMISSIONS[0];
+  return {
+    ...row,
+    description: row.description ?? "Mock fixture standing in until the real backend returns.",
+    team: "mock-team",
+    team_name: "Mock Team",
+    event: "sample-hack-2026",
+    track: "mock-track",
+    demo_video_url: "",
+    repo_url: "",
+    live_url: "",
+    status: "submitted",
+    created_at: row.submitted_at ?? new Date().toISOString(),
+    updated_at: row.submitted_at ?? new Date().toISOString(),
   };
 }
 

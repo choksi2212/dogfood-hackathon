@@ -1,15 +1,55 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { api } from "@/lib/api/client";
+import { api, ApiError } from "@/lib/api/client";
 import { AssignmentPanel, BulkInvitePanel, NormalizationPanel } from "./actions";
+import { EmptyState, ErrorState } from "@/components/StateMessage";
 import styles from "./organizer.module.css";
 
 export default async function OrganizerPage() {
   const cookieHeader = (await cookies()).toString();
-  const [event, memberships] = await Promise.all([
-    api.eventDetail(undefined, cookieHeader),
-    api.memberships(undefined, cookieHeader),
-  ]);
+
+  let event;
+  let memberships;
+  try {
+    [event, memberships] = await Promise.all([
+      api.eventDetail(undefined, cookieHeader),
+      api.memberships(undefined, cookieHeader),
+    ]);
+  } catch (err) {
+    // Same three-state treatment as /judge — anon → sign in, 403 →
+    // "you're signed in but not an organizer", anything else →
+    // generic error with the real message.
+    if (err instanceof ApiError) {
+      if (err.status === 401) {
+        return (
+          <EmptyState>
+            <h2>Sign in to access the dashboard</h2>
+            <p>Only organizers can see this page.</p>
+            <Link href="/login" className={styles.signinLink}>
+              Sign in
+            </Link>
+          </EmptyState>
+        );
+      }
+      if (err.status === 403) {
+        return (
+          <EmptyState>
+            <h2>Organizer role required</h2>
+            <p>
+              You're signed in, but this account isn't listed as an
+              organizer for this event. Ask the event owner to add you.
+            </p>
+          </EmptyState>
+        );
+      }
+    }
+    return (
+      <ErrorState>
+        Couldn't load the dashboard:{" "}
+        {err instanceof Error ? err.message : "Unknown error."}
+      </ErrorState>
+    );
+  }
 
   const roleCounts = memberships.reduce<Record<string, number>>((acc, m) => {
     acc[m.role] = (acc[m.role] ?? 0) + 1;

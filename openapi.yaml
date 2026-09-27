@@ -196,6 +196,30 @@ paths:
           description: Malformed cursor or sort/cursor mismatch
         '429':
           description: Rate limited
+  /api/submissions/{id}:
+    get:
+      summary: Single submission detail (public read)
+      description: |
+        Returns one submission by UUID. Public — anyone with the link can
+        read it (matches the gallery's public-read posture). Drafts 404.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Submission detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Submission'
+        '404':
+          description: Submission not found, withdrawn, or still a draft
+        '429':
+          description: Rate limited
   /api/register:
     post:
       summary: Create a new user account and start a session

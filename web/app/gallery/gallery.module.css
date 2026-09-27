@@ -9,8 +9,25 @@
 .card {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: var(--space-3);
+  padding: 0;
   background: var(--surface);
+  /* Remove the inline padding on .card; .cardLink now owns the box so
+     the whole card is the click target, not just the title text. */
+}
+
+.cardLink {
+  display: block;
+  padding: var(--space-3);
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius);
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.cardLink:hover,
+.cardLink:focus-visible {
+  border-color: var(--accent);
+  background: var(--surface-elevated);
 }
 
 .tagline {

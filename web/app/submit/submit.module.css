@@ -39,3 +39,56 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.field select {
+  font: inherit;
+  color: var(--foreground);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.gate {
+  max-width: 480px;
+  padding: var(--space-6) 0;
+}
+
+.gateTitle {
+  margin: 0 0 var(--space-3);
+  font-size: 1.5rem;
+}
+
+.gateBody {
+  color: var(--muted);
+  margin: 0 0 var(--space-4);
+  line-height: 1.5;
+}
+
+.gateActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.gatePrimary,
+.gateSecondary {
+  display: inline-block;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.gatePrimary {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.gateSecondary {
+  border: 1px solid var(--border);
+  color: var(--foreground);
+}

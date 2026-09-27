@@ -8,6 +8,7 @@ import {
   mockGallery,
   mockJudgeScores,
   mockLogin,
+  mockMe,
   mockMemberships,
   mockMyBatch,
   mockNormalize,
@@ -16,6 +17,7 @@ import {
   mockRetractVote,
   mockScoreSave,
   mockScoreSubmit,
+  mockSubmissionDetail,
   mockSubmit,
   mockVote,
   mockVoteResults,
@@ -42,6 +44,7 @@ import {
   type ScoreSavePayload,
   type ScoreSaveResponse,
   type ScoreSubmitResponse,
+  type SubmissionDetail,
   type SubmitPayload,
   type SubmitResponse,
   type User,
@@ -109,6 +112,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   gallery(): Promise<GalleryResponse> {
     return USE_MOCKS ? mockGallery() : request(routes.gallery());
+  },
+
+  me(): Promise<User> {
+    return USE_MOCKS ? mockMe() : request(routes.me());
+  },
+
+  submission(id: string): Promise<SubmissionDetail> {
+    return USE_MOCKS
+      ? mockSubmissionDetail(id)
+      : request(routes.submission(id));
   },
 
   submit(payload: SubmitPayload, slug?: string): Promise<SubmitResponse> {

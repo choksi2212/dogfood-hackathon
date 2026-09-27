@@ -7,6 +7,7 @@ export const EVENT_SLUG = "sample-hack-2026";
 
 export const routes = {
   gallery: () => "/api/gallery",
+  submission: (id: string) => `/api/submissions/${id}`,
   submit: (slug: string = EVENT_SLUG) => `/api/events/${slug}/submit`,
   judgeScores: () => "/api/judge/scores",
   peerScores: (judge: string) => `/api/judge/peer-scores?judge=${judge}`,
@@ -16,6 +17,9 @@ export const routes = {
   // get the session cookie the other routes require, and to cover T3/T4
   // surfaces run.py never touches.
   login: () => "/api/login",
+  // 200 with user data when authed, 401 otherwise. Used by client
+  // components to gate the submit/vote/judge consoles on a session.
+  me: () => "/api/me",
   vote: (id: string, slug: string = EVENT_SLUG) =>
     `/api/events/${slug}/submissions/${id}/vote`,
   pairwiseBallots: (slug: string = EVENT_SLUG) =>

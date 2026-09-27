@@ -15,6 +15,7 @@ import base64
 import json
 
 from django.utils import timezone
+from django.utils.cache import patch_cache_control
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -217,6 +218,43 @@ class GalleryView(APIView):
         # short enough that new submissions show up promptly.
         cache.set(cache_key, body, timeout=60)
         resp = Response(body)
+        patch_cache_control(resp, public=True, max_age=60)
+        resp["X-Cache"] = "MISS"
+        return resp
+
+
+class SubmissionDetailView(APIView):
+    """GET /api/submissions/<uuid:id> — single-submission read.
+
+    Public read so anyone with the link can see a project (matches the
+    gallery's public-read posture). Drafts are 404'd; only ``submitted``,
+    ``locked`` show. ``withdrawn`` is intentionally visible — once you
+    shipped it, it shipped.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []  # public — no session lookup needed
+
+    def get(self, request, id):
+        try:
+            submission = (
+                Submission.objects.select_related("team", "track", "event")
+                .get(id=id)
+            )
+        except Submission.DoesNotExist:
+            return Response(
+                {"error": {"code": "not_found", "message": "Submission not found."}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if submission.status == "draft":
+            return Response(
+                {"error": {"code": "not_found", "message": "Submission not found."}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        data = SubmissionSerializer(submission).data
+        resp = Response(data)
         patch_cache_control(resp, public=True, max_age=60)
         resp["X-Cache"] = "MISS"
         return resp

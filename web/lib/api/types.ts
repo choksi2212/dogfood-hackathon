@@ -2,7 +2,7 @@ export type Submission = {
   id: string;
   name: string;
   tagline: string;
-  description: string;
+  description?: string;
   track_slug: string;
   thumbnail_path: string | null;
   submitted_at: string | null;
@@ -19,6 +19,22 @@ export type GalleryResponse = {
   next?: string | null;
   total?: number;
   page?: number;
+};
+
+// Matches apps/submissions/views.py SubmissionDetailView — single
+// project read. Adds team + track relations, link URLs, and timestamps
+// on top of the gallery row shape.
+export type SubmissionDetail = Submission & {
+  team: string;
+  team_name: string;
+  event: string;
+  track: string;
+  repo_url: string;
+  live_url: string;
+  demo_video_url: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
 };
 
 export type SubmitPayload = {
