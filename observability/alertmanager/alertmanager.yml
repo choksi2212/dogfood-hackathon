@@ -1,0 +1,59 @@
+# Alertmanager configuration.
+#
+# Default routing: every alert goes to the ``dogfood-portal-default``
+# receiver, which posts JSON to the local webhook. Point
+# ``$ALERT_WEBHOOK_URL`` at Slack / PagerDuty / Discord / whatever.
+#
+# Severity-based routing: ``severity=critical`` is grouped tighter
+# (faster repeat) than ``severity=warning``. Inhibit warnings when
+# the service is fully down so the on-call isn't double-paged.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: dogfood-portal-default
+  group_by: [alertname, service]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # Critical alerts page immediately, individually.
+    - matchers:
+        - severity = "critical"
+      receiver: dogfood-portal-critical
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 1h
+      continue: false
+
+    # Warnings batch into 30-minute windows.
+    - matchers:
+        - severity = "warning"
+      receiver: dogfood-portal-default
+      group_wait: 5m
+      group_interval: 30m
+      repeat_interval: 12h
+
+# Suppress ``warning`` alerts when a ``critical`` for the same target
+# is already firing — avoids noise during incidents.
+inhibit_rules:
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity = "warning"
+    equal: [alertname, service]
+
+receivers:
+  - name: dogfood-portal-default
+    webhook_configs:
+      # Alertmanager doesn't expand ${VAR} in YAML — set the URL via
+      # the AM webhook receiver at the call site, or edit this file
+      # before going to prod.
+      - url: "http://127.0.0.1:5001/alerts"
+        send_resolved: true
+
+  - name: dogfood-portal-critical
+    webhook_configs:
+      - url: "http://127.0.0.1:5001/alerts"
+        send_resolved: true

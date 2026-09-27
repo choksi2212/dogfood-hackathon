@@ -1,0 +1,71 @@
+# Prometheus configuration for the DOGFOOD portal.
+#
+# Local-only stack — Prometheus scrapes Django's /metrics directly and
+# evaluates alert rules. Alertmanager routes firing alerts to the
+# webhook receiver defined in observability/alertmanager/alertmanager.yml.
+#
+# To switch to a remote Prometheus (Grafana Cloud, Mimir, etc.):
+#   1. Set $REMOTE_WRITE_URL to your ingest endpoint.
+#   2. Set $REMOTE_WRITE_BASIC_AUTH to ``user:pass`` (Grafana Cloud
+#      uses ``<instance_id>:<api_key>``).
+#   3. Uncomment the ``remote_write`` block at the bottom.
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    service: dogfood-portal
+    environment: local
+
+# Load alerting rules from a separate file so the rule list can grow
+# without bloating this config.
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+# Alertmanager is on the same docker network — its service name.
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  # --------------------------------------------------------------------
+  # Django portal — exposes ``http_request_duration_ms``,
+  # ``http_requests_total``, ``http_requests_in_progress`` at /metrics.
+  # The route-pattern label (e.g. ``/api/events/{slug}/submit``)
+  # keeps cardinality bounded — operator dashboards group by it.
+  # --------------------------------------------------------------------
+  - job_name: dogfood-portal
+    metrics_path: /metrics
+    scheme: http
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    static_configs:
+      - targets: ["web:8000"]
+        labels:
+          service: portal
+          tier: app
+
+  # --------------------------------------------------------------------
+  # Prometheus self-scrape. Exposes Prometheus's own internals so we
+  # can spot a wedged scraper (target up == 1, target scrape_samples
+  # scraped non-zero, etc.).
+  # --------------------------------------------------------------------
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+# --------------------------------------------------------------------
+# Remote write — leave commented until the company gives us Cloud
+# creds. The block is here so the wiring is obvious.
+# --------------------------------------------------------------------
+# remote_write:
+#   - url: "${REMOTE_WRITE_URL}"
+#     basic_auth:
+#       username: "${REMOTE_WRITE_USERNAME}"
+#       password: "${REMOTE_WRITE_PASSWORD}"
+#     queue_config:
+#       capacity: 10000
+#       max_samples_per_send: 2000
+#       batch_send_deadline: 5s
