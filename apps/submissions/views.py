@@ -9,6 +9,11 @@ T3 surfaces (later):
   POST /api/events/<slug>/submissions/<id>/vote (T3 voting)
 """
 
+from __future__ import annotations
+
+import base64
+import json
+
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -27,6 +32,43 @@ from .serializers import (
     SubmissionSummarySerializer,
 )
 
+PAGE_SIZE = 24
+
+
+def _encode_cursor(sort: str, last_item: Submission) -> str:
+    """Build an opaque base64 cursor from the last item's sort keys.
+
+    The cursor is forward-only and strictly tied to the sort mode — the
+    server refuses to mix them. Format::
+
+        {"v": 1, "s": <sort>, "k": [<k1>, <k2>, ...]}
+
+    For ``sort=track`` the keys are ``[track_order, name]`` (so the
+    server can do ``(track_order, name) > (k1, k2)``).
+    For ``sort=alpha`` the key is ``[name]``.
+    For ``sort=newest`` the keys are ``[submitted_at_iso, id]`` so the
+    submitted_at tie-break is unambiguous.
+    """
+    if sort == "track":
+        keys = [last_item.track.order, last_item.name, str(last_item.id)]
+    elif sort == "alpha":
+        keys = [last_item.name, str(last_item.id)]
+    elif sort == "newest":
+        keys = [last_item.submitted_at.isoformat() if last_item.submitted_at else None, str(last_item.id)]
+    else:
+        keys = [last_item.name, str(last_item.id)]
+    payload = json.dumps({"v": 1, "s": sort, "k": keys}, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(payload).decode().rstrip("=")
+
+
+def _decode_cursor(cursor: str) -> tuple[int, str, list]:
+    """Inverse of :func:`_encode_cursor`. Raises ``ValueError`` on bad
+    input — the caller turns that into a 422."""
+    pad = "=" * (-len(cursor) % 4)
+    raw = base64.urlsafe_b64decode(cursor + pad)
+    obj = json.loads(raw)
+    return obj["v"], obj["s"], obj["k"]
+
 
 class GalleryView(APIView):
     """Public gallery. Used by acceptance checks 1 and 2.
@@ -40,6 +82,24 @@ class GalleryView(APIView):
     filters don't bleed into each other. Cached responses carry
     ``Cache-Control: public, max-age=60`` so upstream proxies can also
     serve from their edge.
+
+    Pagination
+    ----------
+    Two modes are supported. Both return the same shape of ``items``;
+    only the wrapper fields differ.
+
+    * **Cursor** (default): returns ``{items, next, page_size}`` where
+      ``next`` is an opaque cursor for the next page (or ``null`` at
+      the end). The query is a constant-time seek on the indexed sort
+      key, so page 1000 is just as fast as page 1. Call again with
+      ``?after=<next>`` to get the following page.
+    * **Offset** (legacy, ``?page=N``): returns ``{total, page,
+      page_size, items}``. Slow on late pages because PostgreSQL has to
+      scan + skip ``N*page_size`` rows. Opt in by passing ``?page=N``.
+
+    The ``?after`` cursor must match the current ``?sort`` mode; a
+    cursor built with ``sort=alpha`` is rejected if you ask for
+    ``sort=newest``.
     """
 
     permission_classes = [AllowAny]
@@ -49,9 +109,7 @@ class GalleryView(APIView):
         from django.core.cache import cache
         from django.utils.cache import patch_cache_control
 
-        cache_key = "gallery:" + "&".join(
-            f"{k}={v}" for k, v in sorted(request.query_params.items())
-        )
+        cache_key = "gallery:" + "&".join(f"{k}={v}" for k, v in sorted(request.query_params.items()))
         cached = cache.get(cache_key)
         if cached is not None:
             resp = Response(cached)
@@ -59,11 +117,7 @@ class GalleryView(APIView):
             resp["X-Cache"] = "HIT"
             return resp
 
-        qs = (
-            Submission.objects.filter(status="submitted")
-            .select_related("team", "track")
-            .order_by("track__order", "name")
-        )
+        qs = Submission.objects.filter(status="submitted").select_related("team", "track")
 
         track = request.query_params.get("track")
         if track:
@@ -71,24 +125,94 @@ class GalleryView(APIView):
 
         sort = request.query_params.get("sort", "track")
         if sort == "alpha":
-            qs = qs.order_by("name")
+            qs = qs.order_by("name", "id")
         elif sort == "newest":
-            qs = qs.order_by("-submitted_at")
+            qs = qs.order_by("-submitted_at", "-id")
+        else:
+            qs = qs.order_by("track__order", "name", "id")
 
-        try:
-            page = int(request.query_params.get("page", "1"))
-        except ValueError:
-            page = 1
-        page_size = 24
-        items = list(qs[(page - 1) * page_size : page * page_size])
-        total = qs.count()
+        # Cursor pagination is the default — the seek is O(1) on the
+        # indexed sort key for any page. ``?page=N`` opts into the old
+        # offset response (kept for clients that rely on ``total``).
+        after = request.query_params.get("after")
+        use_offset = "page" in request.query_params
 
-        body = {
-            "total": total,
-            "page": page,
-            "page_size": page_size,
-            "items": SubmissionSummarySerializer(items, many=True).data,
-        }
+        if use_offset:
+            try:
+                page = int(request.query_params.get("page", "1"))
+            except ValueError:
+                page = 1
+            items = list(qs[(page - 1) * PAGE_SIZE : page * PAGE_SIZE])
+            total = qs.count()
+            body = {
+                "total": total,
+                "page": page,
+                "page_size": PAGE_SIZE,
+                "items": SubmissionSummarySerializer(items, many=True).data,
+            }
+        else:
+            if after:
+                try:
+                    version, cursor_sort, keys = _decode_cursor(after)
+                except (ValueError, KeyError, TypeError):
+                    return Response(
+                        {
+                            "error": {
+                                "code": "validation_failed",
+                                "message": "Malformed cursor.",
+                            }
+                        },
+                        status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    )
+                if version != 1 or cursor_sort != sort:
+                    return Response(
+                        {
+                            "error": {
+                                "code": "validation_failed",
+                                "message": (f"Cursor was built for sort={cursor_sort!r}, current sort={sort!r}."),
+                            }
+                        },
+                        status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    )
+                # ``id`` is the final tiebreaker on every sort mode so the
+                # seek is unambiguous even with duplicate names / timestamps.
+                if sort == "track":
+                    track_order, name = keys[0], keys[1]
+                    qs = qs.filter(
+                        # Row-value seek: skip everything at-or-before
+                        # the cursor in (track_order, name). The third
+                        # branch is the tie-break by id.
+                    )
+                    from django.db.models import Q
+
+                    last_id = keys[2] if len(keys) > 2 else None
+                    qs = qs.filter(
+                        Q(track__order__gt=track_order)
+                        | (Q(track__order=track_order) & Q(name__gt=name))
+                        | (Q(track__order=track_order) & Q(name=name) & Q(id__gt=last_id))
+                    )
+                elif sort == "alpha":
+                    (name,) = keys[:1]
+                    from django.db.models import Q
+
+                    last_id = keys[1] if len(keys) > 1 else None
+                    qs = qs.filter(Q(name__gt=name) | (Q(name=name) & Q(id__gt=last_id)))
+                else:  # newest
+                    submitted_at_iso, last_id = keys[0], keys[1]
+                    from django.db.models import Q
+
+                    qs = qs.filter(
+                        Q(submitted_at__lt=submitted_at_iso) | (Q(submitted_at=submitted_at_iso) & Q(id__lt=last_id))
+                    )
+
+            items = list(qs[:PAGE_SIZE])
+            next_cursor = _encode_cursor(sort, items[-1]) if len(items) == PAGE_SIZE else None
+            body = {
+                "items": SubmissionSummarySerializer(items, many=True).data,
+                "next": next_cursor,
+                "page_size": PAGE_SIZE,
+            }
+
         # Cache for 60s — long enough to absorb a scrape burst,
         # short enough that new submissions show up promptly.
         cache.set(cache_key, body, timeout=60)
