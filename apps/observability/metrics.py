@@ -110,6 +110,7 @@ _LABEL_NAMES: dict[str, tuple[str, ...]] = {
     "http_requests_total": ("method", "path", "status"),
     "http_request_duration_ms": ("method", "path", "status"),
     "http_requests_in_progress": (),
+    "http_cache_events_total": ("result", "path"),
 }
 
 
@@ -130,12 +131,16 @@ REQUESTS_IN_PROGRESS = _Counter(
     "http_requests_in_progress",
     "HTTP requests currently being handled (gauge, +/-1 on entry/exit).",
 )
+CACHE_EVENTS = _Counter(
+    "http_cache_events_total",
+    "Cache HIT/MISS events from in-process caching of public reads.",
+)
 
 
 def render_metrics() -> str:
     """Render the Prometheus text-format exposition."""
     chunks: list[str] = []
-    for metric in (REQUESTS_TOTAL, REQUESTS_IN_PROGRESS):
+    for metric in (REQUESTS_TOTAL, REQUESTS_IN_PROGRESS, CACHE_EVENTS):
         chunks.extend(metric.render())
     chunks.extend(REQUEST_DURATION_MS.render())
     return "\n".join(chunks) + "\n"
@@ -143,7 +148,7 @@ def render_metrics() -> str:
 
 def reset_for_tests() -> None:
     """Clear all metrics — used by tests so assertions are deterministic."""
-    for metric in (REQUESTS_TOTAL, REQUESTS_IN_PROGRESS):
+    for metric in (REQUESTS_TOTAL, REQUESTS_IN_PROGRESS, CACHE_EVENTS):
         with metric._lock:
             metric._values.clear()
     with REQUEST_DURATION_MS._lock:

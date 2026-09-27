@@ -59,6 +59,22 @@ def _enable_db(db):
     return db
 
 
+@pytest.fixture(autouse=True)
+def _clear_cache():
+    """Clear Django's cache before and after every test.
+
+    Production caches public reads (gallery, widget JSON) with a 60s
+    TTL. Tests share the LocMemCache across the run, so a cache hit
+    from one test could leak data into another. Clearing around
+    every test keeps the cache honest.
+    """
+    from django.core.cache import cache
+
+    cache.clear()
+    yield
+    cache.clear()
+
+
 @pytest.fixture
 def now():
     return _now()

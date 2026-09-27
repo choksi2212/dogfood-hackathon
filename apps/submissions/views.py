@@ -34,12 +34,31 @@ class GalleryView(APIView):
     Returns submitted-only submissions in track order. The check expects
     at least one known fixture title — we seed fixtures with a known
     title so this is always true after `manage.py seed_fixtures`.
+
+    The response is cached for 60s via the in-process LocMemCache. The
+    cache key includes every query param so pagination / sorting / track
+    filters don't bleed into each other. Cached responses carry
+    ``Cache-Control: public, max-age=60`` so upstream proxies can also
+    serve from their edge.
     """
 
     permission_classes = [AllowAny]
     authentication_classes = []  # public — no session lookup needed
 
     def get(self, request):
+        from django.core.cache import cache
+        from django.utils.cache import patch_cache_control
+
+        cache_key = "gallery:" + "&".join(
+            f"{k}={v}" for k, v in sorted(request.query_params.items())
+        )
+        cached = cache.get(cache_key)
+        if cached is not None:
+            resp = Response(cached)
+            patch_cache_control(resp, public=True, max_age=60)
+            resp["X-Cache"] = "HIT"
+            return resp
+
         qs = (
             Submission.objects.filter(status="submitted")
             .select_related("team", "track")
@@ -64,14 +83,19 @@ class GalleryView(APIView):
         items = list(qs[(page - 1) * page_size : page * page_size])
         total = qs.count()
 
-        return Response(
-            {
-                "total": total,
-                "page": page,
-                "page_size": page_size,
-                "items": SubmissionSummarySerializer(items, many=True).data,
-            }
-        )
+        body = {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "items": SubmissionSummarySerializer(items, many=True).data,
+        }
+        # Cache for 60s — long enough to absorb a scrape burst,
+        # short enough that new submissions show up promptly.
+        cache.set(cache_key, body, timeout=60)
+        resp = Response(body)
+        patch_cache_control(resp, public=True, max_age=60)
+        resp["X-Cache"] = "MISS"
+        return resp
 
 
 class SubmitView(APIView):
