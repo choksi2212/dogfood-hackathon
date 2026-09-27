@@ -45,13 +45,9 @@ class Event(models.Model):
         if self.submissions_close_at <= self.open_at:
             raise ValidationError("submissions_close_at must be after open_at")
         if self.judging_open_at < self.submissions_close_at:
-            raise ValidationError(
-                "judging_open_at must be after submissions_close_at"
-            )
+            raise ValidationError("judging_open_at must be after submissions_close_at")
         if self.judging_close_at <= self.judging_open_at:
-            raise ValidationError(
-                "judging_close_at must be after judging_open_at"
-            )
+            raise ValidationError("judging_close_at must be after judging_open_at")
 
     def state(self, now=None):
         """Lifecycle phase. Used by views and tests."""
@@ -126,9 +122,7 @@ class Membership(models.Model):
         on_delete=models.CASCADE,
         related_name="memberships",
     )
-    event = models.ForeignKey(
-        Event, on_delete=models.CASCADE, related_name="memberships"
-    )
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="memberships")
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
@@ -157,9 +151,7 @@ class Rubric(models.Model):
 
 class RubricCriterion(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    rubric = models.ForeignKey(
-        Rubric, on_delete=models.CASCADE, related_name="criteria"
-    )
+    rubric = models.ForeignKey(Rubric, on_delete=models.CASCADE, related_name="criteria")
     name = models.CharField(max_length=40)
     description = models.CharField(max_length=200, blank=True)
     weight = models.DecimalField(max_digits=4, decimal_places=3)

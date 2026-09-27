@@ -12,6 +12,7 @@ row per comparison -- and the ranking -- one row per project per fit run.
 The fit itself (Hunter 2004 MM algorithm with a phantom prior) lives in
 fit.py. This module is just persistence.
 """
+
 import uuid
 
 from django.db import models
@@ -63,8 +64,7 @@ class PairwiseBallot(models.Model):
     )
     voter_key = models.CharField(
         max_length=128,
-        help_text="Identifier of the voter -- user UUID, session token, "
-                  "or 'community:<ip>' for public votes.",
+        help_text="Identifier of the voter -- user UUID, session token, " "or 'community:<ip>' for public votes.",
     )
     left_project = models.ForeignKey(
         "submissions.Submission",
@@ -91,9 +91,7 @@ class PairwiseRanking(models.Model):
     """One project's recovered strength inside a single run."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    run = models.ForeignKey(
-        PairwiseRun, on_delete=models.CASCADE, related_name="rankings"
-    )
+    run = models.ForeignKey(PairwiseRun, on_delete=models.CASCADE, related_name="rankings")
     project = models.ForeignKey(
         "submissions.Submission",
         on_delete=models.CASCADE,

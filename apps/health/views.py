@@ -7,6 +7,7 @@ canary that the compose stack is alive). 200 = ok; 503 = degraded.
 `/readyz` mirrors `/healthz` for ops tooling that distinguishes liveness
 from readiness.
 """
+
 import logging
 import time
 

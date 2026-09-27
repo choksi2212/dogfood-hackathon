@@ -18,6 +18,7 @@ Routes (under /api/):
                                               the ballots currently in
                                               the table.
 """
+
 from __future__ import annotations
 
 from django.db import transaction
@@ -33,7 +34,6 @@ from apps.submissions.models import Submission
 
 from .fit import bradley_terry
 from .models import PairwiseBallot, PairwiseRanking, PairwiseRun
-
 
 VALID_WINNERS = ("left", "right", "tie")
 
@@ -53,15 +53,13 @@ class PairwiseBallotView(APIView):
             event = Event.objects.get(slug=slug)
         except Event.DoesNotExist:
             return Response(
-                {"error": {"code": "not_found",
-                           "message": "Event {!r} not found.".format(slug)}},
+                {"error": {"code": "not_found", "message": f"Event {slug!r} not found."}},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         if timezone.now() > event.judging_close_at:
             return Response(
-                {"error": {"code": "deadline_passed",
-                           "message": "The judging window has closed."}},
+                {"error": {"code": "deadline_passed", "message": "The judging window has closed."}},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
@@ -71,14 +69,12 @@ class PairwiseBallotView(APIView):
 
         if not left_id or not right_id or left_id == right_id:
             return Response(
-                {"error": {"code": "validation_failed",
-                           "message": "left_id and right_id must be set and distinct."}},
+                {"error": {"code": "validation_failed", "message": "left_id and right_id must be set and distinct."}},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
         if winner not in VALID_WINNERS:
             return Response(
-                {"error": {"code": "validation_failed",
-                           "message": "winner must be one of {}.".format(VALID_WINNERS)}},
+                {"error": {"code": "validation_failed", "message": f"winner must be one of {VALID_WINNERS}."}},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
@@ -90,8 +86,12 @@ class PairwiseBallotView(APIView):
             right = Submission.objects.get(id=right_id, event=event)
         except Submission.DoesNotExist:
             return Response(
-                {"error": {"code": "validation_failed",
-                           "message": "left_id or right_id is not a submission for this event."}},
+                {
+                    "error": {
+                        "code": "validation_failed",
+                        "message": "left_id or right_id is not a submission for this event.",
+                    }
+                },
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
@@ -130,17 +130,14 @@ class PairwiseRankView(APIView):
             event = Event.objects.get(slug=slug)
         except Event.DoesNotExist:
             return Response(
-                {"error": {"code": "not_found",
-                           "message": "Event {!r} not found.".format(slug)}},
+                {"error": {"code": "not_found", "message": f"Event {slug!r} not found."}},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         # Pull every ballot for the event. The fit is fast for any
         # realistic ballot count; we don't try to be clever about
         # incremental updates.
-        ballots_qs = PairwiseBallot.objects.filter(event=event).values(
-            "left_project_id", "right_project_id", "winner"
-        )
+        ballots_qs = PairwiseBallot.objects.filter(event=event).values("left_project_id", "right_project_id", "winner")
         ballots = [
             {
                 "left_id": str(row["left_project_id"]),
@@ -154,10 +151,7 @@ class PairwiseRankView(APIView):
         # the event and every id that appears in any ballot. Submissions
         # with zero ballots still get a theta (regularised by the
         # phantom prior).
-        submission_ids = set(
-            str(s.id)
-            for s in Submission.objects.filter(event=event).only("id")
-        )
+        submission_ids = set(str(s.id) for s in Submission.objects.filter(event=event).only("id"))
         ballot_ids = {b["left_id"] for b in ballots} | {b["right_id"] for b in ballots}
         project_ids = sorted(submission_ids | ballot_ids)
 

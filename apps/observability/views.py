@@ -11,6 +11,7 @@ should be reachable only from the Prometheus scraper. Locking it
 down is the responsibility of the fronting proxy / network policy,
 not Django.
 """
+
 from __future__ import annotations
 
 from django.http import HttpRequest, HttpResponse

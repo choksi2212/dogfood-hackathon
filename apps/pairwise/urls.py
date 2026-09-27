@@ -2,7 +2,6 @@ from django.urls import path
 
 from . import views
 
-
 urlpatterns = [
     path(
         "events/<slug:slug>/pairwise/ballots",

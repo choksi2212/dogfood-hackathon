@@ -27,6 +27,7 @@ G7 (T4 surface):
   /api/webhooks                               organizer subscriptions
   /api/schema/                                OpenAPI 3 as JSON
 """
+
 from django.http import JsonResponse
 from django.urls import include, path
 

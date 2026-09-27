@@ -4,6 +4,7 @@ authentication class populates it; with no DEFAULT_AUTHENTICATION_CLASSES,
 `request.user.is_authenticated` would explode on None. We read the user
 that apps.accounts.middleware.SessionMiddleware already resolved.
 """
+
 from rest_framework.authentication import BaseAuthentication
 
 
@@ -13,9 +14,9 @@ class CookieSessionAuthentication(BaseAuthentication):
     then decide whether to allow."""
 
     def authenticate(self, request):
-        from django.contrib.auth.models import AnonymousUser
-
-        user = getattr(request._request, "user", None) if hasattr(request, "_request") else getattr(request, "user", None)
+        user = (
+            getattr(request._request, "user", None) if hasattr(request, "_request") else getattr(request, "user", None)
+        )
         if user is None or not getattr(user, "is_authenticated", False):
             return None
         return (user, None)

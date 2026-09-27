@@ -9,6 +9,7 @@ Tests are marked with `@pytest.mark.pairwise` (declared in
 `pytest.ini`); the `--strict-markers` addopt will surface any
 missing registration if the marker gets renamed.
 """
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -46,12 +47,14 @@ def _ballots_for_order(order):
     """
     ballots = []
     for i_idx, i_id in enumerate(order):
-        for j_id in order[i_idx + 1:]:
-            ballots.append({
-                "left_id": i_id,
-                "right_id": j_id,
-                "winner": "left",
-            })
+        for j_id in order[i_idx + 1 :]:
+            ballots.append(
+                {
+                    "left_id": i_id,
+                    "right_id": j_id,
+                    "winner": "left",
+                }
+            )
     return ballots
 
 
@@ -63,12 +66,16 @@ def _make_team(org, event, slug):
         password="x",  # never used in these tests
     )
     Membership.objects.create(
-        user=captain, event=event,
-        role="participant", created_by=org,
+        user=captain,
+        event=event,
+        role="participant",
+        created_by=org,
     )
     team = Team.objects.create(event=event, name=slug, created_by=captain)
     TeamMember.objects.create(
-        team=team, user=captain, role_in_team="captain",
+        team=team,
+        user=captain,
+        role_in_team="captain",
     )
     return team
 
@@ -93,11 +100,18 @@ def pairwise_event(db, organizer, judge_a):
     Track.objects.create(event=event, slug="main", name="Main", order=0)
     rubric = Rubric.objects.create(event=event, name="Default")
     RubricCriterion.objects.create(
-        rubric=rubric, name="Innovation",
-        weight=Decimal("1.000"), min=1, max=5, order=0,
+        rubric=rubric,
+        name="Innovation",
+        weight=Decimal("1.000"),
+        min=1,
+        max=5,
+        order=0,
     )
     Membership.objects.create(
-        user=judge_a, event=event, role="judge", created_by=organizer,
+        user=judge_a,
+        event=event,
+        role="judge",
+        created_by=organizer,
     )
 
     track = event.tracks.get(slug="main")
@@ -105,8 +119,11 @@ def pairwise_event(db, organizer, judge_a):
     for slug in ("alpha", "beta", "gamma"):
         team = _make_team(organizer, event, slug)
         sub = Submission.objects.create(
-            team=team, event=event, track=track,
-            name=f"Project {slug}", tagline=f"Tagline {slug}",
+            team=team,
+            event=event,
+            track=track,
+            name=f"Project {slug}",
+            tagline=f"Tagline {slug}",
             description="desc",
             status="submitted",
             submitted_at=timezone.now(),
@@ -150,7 +167,7 @@ def test_all_ties_produces_equal_theta():
     project_ids = ["A", "B", "C", "D"]
     ballots = []
     for i_idx, i in enumerate(project_ids):
-        for j in project_ids[i_idx + 1:]:
+        for j in project_ids[i_idx + 1 :]:
             ballots.append({"left_id": i, "right_id": j, "winner": "tie"})
 
     result = bradley_terry(ballots, project_ids)
@@ -163,9 +180,7 @@ def test_all_ties_produces_equal_theta():
     # All theta values equal up to floating-point error.
     theta_values = list(result["theta"].values())
     for v in theta_values[1:]:
-        assert abs(v - theta_values[0]) < 1e-9, (
-            f"theta not equal under all-ties: {result['theta']}"
-        )
+        assert abs(v - theta_values[0]) < 1e-9, f"theta not equal under all-ties: {result['theta']}"
 
 
 def test_single_pair_dominance():
@@ -175,10 +190,7 @@ def test_single_pair_dominance():
     log-odds should grow like log(100/1) = log(100) ~ 4.6 plus the
     phantom prior's regularising effect.
     """
-    ballots = [
-        {"left_id": "X", "right_id": "Y", "winner": "left"}
-        for _ in range(100)
-    ]
+    ballots = [{"left_id": "X", "right_id": "Y", "winner": "left"} for _ in range(100)]
     result = bradley_terry(ballots, ["X", "Y"])
 
     assert result["theta"]["X"] > result["theta"]["Y"]
@@ -236,9 +248,7 @@ def test_sum_to_zero_recentring():
     result = bradley_terry(ballots, project_ids)
 
     total = sum(result["theta"].values())
-    assert abs(total) < 1e-9, (
-        f"sum of theta should be 0 (recentering), got {total}"
-    )
+    assert abs(total) < 1e-9, f"sum of theta should be 0 (recentering), got {total}"
 
 
 def test_tie_votes_count_as_half_win():
@@ -325,14 +335,10 @@ def test_unknown_winner_rejected_at_view(pairwise_event, auth_client):
         content_type="application/json",
     )
 
-    assert resp.status_code == 422, (
-        f"expected 422 for invalid winner, got {resp.status_code}: {resp.content}"
-    )
+    assert resp.status_code == 422, f"expected 422 for invalid winner, got {resp.status_code}: {resp.content}"
     body = resp.json()
     err_str = str(body).lower()
-    assert "winner" in err_str or "validation" in err_str, (
-        f"error body should mention winner/validation, got {body}"
-    )
+    assert "winner" in err_str or "validation" in err_str, f"error body should mention winner/validation, got {body}"
 
 
 def test_pairwise_ranking_endpoint(pairwise_event, auth_client):
@@ -355,14 +361,13 @@ def test_pairwise_ranking_endpoint(pairwise_event, auth_client):
             },
             content_type="application/json",
         )
-        assert resp.status_code in (200, 201), (
-            f"ballot {left_idx}->{right_idx} failed: {resp.status_code} {resp.content}"
-        )
+        assert resp.status_code in (
+            200,
+            201,
+        ), f"ballot {left_idx}->{right_idx} failed: {resp.status_code} {resp.content}"
 
     resp = client.get(f"/api/events/{event.slug}/pairwise/ranking")
-    assert resp.status_code == 200, (
-        f"ranking GET failed: {resp.status_code} {resp.content}"
-    )
+    assert resp.status_code == 200, f"ranking GET failed: {resp.status_code} {resp.content}"
 
     body = resp.json()
     assert body["event_slug"] == event.slug
@@ -379,9 +384,7 @@ def test_pairwise_ranking_endpoint(pairwise_event, auth_client):
 
     # Theta is monotonically decreasing down the ranking.
     thetas = [r["theta"] for r in ranking]
-    assert thetas == sorted(thetas, reverse=True), (
-        f"thetas not in descending order: {thetas}"
-    )
+    assert thetas == sorted(thetas, reverse=True), f"thetas not in descending order: {thetas}"
 
     # Rank numbers are 1..3 in order.
     assert [r["rank"] for r in ranking] == [1, 2, 3]

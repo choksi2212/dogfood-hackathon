@@ -13,10 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "is_active"]
 
     def get_memberships(self, obj):
-        return [
-            {"event": m.event.slug, "role": m.role}
-            for m in obj.memberships.select_related("event")
-        ]
+        return [{"event": m.event.slug, "role": m.role} for m in obj.memberships.select_related("event")]
 
     def create(self, validated_data):
         password = validated_data.pop("password", None)

@@ -8,6 +8,7 @@ T3 surfaces (later):
   POST /api/events/<slug>/submissions/<id>/review-comment (T3 comments)
   POST /api/events/<slug>/submissions/<id>/vote (T3 voting)
 """
+
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny
@@ -173,6 +174,7 @@ class SubmitView(APIView):
         team_id = request.data.get("team_id")
         if team_id:
             from apps.teams.models import Team
+
             try:
                 team = Team.objects.get(id=team_id, event=event)
             except Team.DoesNotExist:
@@ -197,11 +199,7 @@ class SubmitView(APIView):
                 )
             return team
 
-        member = (
-            TeamMember.objects.filter(user=request.user, team__event=event)
-            .select_related("team")
-            .first()
-        )
+        member = TeamMember.objects.filter(user=request.user, team__event=event).select_related("team").first()
         if member is None:
             return Response(
                 {

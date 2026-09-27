@@ -16,12 +16,8 @@ class Submission(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    team = models.OneToOneField(
-        "teams.Team", on_delete=models.CASCADE, related_name="submission"
-    )
-    event = models.ForeignKey(
-        "events.Event", on_delete=models.CASCADE, related_name="submissions"
-    )
+    team = models.OneToOneField("teams.Team", on_delete=models.CASCADE, related_name="submission")
+    event = models.ForeignKey("events.Event", on_delete=models.CASCADE, related_name="submissions")
     track = models.ForeignKey(
         "events.Track",
         on_delete=models.CASCADE,
@@ -34,9 +30,7 @@ class Submission(models.Model):
     demo_video_url = models.URLField(blank=True)
     repo_url = models.URLField(blank=True)
     live_url = models.URLField(blank=True)
-    status = models.CharField(
-        max_length=20, choices=STATUS_CHOICES, default="draft"
-    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
     submitted_at = models.DateTimeField(null=True, blank=True)
     locked_at = models.DateTimeField(null=True, blank=True)
     withdrawn_at = models.DateTimeField(null=True, blank=True)

@@ -5,12 +5,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Event, Membership, Rubric, RubricCriterion, Track
+from .models import Event, Membership, Rubric, RubricCriterion
 from .permissions import IsInEvent, IsOrganizer
 from .serializers import (
     EventSerializer,
     MembershipSerializer,
-    PrizeSerializer,
     RubricSerializer,
     TrackSerializer,
 )

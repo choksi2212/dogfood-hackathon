@@ -20,6 +20,7 @@ The path label is the resolver's route pattern (e.g.
 ``/api/events/<slug>/submit``), not the concrete URL, so cardinality
 stays bounded.
 """
+
 from __future__ import annotations
 
 import logging
@@ -30,7 +31,7 @@ from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Callable
+    from collections.abc import Callable
 
     from django.http import HttpRequest, HttpResponse
 
@@ -55,7 +56,7 @@ def _coerce_request_id(raw: str | None) -> str:
     return cleaned or uuid.uuid4().hex
 
 
-def _route_pattern(request: "HttpRequest") -> str:
+def _route_pattern(request: HttpRequest) -> str:
     """Resolve the request to its URL pattern, falling back to the
     raw path. The match attribute is populated once Django's URL
     resolver has matched the request."""
@@ -68,14 +69,12 @@ def _route_pattern(request: "HttpRequest") -> str:
 class RequestCorrelationMiddleware:
     """Stamp a request_id, time the request, emit metrics + a log line."""
 
-    def __init__(self, get_response: "Callable[[HttpRequest], HttpResponse]") -> None:
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
         self.logger = logging.getLogger("observability.request")
 
-    def __call__(self, request: "HttpRequest") -> "HttpResponse":
-        request_id = _coerce_request_id(
-            request.META.get(_REQUEST_ID_HEADER)
-        )
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        request_id = _coerce_request_id(request.META.get(_REQUEST_ID_HEADER))
         token = _request_id_var.set(request_id)
         # ``request_id`` is set on the request for downstream code
         # (logging context, audit entries). django-stubs doesn't know

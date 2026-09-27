@@ -10,6 +10,7 @@ This file is the only thing added alongside tests/security/test_attacks.py.
 Per the security agent's scope it lives inside tests/security/ and never
 edits any existing file in the project.
 """
+
 from __future__ import annotations
 
 

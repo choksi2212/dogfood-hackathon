@@ -1,4 +1,5 @@
 """Certificate model — public, signed per-submission record."""
+
 import hashlib
 import hmac
 import json

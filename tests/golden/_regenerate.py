@@ -27,6 +27,7 @@ What it does:
 
 The script is idempotent: re-running it overwrites the fixtures.
 """
+
 from __future__ import annotations
 
 import json
@@ -205,6 +206,7 @@ def regenerate_openapi_minimal_golden():
     # Importing the view requires Django to be configured; the spec
     # itself is built by a pure function so we don't need the DB.
     import django
+
     django.setup()
     from apps.api.views import _openapi_spec
 
@@ -222,9 +224,7 @@ def regenerate_openapi_minimal_golden():
             for status_code, resp in responses.items():
                 content = resp.get("content") if isinstance(resp, dict) else None
                 if content:
-                    shapes[status_code] = {
-                        k: v.get("schema", {}) for k, v in content.items()
-                    }
+                    shapes[status_code] = {k: v.get("schema", {}) for k, v in content.items()}
                 else:
                     shapes[status_code] = resp.get("description", "")
             minimal["responses"][f"{method.upper()} {path}"] = shapes
@@ -238,18 +238,16 @@ def regenerate_csv_header_golden():
     updating the golden."""
     sys.path.insert(0, str(REPO_ROOT))
     import os
+
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
     import django
+
     django.setup()
 
-    from apps.judging.views import CSVExportView
     # The header is hard-coded as the first writerow in CSVExportView.get,
     # split across two lines because it's a Python list literal.
     src = Path(REPO_ROOT / "apps" / "judging" / "views.py").read_text()
-    expected = (
-        "event_slug,project_id,project_name,judge_email,"
-        "criterion_name,score,weight\n"
-    )
+    expected = "event_slug,project_id,project_name,judge_email," "criterion_name,score,weight\n"
     out = FIXTURE_DIR / "csv_header.txt"
     out.write_text(expected)
     header_columns = [

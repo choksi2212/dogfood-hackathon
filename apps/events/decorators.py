@@ -2,6 +2,7 @@
 forwards to the wrapped view. Used by submit, judge-score, vote, and
 pairwise-ballot endpoints.
 """
+
 import json
 from functools import wraps
 

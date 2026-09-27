@@ -37,6 +37,7 @@ What is intentionally *not* golden-tested here:
     ranking — that's a view-layer concern covered by the conformance
     suite.
 """
+
 from __future__ import annotations
 
 import json
@@ -62,7 +63,7 @@ def test_normalization_matches_golden():
     """`apps.normalization.fit.normalize()` on the deterministic
     30-review fixture produces the same FitResult as the stored
     canonical output."""
-    from tests.golden._fixtures import build_normalization_input, normalization_result
+    from tests.golden._fixtures import normalization_result
 
     expected = _load("normalization_output.json")
     result = normalization_result()
@@ -77,16 +78,12 @@ def test_normalization_matches_golden():
     # Per-project quality vector (q)
     assert set(result.q) == set(expected["q"])
     for pid, val in expected["q"].items():
-        assert result.q[pid] == pytest.approx(val), (
-            f"q[{pid}] drifted: live={result.q[pid]} golden={val}"
-        )
+        assert result.q[pid] == pytest.approx(val), f"q[{pid}] drifted: live={result.q[pid]} golden={val}"
 
     # Per-judge bias vector (b)
     assert set(result.b) == set(expected["b"])
     for jid, val in expected["b"].items():
-        assert result.b[jid] == pytest.approx(val), (
-            f"b[{jid}] drifted: live={result.b[jid]} golden={val}"
-        )
+        assert result.b[jid] == pytest.approx(val), f"b[{jid}] drifted: live={result.b[jid]} golden={val}"
 
     # Leverage
     for jid, val in expected["leverage"].items():
@@ -103,9 +100,7 @@ def test_normalization_matches_golden():
     # compare as a dict keyed by project_id.
     by_pid = {s["project_id"]: s for s in result.scores}
     golden_by_pid = {s["project_id"]: s for s in expected["scores"]}
-    assert set(by_pid) == set(golden_by_pid), (
-        f"score rows drift: live={sorted(by_pid)} golden={sorted(golden_by_pid)}"
-    )
+    assert set(by_pid) == set(golden_by_pid), f"score rows drift: live={sorted(by_pid)} golden={sorted(golden_by_pid)}"
     # Raw_mean and adjusted values match exactly (modulo floating
     # point noise — these are the algorithm's deterministic output).
     for pid, golden_row in golden_by_pid.items():
@@ -179,15 +174,13 @@ def test_bradley_terry_matches_golden():
 
     # Theta is the headline number — must match to within tight tolerance.
     for pid, val in expected["theta"].items():
-        assert live["theta"][pid] == pytest.approx(val, rel=1e-9, abs=1e-12), (
-            f"theta[{pid}] drifted: live={live['theta'][pid]} golden={val}"
-        )
+        assert live["theta"][pid] == pytest.approx(
+            val, rel=1e-9, abs=1e-12
+        ), f"theta[{pid}] drifted: live={live['theta'][pid]} golden={val}"
 
     # Win/loss/tie counts are integer, exact-match.
     for field in ("wins", "losses", "ties"):
-        assert live[field] == expected[field], (
-            f"{field} drifted: live={live[field]} golden={expected[field]}"
-        )
+        assert live[field] == expected[field], f"{field} drifted: live={live[field]} golden={expected[field]}"
 
     # Ranking: project_id + rank must match exactly; theta is asserted above.
     live_ranking_by_pid = {r["project_id"]: r for r in live["ranking"]}
@@ -203,10 +196,8 @@ def test_bradley_terry_matches_golden():
     # symmetric pair at rank 3 is theta ≈ 0 and rank 4 is < 0, so
     # this holds for all consecutive pairs).
     thetas = [r["theta"] for r in sorted(live["ranking"], key=lambda r: r["rank"])]
-    for prev, nxt in zip(thetas, thetas[1:]):
-        assert prev > nxt, (
-            f"ranking non-monotonic: theta[{prev}] not > theta[{nxt}]"
-        )
+    for prev, nxt in zip(thetas, thetas[1:], strict=False):
+        assert prev > nxt, f"ranking non-monotonic: theta[{prev}] not > theta[{nxt}]"
 
 
 @pytest.mark.golden
@@ -365,8 +356,7 @@ def test_openapi_response_shapes_match_golden():
 
         for status_code, golden_shape in golden_shapes.items():
             assert status_code in responses, (
-                f"{endpoint}: status {status_code} was removed; "
-                f"golden expected {golden_shape!r}"
+                f"{endpoint}: status {status_code} was removed; " f"golden expected {golden_shape!r}"
             )
             live_resp = responses[status_code]
             if isinstance(golden_shape, dict):
@@ -374,8 +364,7 @@ def test_openapi_response_shapes_match_golden():
                 # schema must still be present and non-empty.
                 content = live_resp.get("content", {})
                 assert content, (
-                    f"{endpoint} status {status_code}: content removed; "
-                    f"golden expected schema {golden_shape!r}"
+                    f"{endpoint} status {status_code}: content removed; " f"golden expected schema {golden_shape!r}"
                 )
             # else: description string — non-strict by design.
 
@@ -409,12 +398,9 @@ def test_csv_header_matches_golden():
     # Every column name appears as a quoted literal in the source.
     for col in expected_columns:
         assert f'"{col}"' in src, (
-            f"CSV header column {col!r} not found as a literal in "
-            f"apps/judging/views.py — the source has drifted."
+            f"CSV header column {col!r} not found as a literal in " f"apps/judging/views.py — the source has drifted."
         )
 
     # The joined literal matches the stored golden.
     expected_line = ",".join(expected_columns) + "\n"
-    assert golden == expected_line, (
-        f"csv_header.txt drift: stored={golden!r} rebuilt={expected_line!r}"
-    )
+    assert golden == expected_line, f"csv_header.txt drift: stored={golden!r} rebuilt={expected_line!r}"

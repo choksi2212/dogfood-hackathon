@@ -33,13 +33,13 @@ The fit handles three edge cases the spec calls out explicitly:
      if the underlying assignment/criterion pairing produced more than
      one row; in practice this is a defensive dedup, not a silent drop).
 """
+
 from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
 from math import sqrt
 from typing import Any
-
 
 # --- Public dataclass ------------------------------------------------------
 
@@ -131,9 +131,7 @@ def normalize(scores: list[dict[str, Any]]) -> FitResult:
         b_mean = sum(new_b.values()) / len(new_b)
         new_b = {j: v - b_mean for j, v in new_b.items()}
 
-        max_change = max(
-            (abs(new_q[p] - q[p]) for p in projects), default=0.0
-        )
+        max_change = max((abs(new_q[p] - q[p]) for p in projects), default=0.0)
         max_change = max(
             max_change,
             max((abs(new_b[j] - b[j]) for j in judges), default=0.0),
@@ -232,10 +230,7 @@ def _is_connected(
                 if p not in visited_p:
                     visited_p.add(p)
                     queue.append(("p", p))
-    return (
-        len(visited_p) == len(project_judges)
-        and len(visited_j) == len(judge_projects)
-    )
+    return len(visited_p) == len(project_judges) and len(visited_j) == len(judge_projects)
 
 
 def _is_zero_variance(judge_id: str, cells: dict[tuple[str, str], float]) -> bool:

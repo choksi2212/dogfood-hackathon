@@ -16,6 +16,7 @@ the spec or the code needs updating in the same commit.
 
 Marker: ``@pytest.mark.conformance`` (registered in pytest.ini).
 """
+
 from __future__ import annotations
 
 import json
@@ -66,9 +67,7 @@ def _load_yaml_spec() -> dict:
 def _fetch_live_spec(client: Client) -> dict:
     """GET ``/api/schema/`` and return the parsed JSON body."""
     resp = client.get("/api/schema/")
-    assert resp.status_code == 200, (
-        f"/api/schema/ returned {resp.status_code}, expected 200"
-    )
+    assert resp.status_code == 200, f"/api/schema/ returned {resp.status_code}, expected 200"
     return json.loads(resp.content)
 
 
@@ -136,6 +135,7 @@ def _bind_path_params(path: str) -> str:
 # 1. /api/schema/ returns a valid OpenAPI 3 document
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.conformance
 def test_schema_endpoint_returns_valid_openapi3():
     """``/api/schema/`` must return a syntactically valid OpenAPI 3 doc."""
@@ -143,8 +143,7 @@ def test_schema_endpoint_returns_valid_openapi3():
 
     # OpenAPI 3 declaration
     assert spec.get("openapi") == "3.0.3", (
-        f"/api/schema/ openapi version is {spec.get('openapi')!r}, "
-        "expected '3.0.3'"
+        f"/api/schema/ openapi version is {spec.get('openapi')!r}, " "expected '3.0.3'"
     )
 
     # info.title and info.version
@@ -155,14 +154,13 @@ def test_schema_endpoint_returns_valid_openapi3():
     # At least five paths documented
     paths = spec.get("paths", {})
     assert isinstance(paths, dict), "/api/schema/ paths must be a dict"
-    assert len(paths) >= 5, (
-        f"/api/schema/ documents {len(paths)} paths, expected >= 5"
-    )
+    assert len(paths) >= 5, f"/api/schema/ documents {len(paths)} paths, expected >= 5"
 
 
 # ---------------------------------------------------------------------------
 # 2. openapi.yaml matches the view-served document
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.conformance
 def test_yaml_matches_schema_endpoint():
@@ -188,6 +186,7 @@ def test_yaml_matches_schema_endpoint():
 # ---------------------------------------------------------------------------
 # 3. All paths in the spec exist on the live URLconf
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.conformance
 @pytest.mark.django_db
@@ -227,15 +226,13 @@ def test_all_spec_paths_exist_on_running_service():
                 f"not in declared responses {sorted(declared)}"
             )
 
-    assert not failures, (
-        "Spec paths returned undocumented status codes:\n  - "
-        + "\n  - ".join(failures)
-    )
+    assert not failures, "Spec paths returned undocumented status codes:\n  - " + "\n  - ".join(failures)
 
 
 # ---------------------------------------------------------------------------
 # 4. No undocumented paths exist on the running service
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.conformance
 def test_no_undocumented_paths_in_urlconf():
@@ -245,15 +242,15 @@ def test_no_undocumented_paths_in_urlconf():
     live_paths = _django_paths()
 
     undocumented = live_paths - spec_paths
-    assert not undocumented, (
-        "URLconf exposes paths not present in openapi.yaml:\n  - "
-        + "\n  - ".join(sorted(undocumented))
+    assert not undocumented, "URLconf exposes paths not present in openapi.yaml:\n  - " + "\n  - ".join(
+        sorted(undocumented)
     )
 
 
 # ---------------------------------------------------------------------------
 # 5. Spec endpoints declare the correct HTTP methods
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.conformance
 def test_spec_endpoints_have_documented_methods():
@@ -286,19 +283,16 @@ def test_spec_endpoints_have_documented_methods():
         response = getattr(client, method.lower())(bound)
         if response.status_code not in allowed and response.status_code != 405:
             failures.append(
-                f"{method} {path}: returned {response.status_code}, "
-                f"expected one of {sorted(allowed)} (or 405)"
+                f"{method} {path}: returned {response.status_code}, " f"expected one of {sorted(allowed)} (or 405)"
             )
 
-    assert not failures, (
-        "Spec endpoints returned unexpected status codes:\n  - "
-        + "\n  - ".join(failures)
-    )
+    assert not failures, "Spec endpoints returned unexpected status codes:\n  - " + "\n  - ".join(failures)
 
 
 # ---------------------------------------------------------------------------
 # 6. The cookie security scheme exists and is referenced where required
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.conformance
 def test_security_scheme_defined():
@@ -334,15 +328,13 @@ def test_admin_endpoints_reference_security():
             security = op.get("security")
             if not security or "cookie" not in {next(iter(s.keys()), None) for s in security}:
                 failures.append(f"{method.upper()} {path}: missing cookie security")
-    assert not failures, (
-        "Admin endpoints missing cookie security declaration:\n  - "
-        + "\n  - ".join(failures)
-    )
+    assert not failures, "Admin endpoints missing cookie security declaration:\n  - " + "\n  - ".join(failures)
 
 
 # ---------------------------------------------------------------------------
 # 7. Schema definitions are referenced by at least one response
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.conformance
 def test_defined_schemas_are_referenced():
@@ -359,14 +351,13 @@ def test_defined_schemas_are_referenced():
         if f'"#/components/schemas/{name}"' not in spec_text:
             unreferenced.append(name)
 
-    assert not unreferenced, (
-        f"Schemas declared but never referenced: {sorted(unreferenced)}"
-    )
+    assert not unreferenced, f"Schemas declared but never referenced: {sorted(unreferenced)}"
 
 
 # ---------------------------------------------------------------------------
 # 8. Every $ref resolves to a defined component
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.conformance
 def test_no_broken_refs():
@@ -380,17 +371,13 @@ def test_no_broken_refs():
             if "$ref" in node and isinstance(node["$ref"], str):
                 ref = node["$ref"]
                 if not ref.startswith("#/components/"):
-                    failures.append(
-                        f"$ref {ref!r} at {'/'.join(trail)}: not in #/components/"
-                    )
+                    failures.append(f"$ref {ref!r} at {'/'.join(trail)}: not in #/components/")
                 else:
                     parts = ref.removeprefix("#/components/").split("/")
                     cursor = components
                     for part in parts:
                         if not isinstance(cursor, dict) or part not in cursor:
-                            failures.append(
-                                f"$ref {ref!r} at {'/'.join(trail)}: target missing"
-                            )
+                            failures.append(f"$ref {ref!r} at {'/'.join(trail)}: target missing")
                             break
                         cursor = cursor[part]
             for k, v in node.items():
@@ -407,6 +394,7 @@ def test_no_broken_refs():
 # Bonus artefact: API First
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.conformance
 def test_api_first_artefact_present():
     """``openapi.yaml`` exists at the repo root, is non-empty, and parses as
@@ -415,8 +403,6 @@ def test_api_first_artefact_present():
     assert OPENAPI_YAML.stat().st_size > 0, f"{OPENAPI_YAML} is empty"
 
     spec = _load_yaml_spec()
-    assert spec.get("openapi", "").startswith("3."), (
-        "openapi.yaml is not OpenAPI 3"
-    )
+    assert spec.get("openapi", "").startswith("3."), "openapi.yaml is not OpenAPI 3"
     assert spec.get("info", {}).get("title"), "openapi.yaml is missing info.title"
     assert spec.get("info", {}).get("version"), "openapi.yaml is missing info.version"

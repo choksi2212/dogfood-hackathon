@@ -23,6 +23,7 @@ What it does:
 Output: prints a HEADER block to stdout. Capture it into .dogfood.toml's
 [auth] block.
 """
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -48,6 +49,7 @@ DEMO_USERS = [
 ]
 
 DEMO_PASSWORD = "dogfood-dev-password"
+
 
 # Submissions-close deadline goes in the past (1 hour ago) so the
 # `POST /api/submit` path returns 422 even with a valid participant cookie.
@@ -115,22 +117,20 @@ class Command(BaseCommand):
 
         # Tracks
         main, _ = Track.objects.update_or_create(
-            event=event, slug="main",
+            event=event,
+            slug="main",
             defaults={"name": "Main", "description": "Main track", "order": 0},
         )
         wildcard, _ = Track.objects.update_or_create(
-            event=event, slug="wildcard",
+            event=event,
+            slug="wildcard",
             defaults={"name": "Wildcard", "description": "Anything goes", "order": 1},
         )
 
         # Rubric + criteria (weights sum to 1.000)
-        rubric, _ = Rubric.objects.update_or_create(
-            event=event, defaults={"name": "Default"}
-        )
+        rubric, _ = Rubric.objects.update_or_create(event=event, defaults={"name": "Default"})
         RubricCriterion.objects.filter(rubric=rubric).delete()
-        for order, (name, weight) in enumerate(
-            [("Innovation", "0.400"), ("Execution", "0.350"), ("Impact", "0.250")]
-        ):
+        for order, (name, weight) in enumerate([("Innovation", "0.400"), ("Execution", "0.350"), ("Impact", "0.250")]):
             RubricCriterion.objects.create(
                 rubric=rubric,
                 name=name,
@@ -148,12 +148,16 @@ class Command(BaseCommand):
         for email, name, role, label in DEMO_USERS:
             user = self._ensure_user(email, name)
             Membership.objects.update_or_create(
-                user=user, event=event,
+                user=user,
+                event=event,
                 defaults={"role": role, "created_by": organizer},
             )
             session, token = Session.create(
-                user, label=label, ip="127.0.0.1",
-                user_agent="seed_fixtures/1.0", ttl_days=365,
+                user,
+                label=label,
+                ip="127.0.0.1",
+                user_agent="seed_fixtures/1.0",
+                ttl_days=365,
             )
             headers[label] = token
             created_users[label] = user
@@ -169,20 +173,26 @@ class Command(BaseCommand):
                 f"Captain {team_name}",
             )
             Membership.objects.update_or_create(
-                user=captain, event=event,
+                user=captain,
+                event=event,
                 defaults={"role": "participant", "created_by": organizer},
             )
             team = Team.objects.create(
-                event=event, name=team_name, created_by=captain,
+                event=event,
+                name=team_name,
+                created_by=captain,
             )
             TeamMember.objects.create(
-                team=team, user=captain, role_in_team="captain",
+                team=team,
+                user=captain,
+                role_in_team="captain",
             )
             # The participant user is a member of the first team so the
             # `POST /api/submit` test has a team to resolve.
             if idx == 0:
                 TeamMember.objects.get_or_create(
-                    team=team, user=created_users["participant"],
+                    team=team,
+                    user=created_users["participant"],
                     defaults={"role_in_team": "member"},
                 )
             track = main if idx % 2 == 0 else wildcard
@@ -195,10 +205,7 @@ class Command(BaseCommand):
                 track=track,
                 name=tagline,
                 tagline=tagline,
-                description=(
-                    f"{team_name} — submission for the Sample Hack 2026 demo. "
-                    f"This is fixture row {idx}."
-                ),
+                description=(f"{team_name} — submission for the Sample Hack 2026 demo. " f"This is fixture row {idx}."),
                 status=sub_status,
                 submitted_at=now - timedelta(hours=2) if sub_status == "submitted" else None,
             )
@@ -229,13 +236,12 @@ class Command(BaseCommand):
             criteria = list(RubricCriterion.objects.filter(rubric=rubric))
             if criteria:
                 import hashlib
-                for assignment in JudgeAssignment.objects.filter(
-                    batch_id=assignment_result["batch_id"]
-                ).select_related("judge"):
+
+                for assignment in JudgeAssignment.objects.filter(batch_id=assignment_result["batch_id"]).select_related(
+                    "judge"
+                ):
                     seed_value = int(
-                        hashlib.sha256(
-                            f"{assignment.judge_id}-{assignment.project_id}".encode()
-                        ).hexdigest()[:8],
+                        hashlib.sha256(f"{assignment.judge_id}-{assignment.project_id}".encode()).hexdigest()[:8],
                         16,
                     )
                     for i, criterion in enumerate(criteria):
@@ -259,7 +265,9 @@ class Command(BaseCommand):
 
         self.stdout.write("")
         self.stdout.write("# Verify:")
-        self.stdout.write(f'#   curl -sS -H "Cookie: session={headers["participant"]}" http://localhost:8000/api/submit -X POST')
+        self.stdout.write(
+            f'#   curl -sS -H "Cookie: session={headers["participant"]}" http://localhost:8000/api/submit -X POST'
+        )
 
     @staticmethod
     def _bootstrap_creator():

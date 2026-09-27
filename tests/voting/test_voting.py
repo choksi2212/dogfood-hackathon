@@ -42,26 +42,23 @@ Implementation notes that drove the test design:
   on the underlying request, which DRF's `Request.__init__` honours
   regardless of the view's `authentication_classes`.
 """
+
 from __future__ import annotations
 
 import hashlib
-import json
 from datetime import timedelta
-from decimal import Decimal
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
-from django.test import Client
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.accounts.models import Session, User
 from apps.abuse.models import AbuseFlag
-from apps.events.models import Event, Membership, Rubric, RubricCriterion, Track
+from apps.accounts.models import User
+from apps.events.models import Event, Membership, Track
 from apps.submissions.models import Submission
 from apps.teams.models import Team, TeamMember
 from apps.voting.models import Vote, VoteAudit, VoteBudget
-
 
 DEMO_PASSWORD = "voting-tests-not-a-real-password"
 VOTING_EVENT_SLUG = "voting-test-2026"
@@ -124,7 +121,8 @@ def voting_event(db, organizer):
         ),
     )
     main, _ = Track.objects.update_or_create(
-        event=event, slug="main",
+        event=event,
+        slug="main",
         defaults={"name": "Main", "description": "Main track", "order": 0},
     )
     return event
@@ -144,14 +142,20 @@ def voting_team(db, voting_event, organizer):
         password=DEMO_PASSWORD,
     )
     Membership.objects.create(
-        user=captain, event=voting_event,
-        role="participant", created_by=organizer,
+        user=captain,
+        event=voting_event,
+        role="participant",
+        created_by=organizer,
     )
     team = Team.objects.create(
-        event=voting_event, name="Voting Target Team", created_by=captain,
+        event=voting_event,
+        name="Voting Target Team",
+        created_by=captain,
     )
     TeamMember.objects.create(
-        team=team, user=captain, role_in_team="captain",
+        team=team,
+        user=captain,
+        role_in_team="captain",
     )
     return team
 
@@ -184,17 +188,25 @@ def self_vote_team(db, voting_event, organizer, participant):
         password=DEMO_PASSWORD,
     )
     Membership.objects.create(
-        user=captain, event=voting_event,
-        role="participant", created_by=organizer,
+        user=captain,
+        event=voting_event,
+        role="participant",
+        created_by=organizer,
     )
     team = Team.objects.create(
-        event=voting_event, name="Self Vote Team", created_by=captain,
+        event=voting_event,
+        name="Self Vote Team",
+        created_by=captain,
     )
     TeamMember.objects.create(
-        team=team, user=captain, role_in_team="captain",
+        team=team,
+        user=captain,
+        role_in_team="captain",
     )
     TeamMember.objects.create(
-        team=team, user=participant, role_in_team="member",
+        team=team,
+        user=participant,
+        role_in_team="member",
     )
     main = voting_event.tracks.get(slug="main")
     sub = Submission.objects.create(
@@ -236,7 +248,8 @@ def closed_event(db, organizer):
         ),
     )
     Track.objects.update_or_create(
-        event=event, slug="main",
+        event=event,
+        slug="main",
         defaults={"name": "Main", "description": "Main", "order": 0},
     )
     return event
@@ -285,9 +298,7 @@ def _authed_client(user):
 class TestSimpleMode:
     """T3 voting in `simple` mode: every cast is exactly 1 vote."""
 
-    def test_simple_mode_cast_creates_vote_with_one(
-        self, participant, voting_submission, voting_event
-    ):
+    def test_simple_mode_cast_creates_vote_with_one(self, participant, voting_submission, voting_event):
         """POST with no `votes` field on a simple-mode event creates a
         Vote row with `votes=1`. The body is empty because simple mode
         ignores any `votes` value sent by the client.
@@ -318,9 +329,7 @@ class TestQuadraticMode:
         event.voting_mode = "quadratic"
         event.save(update_fields=["voting_mode"])
 
-    def test_quadratic_mode_deducts_votes_squared(
-        self, participant, voting_submission, voting_event
-    ):
+    def test_quadratic_mode_deducts_votes_squared(self, participant, voting_submission, voting_event):
         """First cast with votes=3 costs 9 credits. Replacing with
         votes=2 charges only the delta (4 - 9 = -5), so 5 credits are
         refunded. End state: spent_credits = 4.
@@ -330,7 +339,9 @@ class TestQuadraticMode:
         url = _vote_url(voting_event.slug, voting_submission.id)
 
         resp1 = client.post(
-            url, data={"votes": 3}, format="json",
+            url,
+            data={"votes": 3},
+            format="json",
         )
         assert resp1.status_code == 201, resp1.content
         assert resp1.json()["spent_credits"] == 9
@@ -339,7 +350,9 @@ class TestQuadraticMode:
         assert budget.spent_credits == 9
 
         resp2 = client.post(
-            url, data={"votes": 2}, format="json",
+            url,
+            data={"votes": 2},
+            format="json",
         )
         assert resp2.status_code == 201, resp2.content
         # 9 was already spent; replacing with votes=2 charges only 4.
@@ -348,9 +361,7 @@ class TestQuadraticMode:
         budget.refresh_from_db()
         assert budget.spent_credits == 4
 
-    def test_quadratic_budget_cap_returns_422(
-        self, participant, voting_submission, voting_event
-    ):
+    def test_quadratic_budget_cap_returns_422(self, participant, voting_submission, voting_event):
         """11 votes would cost 121 credits, exceeding the 100-credit
         budget. The server rejects with 422 and writes NO Vote row.
         """
@@ -359,14 +370,17 @@ class TestQuadraticMode:
         url = _vote_url(voting_event.slug, voting_submission.id)
 
         resp = client.post(
-            url, data={"votes": 11}, format="json",
+            url,
+            data={"votes": 11},
+            format="json",
         )
         assert resp.status_code == 422, resp.content
         body = resp.json()
         assert "budget" in body["error"]["message"].lower()
 
         assert not Vote.objects.filter(
-            event=voting_event, project=voting_submission,
+            event=voting_event,
+            project=voting_submission,
         ).exists()
         assert not VoteBudget.objects.filter(event=voting_event).exists()
 
@@ -377,9 +391,7 @@ class TestQuadraticMode:
 class TestSelfVoteGuard:
     """A team member cannot vote on their own team's submission."""
 
-    def test_self_vote_returns_403(
-        self, participant, self_vote_team, voting_event
-    ):
+    def test_self_vote_returns_403(self, participant, self_vote_team, voting_event):
         """When the authenticated voter is a TeamMember of the
         submission's team, POST returns 403 `forbidden_role`.
         """
@@ -391,7 +403,8 @@ class TestSelfVoteGuard:
         assert resp.status_code == 403, resp.content
         assert resp.json()["error"]["code"] == "forbidden_role"
         assert not Vote.objects.filter(
-            event=voting_event, project=submission,
+            event=voting_event,
+            project=submission,
         ).exists()
 
 
@@ -401,9 +414,7 @@ class TestSelfVoteGuard:
 class TestRetraction:
     """DELETE removes the ballot (sets retracted_at) and refunds credits."""
 
-    def test_retraction_removes_vote_and_refunds_budget(
-        self, participant, voting_submission, voting_event
-    ):
+    def test_retraction_removes_vote_and_refunds_budget(self, participant, voting_submission, voting_event):
         """Cast a quadratic ballot (cost 9), then DELETE — vote.effective
         becomes 0 and the 9 credits are refunded.
         """
@@ -434,9 +445,7 @@ class TestRetraction:
 class TestIdempotency:
     """A second POST from the same voter updates rather than duplicates."""
 
-    def test_idempotent_cast_updates_existing_vote(
-        self, participant, voting_submission, voting_event
-    ):
+    def test_idempotent_cast_updates_existing_vote(self, participant, voting_submission, voting_event):
         """Two POSTs from the same voter_key produce ONE Vote row. The
         second cast updates `votes` and clears `retracted_at`.
         """
@@ -450,9 +459,13 @@ class TestIdempotency:
         assert second.status_code == 201
         assert second.json()["vote_id"] == first_vote_id
 
-        assert Vote.objects.filter(
-            event=voting_event, project=voting_submission,
-        ).count() == 1
+        assert (
+            Vote.objects.filter(
+                event=voting_event,
+                project=voting_submission,
+            ).count()
+            == 1
+        )
 
 
 @pytest.mark.django_db
@@ -461,9 +474,7 @@ class TestIdempotency:
 class TestAnonymousVoterKey:
     """Without a session cookie, the voter_key is a fingerprint."""
 
-    def test_anonymous_voter_key_is_fingerprint(
-        self, voting_submission, voting_event
-    ):
+    def test_anonymous_voter_key_is_fingerprint(self, voting_submission, voting_event):
         """Two anonymous clients with different IPs produce different
         fingerprint voter_keys, both prefixed `fp:` and derived from
         sha256(ip + user_agent)[:32].
@@ -481,7 +492,8 @@ class TestAnonymousVoterKey:
         assert resp_a.status_code == 201, resp_a.content
 
         votes_a = Vote.objects.filter(
-            event=voting_event, project=voting_submission,
+            event=voting_event,
+            project=voting_submission,
             voter_key=_expected_fp_key("10.0.0.1", "agent-a/1.0"),
         )
         assert votes_a.count() == 1
@@ -498,7 +510,8 @@ class TestAnonymousVoterKey:
 
         keys = list(
             Vote.objects.filter(
-                event=voting_event, project=voting_submission,
+                event=voting_event,
+                project=voting_submission,
             ).values_list("voter_key", flat=True)
         )
         assert len(keys) == 2
@@ -512,9 +525,7 @@ class TestAnonymousVoterKey:
 class TestAuditTrail:
     """Every cast and retract writes a VoteAudit row."""
 
-    def test_every_cast_and_retract_writes_voteaudit(
-        self, participant, voting_submission, voting_event
-    ):
+    def test_every_cast_and_retract_writes_voteaudit(self, participant, voting_submission, voting_event):
         """One cast + one retract = one VoteAudit row per action, each
         linked to the same Vote id.
         """
@@ -529,9 +540,7 @@ class TestAuditTrail:
 
         audits = VoteAudit.objects.filter(vote_id=vote_id).order_by("at")
         actions = [a.action for a in audits]
-        assert actions == ["cast", "retract"], (
-            "audit must record cast then retract in order; got {}".format(actions)
-        )
+        assert actions == ["cast", "retract"], f"audit must record cast then retract in order; got {actions}"
 
 
 @pytest.mark.django_db
@@ -541,7 +550,9 @@ class TestAbuseFlagModel:
     """AbuseFlag model — used by T5 features, created directly here."""
 
     def test_abuse_flag_model_can_be_created_with_pending_status(
-        self, organizer, voting_submission,
+        self,
+        organizer,
+        voting_submission,
     ):
         """`AbuseFlag.objects.create(target_type="submission", ...)`
         persists a row whose `status` defaults to `pending`.
@@ -570,7 +581,10 @@ class TestVotingWindow:
     """The vote endpoint respects the submissions_close_at deadline."""
 
     def test_vote_after_submissions_close_returns_422(
-        self, participant, organizer, closed_event,
+        self,
+        participant,
+        organizer,
+        closed_event,
     ):
         """`closed_event` has `submissions_close_at` in the past. The
         `@deadline_gated` decorator rejects the POST with 422 before
@@ -583,14 +597,20 @@ class TestVotingWindow:
             password=DEMO_PASSWORD,
         )
         Membership.objects.create(
-            user=captain, event=closed_event,
-            role="participant", created_by=organizer,
+            user=captain,
+            event=closed_event,
+            role="participant",
+            created_by=organizer,
         )
         team = Team.objects.create(
-            event=closed_event, name="Closed Team", created_by=captain,
+            event=closed_event,
+            name="Closed Team",
+            created_by=captain,
         )
         TeamMember.objects.create(
-            team=team, user=captain, role_in_team="captain",
+            team=team,
+            user=captain,
+            role_in_team="captain",
         )
         submission = Submission.objects.create(
             team=team,
@@ -608,5 +628,6 @@ class TestVotingWindow:
 
         assert resp.status_code == 422, resp.content
         assert not Vote.objects.filter(
-            event=closed_event, project=submission,
+            event=closed_event,
+            project=submission,
         ).exists()

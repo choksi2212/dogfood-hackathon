@@ -2,7 +2,7 @@
 hash-stored Session row. Sliding expiry: each authenticated request
 extends the session lifetime by 14 days.
 """
-import hashlib
+
 from datetime import timedelta
 
 from django.contrib.auth.models import AnonymousUser
@@ -32,9 +32,7 @@ class SessionMiddleware:
                 request.user = session.user
                 request.session_obj = session
                 session.last_seen_at = timezone.now()
-                session.expires_at = timezone.now() + timedelta(
-                    days=self.SLIDING_TTL_DAYS
-                )
+                session.expires_at = timezone.now() + timedelta(days=self.SLIDING_TTL_DAYS)
                 session.save(update_fields=["last_seen_at", "expires_at"])
             elif session is not None:
                 # expired — purge it
@@ -53,8 +51,10 @@ class AuditMiddleware:
         response = self.get_response(request)
         if response.status_code in (401, 403) and request.path.startswith("/api/"):
             from django.contrib.auth.models import AnonymousUser
+
             user = getattr(request, "user", None) or AnonymousUser()
             from apps.audit.models import AuditEvent
+
             AuditEvent.objects.create(
                 actor_id=user.id if user.is_authenticated else None,
                 action=f"{request.method} {request.path}",
@@ -89,6 +89,7 @@ class RateLimitMiddleware:
 
     def __init__(self, get_response):
         from collections import defaultdict
+
         self.get_response = get_response
         self.buckets = defaultdict(dict)
 

@@ -3,6 +3,7 @@
 Marker: ``@pytest.mark.smoke`` (closest existing marker; this is the
 operator-facing smoke test for the platform's telemetry surface).
 """
+
 from __future__ import annotations
 
 import json
@@ -23,9 +24,7 @@ def test_response_carries_request_id_header(client):
     assert resp.status_code == 200
     rid = resp.get("X-Request-ID")
     assert rid, "X-Request-ID header missing"
-    assert len(rid) >= 16, (
-        f"X-Request-ID looks too short to be unique: {rid!r}"
-    )
+    assert len(rid) >= 16, f"X-Request-ID looks too short to be unique: {rid!r}"
 
 
 def test_inbound_request_id_is_honoured(client):
@@ -63,9 +62,7 @@ def test_metrics_endpoint_records_other_requests(client):
     """Calling /healthz must increment http_requests_total."""
     client.get("/healthz")
     body = client.get("/metrics").content.decode()
-    assert "/healthz" in body, (
-        "Expected /healthz in metrics labels after a healthz call"
-    )
+    assert "/healthz" in body, "Expected /healthz in metrics labels after a healthz call"
 
 
 def test_observability_ping_returns_pong(client):
@@ -78,9 +75,7 @@ def test_json_log_formatter_emits_required_keys():
     """The JSON formatter must produce the stable schema we promised."""
     from apps.observability.logging import JsonFormatter
 
-    fmt = JsonFormatter(
-        ("ts", "level", "logger", "msg", "request_id", "status")
-    )
+    fmt = JsonFormatter(("ts", "level", "logger", "msg", "request_id", "status"))
     record = logging.LogRecord(
         name="observability.request",
         level=logging.INFO,
@@ -107,8 +102,13 @@ def test_json_log_formatter_handles_extra_fields():
 
     fmt = JsonFormatter(("ts", "level", "msg"))
     record = logging.LogRecord(
-        name="x", level=logging.INFO, pathname=__file__, lineno=1,
-        msg="hi", args=(), exc_info=None,
+        name="x",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="hi",
+        args=(),
+        exc_info=None,
     )
     record.user_email = "alice@test.local"
     payload = json.loads(fmt.format(record))

@@ -29,6 +29,7 @@ Run from the repo root:
 
     docker compose exec web pytest tests/certificates/ -v
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -36,16 +37,15 @@ import hmac
 import json
 
 import pytest
+from django.conf import settings
 from django.test import Client
 
+from apps.accounts.models import User
 from apps.certificates.models import (
     Certificate,
     sign_payload,
     verify_payload,
 )
-from apps.accounts.models import User
-from django.conf import settings
-
 
 # --- Helpers ---------------------------------------------------------------
 
@@ -84,9 +84,7 @@ class TestSignVerifyUnit:
         sig = sign_payload(payload)
         assert isinstance(sig, str)
         assert len(sig) == 64
-        assert all(c in "0123456789abcdef" for c in sig), (
-            "signature must be lowercase hex: {!r}".format(sig)
-        )
+        assert all(c in "0123456789abcdef" for c in sig), f"signature must be lowercase hex: {sig!r}"
 
     def test_sign_uses_default_secret_key(self):
         """`sign_payload` with no key argument uses Django's SECRET_KEY."""
@@ -192,9 +190,7 @@ class TestSignVerifyUnit:
             dict(payload, team_name="Test Tean"),
             dict(payload, event_slug="sample-hack-2027"),
         ]:
-            assert verify_payload(mutated, sig) is False, (
-                "mutation went undetected: {!r}".format(mutated)
-            )
+            assert verify_payload(mutated, sig) is False, f"mutation went undetected: {mutated!r}"
 
     def test_signature_length_is_constant(self):
         """The signature is always 64 hex chars regardless of payload."""
@@ -220,7 +216,7 @@ class TestSignVerifyUnit:
         ]:
             ours = sign_payload(payload, key=key)
             ref = _reference_signature(payload, key)
-            assert ours == ref, "ours={} ref={} payload={}".format(ours, ref, payload)
+            assert ours == ref, f"ours={ours} ref={ref} payload={payload}"
 
 
 # --- DB tests --------------------------------------------------------------
@@ -240,9 +236,7 @@ class TestSignVerifyUnit:
 class TestCertificateModel:
     """`Certificate.issue()` and `Certificate.verify()` against a real DB."""
 
-    def test_issue_creates_row_with_public_id_and_signature(
-        self, sample_submission, sample_event
-    ):
+    def test_issue_creates_row_with_public_id_and_signature(self, sample_submission, sample_event):
         """`issue()` persists a row with non-empty `public_id` and a
         64-char signature.
         """
@@ -257,16 +251,12 @@ class TestCertificateModel:
         assert fresh.signature == cert.signature
         assert fresh.signed_payload == payload
 
-    def test_verify_returns_true_for_freshly_issued_cert(
-        self, sample_submission, sample_event
-    ):
+    def test_verify_returns_true_for_freshly_issued_cert(self, sample_submission, sample_event):
         payload = _payload_for(sample_submission, event_slug=sample_event.slug)
         cert = Certificate.issue(sample_submission, payload=payload)
         assert cert.verify() is True
 
-    def test_verify_returns_false_when_payload_is_tampered_in_db(
-        self, sample_submission, sample_event
-    ):
+    def test_verify_returns_false_when_payload_is_tampered_in_db(self, sample_submission, sample_event):
         """Mutating `signed_payload` directly in the database (simulating
         a row-level compromise) makes `Certificate.verify()` return False.
         """
@@ -277,13 +267,9 @@ class TestCertificateModel:
         tampered = dict(payload, team_name="Mallory")
         Certificate.objects.filter(pk=cert.pk).update(signed_payload=tampered)
         cert.refresh_from_db()
-        assert cert.verify() is False, (
-            "tampered signed_payload still verifies; HMAC is not binding."
-        )
+        assert cert.verify() is False, "tampered signed_payload still verifies; HMAC is not binding."
 
-    def test_verify_returns_false_when_signature_is_tampered_in_db(
-        self, sample_submission, sample_event
-    ):
+    def test_verify_returns_false_when_signature_is_tampered_in_db(self, sample_submission, sample_event):
         """Mutating the `signature` column directly must invalidate
         verification — the stored signature is what the platform
         checks against.
@@ -296,34 +282,39 @@ class TestCertificateModel:
         cert.refresh_from_db()
         assert cert.verify() is False
 
-    def test_public_id_is_unique_across_different_submissions(
-        self, sample_event
-    ):
+    def test_public_id_is_unique_across_different_submissions(self, sample_event):
         """Two `issue()` calls on two different submissions (on two
         different teams — `Submission.team` is OneToOne) produce two
         different `public_id`s — `public_id` is a unique handle.
         """
-        from apps.teams.models import Team, TeamMember
-        from apps.events.models import Track
         from apps.submissions.models import Submission
+        from apps.teams.models import Team, TeamMember
 
         main = sample_event.tracks.get(slug="main")
 
         def _team_with_submission(name, project_name):
             captain = User.objects.create_user(
-                email="captain-{}@test.local".format(name.lower()),
-                username="captain-{}@test.local".format(name.lower()),
+                email=f"captain-{name.lower()}@test.local",
+                username=f"captain-{name.lower()}@test.local",
                 password="x",
             )
             team = Team.objects.create(
-                event=sample_event, name=name, created_by=captain,
+                event=sample_event,
+                name=name,
+                created_by=captain,
             )
             TeamMember.objects.create(
-                team=team, user=captain, role_in_team="captain",
+                team=team,
+                user=captain,
+                role_in_team="captain",
             )
             return team, Submission.objects.create(
-                team=team, event=sample_event, track=main,
-                name=project_name, tagline="x", status="submitted",
+                team=team,
+                event=sample_event,
+                track=main,
+                name=project_name,
+                tagline="x",
+                status="submitted",
             )
 
         team_a, sub_a = _team_with_submission("Alpha", "Project A")
@@ -333,22 +324,16 @@ class TestCertificateModel:
 
         cert_a = Certificate.issue(sub_a, payload=_payload_for(sub_a))
         cert_b = Certificate.issue(sub_b, payload=_payload_for(sub_b))
-        assert cert_a.public_id != cert_b.public_id, (
-            "public_id collision across different submissions: {}".format(
-                cert_a.public_id
-            )
-        )
+        assert (
+            cert_a.public_id != cert_b.public_id
+        ), f"public_id collision across different submissions: {cert_a.public_id}"
 
-    def test_reissuing_creates_two_distinct_rows(
-        self, sample_submission, sample_event
-    ):
+    def test_reissuing_creates_two_distinct_rows(self, sample_submission, sample_event):
         """Calling `Certificate.issue()` twice on the same submission
         creates two distinct Certificate rows (and two distinct public_ids).
         """
         payload_v1 = _payload_for(sample_submission, event_slug=sample_event.slug)
-        payload_v2 = _payload_for(
-            sample_submission, event_slug=sample_event.slug, team_name="Renamed"
-        )
+        payload_v2 = _payload_for(sample_submission, event_slug=sample_event.slug, team_name="Renamed")
         cert_v1 = Certificate.issue(sample_submission, payload=payload_v1)
         cert_v2 = Certificate.issue(sample_submission, payload=payload_v2)
         assert cert_v1.pk != cert_v2.pk
@@ -357,9 +342,7 @@ class TestCertificateModel:
         assert cert_v1.verify() is True
         assert cert_v2.verify() is True
 
-    def test_payload_must_contain_required_fields(
-        self, sample_submission, sample_event
-    ):
+    def test_payload_must_contain_required_fields(self, sample_submission, sample_event):
         """The platform enforces that issued payloads include at minimum
         `submission_id`, `team_name`, `event_slug`. We test by issuing
         with a payload that has these fields and asserting they round-trip.
@@ -368,14 +351,10 @@ class TestCertificateModel:
         cert = Certificate.issue(sample_submission, payload=payload)
         cert.refresh_from_db()
         for required in ("submission_id", "team_name", "event_slug"):
-            assert required in cert.signed_payload, (
-                "required field {!r} missing from signed_payload".format(required)
-            )
+            assert required in cert.signed_payload, f"required field {required!r} missing from signed_payload"
         assert cert.signed_payload["submission_id"] == str(sample_submission.id)
 
-    def test_issued_by_is_optional(
-        self, sample_submission, sample_event
-    ):
+    def test_issued_by_is_optional(self, sample_submission, sample_event):
         """`issued_by` is optional — a certificate can be system-issued."""
         payload = _payload_for(sample_submission, event_slug=sample_event.slug)
         cert = Certificate.issue(sample_submission, payload=payload)
@@ -419,11 +398,7 @@ class TestCertificateView:
         cert = self._issue(sample_submission, sample_event.slug)
         client = Client()
         resp = client.get(self.CERT_URL.format(public_id=cert.public_id))
-        assert resp.status_code == 200, (
-            "expected 200, got {}: {!r}".format(
-                resp.status_code, resp.content[:200]
-            )
-        )
+        assert resp.status_code == 200, f"expected 200, got {resp.status_code}: {resp.content[:200]!r}"
         body = resp.json()
         assert body["public_id"] == cert.public_id
         assert body["submission_id"] == str(sample_submission.id)
@@ -443,9 +418,7 @@ class TestCertificateView:
         resp = anon.get(self.CERT_URL.format(public_id=cert.public_id))
         assert resp.status_code == 200
 
-    def test_get_with_unknown_public_id_returns_404(
-        self, sample_submission, sample_event
-    ):
+    def test_get_with_unknown_public_id_returns_404(self, sample_submission, sample_event):
         """`abc-not-real` is not a valid certificate — 404 not_found."""
         self._issue(sample_submission, sample_event.slug)  # at least one exists
         client = Client()
@@ -454,9 +427,7 @@ class TestCertificateView:
         body = resp.json()
         assert body["error"]["code"] == "not_found"
 
-    def test_get_with_tampered_payload_returns_400(
-        self, sample_submission, sample_event
-    ):
+    def test_get_with_tampered_payload_returns_400(self, sample_submission, sample_event):
         """The platform refuses to serve a cert whose signature no
         longer verifies. We tamper the payload in the DB after issuing,
         then GET — the view returns 400 signature_invalid.
@@ -466,17 +437,13 @@ class TestCertificateView:
         Certificate.objects.filter(pk=cert.pk).update(signed_payload=tampered)
         client = Client()
         resp = client.get(self.CERT_URL.format(public_id=cert.public_id))
-        assert resp.status_code == 400, (
-            "expected 400 signature_invalid, got {}: {!r}".format(
-                resp.status_code, resp.content[:200]
-            )
-        )
+        assert (
+            resp.status_code == 400
+        ), f"expected 400 signature_invalid, got {resp.status_code}: {resp.content[:200]!r}"
         body = resp.json()
         assert body["error"]["code"] == "signature_invalid"
 
-    def test_get_with_tampered_signature_returns_400(
-        self, sample_submission, sample_event
-    ):
+    def test_get_with_tampered_signature_returns_400(self, sample_submission, sample_event):
         """Mutating the `signature` column in the DB also causes a 400 —
         the view's `cert.verify()` is the source of truth.
         """
@@ -489,9 +456,7 @@ class TestCertificateView:
         body = resp.json()
         assert body["error"]["code"] == "signature_invalid"
 
-    def test_view_signature_in_body_matches_db_signature(
-        self, sample_submission, sample_event
-    ):
+    def test_view_signature_in_body_matches_db_signature(self, sample_submission, sample_event):
         """The signature in the HTTP response body equals the signature
         stored in the DB — the view does not re-sign on the fly.
         """
@@ -500,9 +465,7 @@ class TestCertificateView:
         resp = client.get(self.CERT_URL.format(public_id=cert.public_id))
         assert resp.json()["signature"] == cert.signature
 
-    def test_view_does_not_accept_post(
-        self, sample_submission, sample_event
-    ):
+    def test_view_does_not_accept_post(self, sample_submission, sample_event):
         """The certificate endpoint is GET-only (signed records are
         immutable from the client side; mutations would invalidate the
         signature).
@@ -511,6 +474,4 @@ class TestCertificateView:
         client = Client()
         resp = client.post(self.CERT_URL.format(public_id=cert.public_id), {})
         # 405 Method Not Allowed is the Django default for `@require_GET`.
-        assert resp.status_code == 405, (
-            "expected 405 for POST, got {}".format(resp.status_code)
-        )
+        assert resp.status_code == 405, f"expected 405 for POST, got {resp.status_code}"

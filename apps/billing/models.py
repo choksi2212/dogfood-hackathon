@@ -17,6 +17,7 @@ hierarchy. A real Stripe integration would slot in here; for the
 hackathon demo the upgrade flow is a coordinator-only endpoint that
 mutates ``BillingAccount.plan`` and writes an ``Invoice`` row.
 """
+
 import uuid
 
 from django.db import models
@@ -61,12 +62,8 @@ class BillingAccount(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    event = models.OneToOneField(
-        "events.Event", on_delete=models.CASCADE, related_name="billing"
-    )
-    plan = models.ForeignKey(
-        Plan, on_delete=models.PROTECT, related_name="accounts"
-    )
+    event = models.OneToOneField("events.Event", on_delete=models.CASCADE, related_name="billing")
+    plan = models.ForeignKey(Plan, on_delete=models.PROTECT, related_name="accounts")
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="trial")
     current_period_start = models.DateTimeField(null=True, blank=True)
     current_period_end = models.DateTimeField(null=True, blank=True)
@@ -92,9 +89,7 @@ class Invoice(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    account = models.ForeignKey(
-        BillingAccount, on_delete=models.CASCADE, related_name="invoices"
-    )
+    account = models.ForeignKey(BillingAccount, on_delete=models.CASCADE, related_name="invoices")
     kind = models.CharField(max_length=12, choices=KIND_CHOICES)
     amount_cents = models.IntegerField()
     description = models.CharField(max_length=200, blank=True)

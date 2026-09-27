@@ -22,11 +22,11 @@ Keep this file framework-free — it is imported by both pytest and by the
 helper script that regenerates the goldens (scripts/regenerate_goldens.py
 if you build one).
 """
+
 from __future__ import annotations
 
 from apps.normalization.fit import normalize
 from apps.pairwise.fit import bradley_terry
-
 
 # --- Normalization: 30-review full-coverage dataset ------------------------
 
