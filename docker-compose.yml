@@ -162,6 +162,10 @@ services:
         condition: service_started
       alertmanager:
         condition: service_started
+    volumes:
+      # Microcache backing store — 50MB shared-memory dict for the
+      # nginx-level cache of public reads (gallery, widget JSON).
+      - nginx-microcache:/var/cache/nginx/microcache
     ports:
       # 127.0.0.1 only — operator / demo machine. The company sets up
       # a real TLS-terminating proxy in front of this in production.
@@ -172,3 +176,4 @@ volumes:
   prometheus-data:
   alertmanager-data:
   grafana-data:
+  nginx-microcache:
