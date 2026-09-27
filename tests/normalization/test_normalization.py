@@ -599,14 +599,8 @@ class TestUnbalancedBipartiteMovesRanks:
         biases = {b["judge_id"]: b["bias"] for b in result.biases}
 
         # Bias must be non-trivial for the test to be meaningful.
-        assert biases["jA"] < -0.5, (
-            f"judge A should have negative bias (harsh rater); "
-            f"got {biases['jA']!r}"
-        )
-        assert biases["jB"] > 0.0, (
-            f"judge B should have positive bias (lenient rater); "
-            f"got {biases['jB']!r}"
-        )
+        assert biases["jA"] < -0.5, f"judge A should have negative bias (harsh rater); " f"got {biases['jA']!r}"
+        assert biases["jB"] > 0.0, f"judge B should have positive bias (lenient rater); " f"got {biases['jB']!r}"
 
         # Sanity: every project's adjusted mean differs from its raw
         # mean. On balanced coverage this would be False (no movement).
@@ -643,11 +637,7 @@ class TestUnbalancedBipartiteMovesRanks:
         for a in assignments.select_related("judge", "project"):
             judges_per_project.setdefault(str(a.project_id), set()).add(str(a.judge_id))
         n_judges = max(len(v) for v in judges_per_project.values())
-        all_full = all(
-            len(judges_per_project[pid]) == n_judges
-            for pid in judges_per_project
-        )
+        all_full = all(len(judges_per_project[pid]) == n_judges for pid in judges_per_project)
         assert all_full, (
-            "demo fixture is no longer balanced; rerun this assertion "
-            "and the demo proof document will need updating"
+            "demo fixture is no longer balanced; rerun this assertion " "and the demo proof document will need updating"
         )

@@ -61,9 +61,7 @@ class Comment(models.Model):
         on_delete=models.CASCADE,
         related_name="comments",
     )
-    author = models.ForeignKey(
-        "accounts.User", on_delete=models.SET_NULL, null=True, related_name="comments"
-    )
+    author = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, related_name="comments")
     body = models.TextField(max_length=2000)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
