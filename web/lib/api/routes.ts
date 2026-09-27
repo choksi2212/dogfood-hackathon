@@ -17,6 +17,7 @@ export const routes = {
   // get the session cookie the other routes require, and to cover T3/T4
   // surfaces run.py never touches.
   login: () => "/api/login",
+  logout: () => "/api/logout",
   // 200 with user data when authed, 401 otherwise. Used by client
   // components to gate the submit/vote/judge consoles on a session.
   me: () => "/api/me",

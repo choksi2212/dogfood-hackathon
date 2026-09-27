@@ -85,8 +85,8 @@ export const api = {
     return request(routes.gallery());
   },
 
-  me(): Promise<User> {
-    return request(routes.me());
+  me(cookieHeader?: string): Promise<User> {
+    return request(routes.me(), cookieInit(cookieHeader));
   },
 
   submission(id: string): Promise<SubmissionDetail> {
@@ -105,6 +105,23 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     });
+  },
+
+  // 204 No Content on success — bypasses `request`'s unconditional
+  // `res.json()` since there's no body to parse.
+  async logout(): Promise<void> {
+    const res = await fetch(routes.logout(), {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as ApiErrorBody | null;
+      throw new ApiError(
+        res.status,
+        body?.error?.code ?? "unknown_error",
+        body?.error?.message ?? `Logout failed with ${res.status}`,
+      );
+    }
   },
 
   // `cookieHeader` is required when called from a Server Component —

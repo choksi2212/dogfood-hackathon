@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { Geist } from "next/font/google";
 import "./globals.css";
-import { Nav } from "@/components/Nav";
-import styles from "./layout.module.css";
+import { cn } from "@/lib/utils";
+import { ThemeProvider } from "@/components/theme-provider";
+
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "Dogfood Portal",
@@ -15,17 +17,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={cn("font-sans", geist.variable)} suppressHydrationWarning>
       <body>
-        <div className={styles.shell}>
-          <header className={styles.header}>
-            <Link href="/gallery" className={styles.brand}>
-              Dogfood Portal
-            </Link>
-            <Nav />
-          </header>
-          <main className={styles.main}>{children}</main>
-        </div>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
