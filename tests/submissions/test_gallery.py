@@ -93,9 +93,9 @@ def test_cursor_page_2_first_item_is_strictly_after_page_1_last(client, many_sub
     last_of_page1 = page1["items"][-1]["name"]
     page2 = client.get(f"/api/gallery?sort=alpha&after={page1['next']}", HTTP_HOST=HTTP_HOST).json()
     first_of_page2 = page2["items"][0]["name"]
-    assert first_of_page2 > last_of_page1, (
-        f"page 2 first ({first_of_page2!r}) must sort after page 1 last ({last_of_page1!r})"
-    )
+    assert (
+        first_of_page2 > last_of_page1
+    ), f"page 2 first ({first_of_page2!r}) must sort after page 1 last ({last_of_page1!r})"
 
 
 @pytest.mark.django_db
