@@ -123,18 +123,77 @@ paths:
   /api/gallery:
     get:
       summary: Public gallery of submitted projects
+      description: |
+        Returns submitted projects with pagination. Two modes:
+
+        * **Cursor (default)** — Response is `{items, next, page_size}`.
+          Pass `?after=<cursor>` to fetch the next page. The cursor is
+          opaque (base64 of the last item's sort key). Page 1000 is
+          just as fast as page 1 because PostgreSQL seeks directly on
+          the indexed sort key.
+
+        * **Offset (legacy)** — Pass `?page=N` to opt in. Response is
+          `{total, page, page_size, items}`. Slow on late pages.
+
+        Sort modes: `sort=track` (default; by `track__order, name`),
+        `sort=alpha` (by name), `sort=newest` (by `-submitted_at`).
+        The `?after` cursor must match the current `?sort` mode.
+      parameters:
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [track, alpha, newest]
+        - name: track
+          in: query
+          schema:
+            type: string
+          description: Comma-separated track slugs to filter by
+        - name: after
+          in: query
+          schema:
+            type: string
+          description: Cursor from a previous response's `next` field
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: Opt into offset pagination (legacy)
       responses:
         '200':
           description: List of submissions
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Submission'
+                oneOf:
+                  - title: Cursor response
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Submission'
+                      next:
+                        type: string
+                        nullable: true
+                      page_size:
+                        type: integer
+                  - title: Offset response (?page=N)
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Submission'
+                      total:
+                        type: integer
+                      page:
+                        type: integer
+                      page_size:
+                        type: integer
+        '422':
+          description: Malformed cursor or sort/cursor mismatch
         '429':
           description: Rate limited
   /api/register:
