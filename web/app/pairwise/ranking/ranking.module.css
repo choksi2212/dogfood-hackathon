@@ -9,6 +9,27 @@
   font-size: 0.9rem;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.exportButton {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--foreground);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.exportButton:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .meta {
   color: var(--muted);
   font-size: 0.85rem;
