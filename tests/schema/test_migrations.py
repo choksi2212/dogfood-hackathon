@@ -425,8 +425,13 @@ def test_no_fk_points_at_auth_user_table():
             related_model = getattr(fk, "related_model", None)
             if related_model is None:
                 continue
-            # FK targets auth.* — should never happen with AUTH_USER_MODEL set.
-            if related_model._meta.app_label == "auth":
+            # FK targets auth.User specifically (bypassing the swappable).
+            # FKs to auth.Group / auth.Permission are legitimate — they
+            # wire up Django's permission system, not the user model.
+            if (
+                related_model._meta.app_label == "auth"
+                and related_model._meta.model_name == "user"
+            ):
                 bad_refs.append(
                     (model.__name__, fk.name, related_model.__name__)
                 )

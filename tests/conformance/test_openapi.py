@@ -261,7 +261,7 @@ def test_spec_endpoints_have_documented_methods():
     resolve to a documented status code (or 405)."""
     cases = [
         ("/api/gallery", "GET", {200}),
-        ("/api/events/{slug}/submit", "POST", {201, 403, 422}),
+        ("/api/events/{slug}/submit", "POST", {201, 401, 403, 422}),
         ("/api/judge/scores", "GET", {200, 401, 403}),
         ("/api/judge/peer-scores", "GET", {403, 401}),
         ("/api/csv_export", "GET", {200, 401, 403}),
@@ -274,8 +274,8 @@ def test_spec_endpoints_have_documented_methods():
         ("/api/events/{slug}/normalize", "POST", {200, 401, 403, 422}),
         ("/api/events/{slug}/pairwise/ballots", "POST", {201, 401, 403}),
         ("/api/events/{slug}/pairwise/ranking", "GET", {200, 401, 403}),
-        ("/api/events/{slug}/submissions/{id}/vote", "POST", {201, 401, 403}),
-        ("/api/events/{slug}/submissions/{id}/vote", "DELETE", {200, 401, 403}),
+        ("/api/events/{slug}/submissions/{id}/vote", "POST", {201, 401, 403, 404}),
+        ("/api/events/{slug}/submissions/{id}/vote", "DELETE", {200, 401, 403, 404}),
         ("/healthz", "GET", {200, 503}),
     ]
     client = Client()

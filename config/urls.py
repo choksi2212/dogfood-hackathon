@@ -57,4 +57,6 @@ urlpatterns = [
     path("api/certificates/", include("apps.certificates.urls")),
     path("api/", include("apps.widget.urls")),
     path("widget.js", include("apps.widget.urls_root")),
+    path("api/billing/", include("apps.billing.urls")),
+    path("", include("apps.observability.urls")),
 ]

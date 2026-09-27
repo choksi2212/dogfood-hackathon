@@ -170,6 +170,15 @@ def two_project_event(db, organizer, judge_a, judge_b, judge_c, participant):
 
 
 @pytest.fixture
+def two_project_event_first_project(two_project_event):
+    """The first submission of the two-project event.
+
+    Many race tests need a stable target project to score / vote against.
+    """
+    return two_project_event.submissions.order_by("created_at").first()
+
+
+@pytest.fixture
 def assigned_judge_a(db, two_project_event, judge_a, two_project_event_first_project):
     """A ``JudgeAssignment`` for ``judge_a`` on the first project."""
     return build_judge_assignment_for(
