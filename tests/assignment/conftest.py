@@ -12,6 +12,7 @@ NOTE: the shared `sample_event` fixture only creates one user per call
 our tests get the full judge roster without having to thread five
 fixture parameters through every test signature.
 """
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -22,7 +23,6 @@ from django.utils import timezone
 from apps.events.models import Event, Membership, Track
 from apps.submissions.models import Submission
 from apps.teams.models import Team, TeamMember
-
 
 DEMO_PASSWORD = "dogfood-dev-password"
 EVENT_SLUG = "sample-hack-2026"
@@ -56,7 +56,8 @@ def _ensure_judge_user(email, name, event, organizer):
     user.set_password(DEMO_PASSWORD)
     user.save()
     Membership.objects.update_or_create(
-        user=user, event=event,
+        user=user,
+        event=event,
         defaults={"role": "judge", "created_by": organizer},
     )
     return user
@@ -83,21 +84,19 @@ def sample_event(db, organizer):
         ),
     )
     main, _ = Track.objects.update_or_create(
-        event=event, slug="main",
+        event=event,
+        slug="main",
         defaults={"name": "Main", "description": "Main track", "order": 0},
     )
     wildcard, _ = Track.objects.update_or_create(
-        event=event, slug="wildcard",
+        event=event,
+        slug="wildcard",
         defaults={"name": "Wildcard", "description": "Anything goes", "order": 1},
     )
 
-    rubric, _ = Rubric.objects.update_or_create(
-        event=event, defaults={"name": "Default"}
-    )
+    rubric, _ = Rubric.objects.update_or_create(event=event, defaults={"name": "Default"})
     RubricCriterion.objects.filter(rubric=rubric).delete()
-    for order, (name, weight) in enumerate(
-        [("Innovation", "0.400"), ("Execution", "0.350"), ("Impact", "0.250")]
-    ):
+    for order, (name, weight) in enumerate([("Innovation", "0.400"), ("Execution", "0.350"), ("Impact", "0.250")]):
         RubricCriterion.objects.create(
             rubric=rubric,
             name=name,
@@ -110,7 +109,8 @@ def sample_event(db, organizer):
 
     # Organizer membership.
     Membership.objects.update_or_create(
-        user=organizer, event=event,
+        user=organizer,
+        event=event,
         defaults={"role": "organizer", "created_by": organizer},
     )
     # Three judges + a participant.
@@ -118,10 +118,14 @@ def sample_event(db, organizer):
     _ensure_judge_user("judge_b@test.local", "Test Judge B", event, organizer)
     _ensure_judge_user("judge_c@test.local", "Test Judge C", event, organizer)
     _ensure_judge_user(
-        "participant@test.local", "Test Participant", event, organizer,
+        "participant@test.local",
+        "Test Participant",
+        event,
+        organizer,
     )
     Membership.objects.filter(
-        user__email="participant@test.local", event=event,
+        user__email="participant@test.local",
+        event=event,
     ).update(role="participant")
 
     return event
@@ -131,12 +135,18 @@ def sample_event(db, organizer):
 def extra_judge(db, sample_event, organizer):
     """A fourth judge for cap-stress tests."""
     return _ensure_judge_user(
-        "judge_d@test.local", "Test Judge D", sample_event, organizer,
+        "judge_d@test.local",
+        "Test Judge D",
+        sample_event,
+        organizer,
     )
 
 
 def _make_team_with_submission(
-    sample_event, organizer, team_name: str, track: Track,
+    sample_event,
+    organizer,
+    team_name: str,
+    track: Track,
     status: str = "submitted",
 ):
     from apps.accounts.models import User
@@ -152,14 +162,19 @@ def _make_team_with_submission(
     captain.set_password(DEMO_PASSWORD)
     captain.save()
     Membership.objects.get_or_create(
-        user=captain, event=sample_event,
+        user=captain,
+        event=sample_event,
         defaults={"role": "participant", "created_by": organizer},
     )
     team = Team.objects.create(
-        event=sample_event, name=team_name, created_by=captain,
+        event=sample_event,
+        name=team_name,
+        created_by=captain,
     )
     TeamMember.objects.create(
-        team=team, user=captain, role_in_team="captain",
+        team=team,
+        user=captain,
+        role_in_team="captain",
     )
     sub = Submission.objects.create(
         team=team,
@@ -176,7 +191,9 @@ def _make_team_with_submission(
 
 @pytest.fixture
 def six_submissions_two_tracks(
-    db, sample_event, organizer,
+    db,
+    sample_event,
+    organizer,
 ):
     """Six submitted projects split evenly across two tracks (main /
     wildcard). All have distinct captains, so no judge COIs."""
@@ -190,7 +207,8 @@ def six_submissions_two_tracks(
     for i in range(6):
         track = main if i % 2 == 0 else wildcard
         team, sub = _make_team_with_submission(
-            sample_event, organizer,
+            sample_event,
+            organizer,
             team_name=f"Team-{i:02d}",
             track=track,
             status="submitted",
@@ -207,7 +225,8 @@ def ten_submissions_three_tracks(db, sample_event, organizer):
     main = sample_event.tracks.get(slug="main")
     wildcard = sample_event.tracks.get(slug="wildcard")
     chaos, _ = Track.objects.get_or_create(
-        event=sample_event, slug="chaos",
+        event=sample_event,
+        slug="chaos",
         defaults={"name": "Chaos", "description": "Wild west", "order": 2},
     )
 
@@ -219,7 +238,8 @@ def ten_submissions_three_tracks(db, sample_event, organizer):
     for i in range(10):
         track = tracks_cycle[i % 3]
         _, sub = _make_team_with_submission(
-            sample_event, organizer,
+            sample_event,
+            organizer,
             team_name=f"Multi-{i:02d}",
             track=track,
             status="submitted",

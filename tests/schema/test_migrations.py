@@ -6,6 +6,7 @@ no mocks, no fixtures that hide the real model.
 
 Mark with @pytest.mark.schema so the schema lane can be run in isolation.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -21,16 +22,11 @@ from django.db import connection, migrations, models, transaction
 from django.db.migrations.loader import MigrationLoader
 from django.utils import timezone
 
-
 pytestmark = pytest.mark.schema
 
 
 # Apps we own. Anything under apps.* that ships in INSTALLED_APPS.
-LOCAL_APPS = sorted(
-    cfg.name
-    for cfg in django_apps.get_app_configs()
-    if cfg.name.startswith("apps.")
-)
+LOCAL_APPS = sorted(cfg.name for cfg in django_apps.get_app_configs() if cfg.name.startswith("apps."))
 
 
 # Models named by the spec that must carry a UUID primary key.
@@ -38,28 +34,36 @@ LOCAL_APPS = sorted(
 # to Django's auto PK, but anything exposed to judges and participants
 # needs a UUID so URLs don't leak the row count.
 EXPECTED_UUID_PKS = {
-    "Submission",        # apps.submissions
-    "Team",              # apps.teams
-    "Vote",              # apps.voting
-    "JudgeAssignment",   # apps.judging
-    "Event",             # apps.events
-    "AuditEvent",        # apps.audit
-    "AbuseFlag",         # apps.abuse
-    "Certificate",       # apps.certificates
-    "Webhook",           # apps.api
-    "PairwiseRun",       # apps.pairwise
+    "Submission",  # apps.submissions
+    "Team",  # apps.teams
+    "Vote",  # apps.voting
+    "JudgeAssignment",  # apps.judging
+    "Event",  # apps.events
+    "AuditEvent",  # apps.audit
+    "AbuseFlag",  # apps.abuse
+    "Certificate",  # apps.certificates
+    "Webhook",  # apps.api
+    "PairwiseRun",  # apps.pairwise
     "NormalizationRun",  # apps.normalization
-    "User",              # apps.accounts
-    "Session",           # apps.accounts
+    "User",  # apps.accounts
+    "Session",  # apps.accounts
 }
 
 
 # The DB tables Django owns. We exclude these from the "all PKs are
 # UUID" check — they belong to Django's internals.
-DJANGO_TABLES = {"django_migrations", "django_session", "django_admin_log",
-                 "django_content_type", "auth_permission", "auth_group",
-                 "auth_group_permissions", "auth_user_user_permissions",
-                 "auth_user_groups", "auth_user"}
+DJANGO_TABLES = {
+    "django_migrations",
+    "django_session",
+    "django_admin_log",
+    "django_content_type",
+    "auth_permission",
+    "auth_group",
+    "auth_group_permissions",
+    "auth_user_user_permissions",
+    "auth_user_groups",
+    "auth_user",
+}
 
 
 # --------------------------------------------------------------------------- #
@@ -72,10 +76,7 @@ def _migration_files(app_name: str) -> list[Path]:
     migrations_dir = Path(settings.BASE_DIR) / app_name.replace(".", "/") / "migrations"
     if not migrations_dir.exists():
         return []
-    return sorted(
-        p for p in migrations_dir.glob("*.py")
-        if p.name != "__init__.py"
-    )
+    return sorted(p for p in migrations_dir.glob("*.py") if p.name != "__init__.py")
 
 
 @pytest.mark.parametrize("app_name", LOCAL_APPS)
@@ -90,9 +91,7 @@ def test_every_local_app_has_migration_files(app_name):
     models_list = list(cfg.get_models())
     if not models_list:
         # Model-less app — only require the migrations package itself.
-        migrations_pkg = (
-            Path(settings.BASE_DIR) / app_name.replace(".", "/") / "migrations"
-        )
+        migrations_pkg = Path(settings.BASE_DIR) / app_name.replace(".", "/") / "migrations"
         assert migrations_pkg.exists(), (
             f"{app_name} has no models and no migrations package — "
             "expected apps/<name>/migrations/__init__.py at minimum"
@@ -120,17 +119,17 @@ def test_no_missing_migrations():
     exit_code = 0
     try:
         call_command(
-            "makemigrations", "--dry-run", "--check",
-            stdout=out, stderr=err,
+            "makemigrations",
+            "--dry-run",
+            "--check",
+            stdout=out,
+            stderr=err,
         )
     except SystemExit as exc:
         exit_code = exc.code
 
     output = out.getvalue() + err.getvalue()
-    assert exit_code == 0, (
-        f"makemigrations --dry-run --check reported drift "
-        f"(exit {exit_code}):\n{output}"
-    )
+    assert exit_code == 0, f"makemigrations --dry-run --check reported drift " f"(exit {exit_code}):\n{output}"
 
 
 # --------------------------------------------------------------------------- #
@@ -154,14 +153,14 @@ def test_models_import_cleanly(app_name):
     module = importlib.import_module(f"{app_name}.models")
     assert module is not None
     exported_models = [
-        obj for name, obj in vars(module).items()
-        if isinstance(obj, type) and issubclass(obj, models.Model)
+        obj
+        for name, obj in vars(module).items()
+        if isinstance(obj, type)
+        and issubclass(obj, models.Model)
         and obj is not models.Model
         and not name.startswith("_")
     ]
-    assert exported_models, (
-        f"{app_name}.models imported cleanly but exported no Model subclass"
-    )
+    assert exported_models, f"{app_name}.models imported cleanly but exported no Model subclass"
 
 
 def test_every_model_has_a_primary_key():
@@ -174,9 +173,7 @@ def test_every_model_has_a_primary_key():
     concrete = [m for m in django_apps.get_models() if not m._meta.abstract]
     assert concrete, "No concrete models registered — Django is misconfigured"
     for model in concrete:
-        assert model._meta.pk is not None, (
-            f"{model.__name__} (in {model._meta.app_label}) has no primary key"
-        )
+        assert model._meta.pk is not None, f"{model.__name__} (in {model._meta.app_label}) has no primary key"
 
 
 @pytest.mark.parametrize("model_name", sorted(EXPECTED_UUID_PKS))
@@ -188,15 +185,11 @@ def test_expected_models_have_uuid_primary_key(model_name):
     `session_key` as its PK).
     """
     model = _local_model(model_name)
-    assert model is not None, (
-        f"{model_name} not found under any apps.* app — has it been "
-        "deleted or moved?"
-    )
+    assert model is not None, f"{model_name} not found under any apps.* app — has it been " "deleted or moved?"
     pk = model._meta.pk
     assert pk is not None, f"{model_name} has no primary key"
     assert isinstance(pk, models.UUIDField), (
-        f"{model_name}.pk is {type(pk).__name__}, expected UUIDField. "
-        "URLs and API contracts assume a UUID."
+        f"{model_name}.pk is {type(pk).__name__}, expected UUIDField. " "URLs and API contracts assume a UUID."
     )
 
 
@@ -279,12 +272,18 @@ def test_unique_together_constraint_enforced():
         created_by=user,
     )
     Membership.objects.create(
-        user=user, event=event, role="participant", created_by=user,
+        user=user,
+        event=event,
+        role="participant",
+        created_by=user,
     )
     with pytest.raises(IntegrityError):
         with transaction.atomic():
             Membership.objects.create(
-                user=user, event=event, role="judge", created_by=user,
+                user=user,
+                event=event,
+                role="judge",
+                created_by=user,
             )
 
 
@@ -316,20 +315,33 @@ def test_event_delete_cascades_to_teams_submissions_memberships():
         created_by=captain,
     )
     track = Track.objects.create(
-        event=event, name="Main", slug="main", order=0,
+        event=event,
+        name="Main",
+        slug="main",
+        order=0,
     )
     team = Team.objects.create(
-        event=event, name="Cascade Team", created_by=captain,
+        event=event,
+        name="Cascade Team",
+        created_by=captain,
     )
     TeamMember.objects.create(
-        team=team, user=captain, role_in_team="captain",
+        team=team,
+        user=captain,
+        role_in_team="captain",
     )
     submission = Submission.objects.create(
-        team=team, event=event, track=track,
-        name="Cascade Project", tagline="t", description="d",
+        team=team,
+        event=event,
+        track=track,
+        name="Cascade Project",
+        tagline="t",
+        description="d",
     )
     membership = Membership.objects.create(
-        user=captain, event=event, role="participant",
+        user=captain,
+        event=event,
+        role="participant",
         created_by=captain,
     )
 
@@ -340,12 +352,9 @@ def test_event_delete_cascades_to_teams_submissions_memberships():
     assert not Event.objects.filter(id=event_id).exists()
     # Children gone too.
     assert not Team.objects.filter(id=team.id).exists(), "Team did not cascade"
-    assert not TeamMember.objects.filter(team_id=team.id).exists(), \
-        "TeamMember did not cascade"
-    assert not Submission.objects.filter(id=submission.id).exists(), \
-        "Submission did not cascade"
-    assert not Membership.objects.filter(id=membership.id).exists(), \
-        "Membership did not cascade"
+    assert not TeamMember.objects.filter(team_id=team.id).exists(), "TeamMember did not cascade"
+    assert not Submission.objects.filter(id=submission.id).exists(), "Submission did not cascade"
+    assert not Membership.objects.filter(id=membership.id).exists(), "Membership did not cascade"
 
 
 @pytest.mark.django_db
@@ -374,17 +383,28 @@ def test_submission_team_delete_cascades():
         created_by=captain,
     )
     track = Track.objects.create(
-        event=event, name="Main", slug="main", order=0,
+        event=event,
+        name="Main",
+        slug="main",
+        order=0,
     )
     team = Team.objects.create(
-        event=event, name="Will Be Deleted", created_by=captain,
+        event=event,
+        name="Will Be Deleted",
+        created_by=captain,
     )
     TeamMember.objects.create(
-        team=team, user=captain, role_in_team="captain",
+        team=team,
+        user=captain,
+        role_in_team="captain",
     )
     submission = Submission.objects.create(
-        team=team, event=event, track=track,
-        name="Orphan Project", tagline="t", description="d",
+        team=team,
+        event=event,
+        track=track,
+        name="Orphan Project",
+        tagline="t",
+        description="d",
     )
     sub_id = submission.id
     team_id = team.id
@@ -392,8 +412,7 @@ def test_submission_team_delete_cascades():
     team.delete()
 
     assert not Team.objects.filter(id=team_id).exists()
-    assert not Submission.objects.filter(id=sub_id).exists(), \
-        "Submission did not cascade-delete with its Team"
+    assert not Submission.objects.filter(id=sub_id).exists(), "Submission did not cascade-delete with its Team"
 
 
 # --------------------------------------------------------------------------- #
@@ -413,9 +432,9 @@ def test_no_fk_points_at_auth_user_table():
     from django.contrib.auth import get_user_model
 
     auth_user_model = get_user_model()
-    assert auth_user_model._meta.db_table == "users_user", (
-        "AUTH_USER_MODEL is configured but db_table drifted from `users_user`"
-    )
+    assert (
+        auth_user_model._meta.db_table == "users_user"
+    ), "AUTH_USER_MODEL is configured but db_table drifted from `users_user`"
 
     bad_refs = []
     for model in django_apps.get_models():
@@ -428,18 +447,12 @@ def test_no_fk_points_at_auth_user_table():
             # FK targets auth.User specifically (bypassing the swappable).
             # FKs to auth.Group / auth.Permission are legitimate — they
             # wire up Django's permission system, not the user model.
-            if (
-                related_model._meta.app_label == "auth"
-                and related_model._meta.model_name == "user"
-            ):
-                bad_refs.append(
-                    (model.__name__, fk.name, related_model.__name__)
-                )
+            if related_model._meta.app_label == "auth" and related_model._meta.model_name == "user":
+                bad_refs.append((model.__name__, fk.name, related_model.__name__))
 
     assert not bad_refs, (
         "FKs to auth.* detected — they must point at "
-        f"{settings.AUTH_USER_MODEL} instead:\n"
-        + "\n".join(f"  {m}.{n} -> {t}" for m, n, t in bad_refs)
+        f"{settings.AUTH_USER_MODEL} instead:\n" + "\n".join(f"  {m}.{n} -> {t}" for m, n, t in bad_refs)
     )
 
 
@@ -480,10 +493,7 @@ def test_all_user_fks_use_swappable_dependency():
                     else str(target)
                 )
                 if target_label == "auth.user":
-                    bad.append(
-                        f"{app_label}.{migration_name}: {op.__class__.__name__}"
-                        f".{field.name} -> auth.user"
-                    )
+                    bad.append(f"{app_label}.{migration_name}: {op.__class__.__name__}" f".{field.name} -> auth.user")
 
     assert not bad, (
         f"Migrations reference auth.User directly. Use "
@@ -509,10 +519,7 @@ def test_local_migration_graph_has_no_cycles():
 
     # Restrict to apps.* apps — contrib's internal migrations form
     # their own well-known graph and we don't own them.
-    local_nodes = [
-        (app, name) for (app, name) in loader.disk_migrations
-        if app.startswith("apps.")
-    ]
+    local_nodes = [(app, name) for (app, name) in loader.disk_migrations if app.startswith("apps.")]
     # Build (node, [deps]) — only count deps that are local too.
     deps: dict[tuple, list[tuple]] = {n: [] for n in local_nodes}
     for app, name in local_nodes:
@@ -573,22 +580,13 @@ def test_migration_graph_is_consistent():
             if not dep_app.startswith("apps."):
                 # External dep (e.g. a contrib app). Loader resolves it,
                 # so we just sanity-check it's known.
-                if (dep_app, dep_name) not in disk and (
-                    dep_app, dep_name
-                ) not in applied:
-                    missing.append(
-                        f"{app}.{name} -> {dep_app}.{dep_name}"
-                    )
+                if (dep_app, dep_name) not in disk and (dep_app, dep_name) not in applied:
+                    missing.append(f"{app}.{name} -> {dep_app}.{dep_name}")
                 continue
-            if (dep_app, dep_name) not in disk and (
-                dep_app, dep_name
-            ) not in applied:
+            if (dep_app, dep_name) not in disk and (dep_app, dep_name) not in applied:
                 missing.append(f"{app}.{name} -> {dep_app}.{dep_name}")
 
-    assert not missing, (
-        "Migrations reference unknown predecessors:\n  "
-        + "\n  ".join(missing)
-    )
+    assert not missing, "Migrations reference unknown predecessors:\n  " + "\n  ".join(missing)
 
 
 # --------------------------------------------------------------------------- #
@@ -605,18 +603,11 @@ def test_user_table_named_users_user():
     re-introduced the default user model.
     """
     with connection.cursor() as cur:
-        cur.execute(
-            "SELECT table_name FROM information_schema.tables "
-            "WHERE table_schema = current_schema()"
-        )
+        cur.execute("SELECT table_name FROM information_schema.tables " "WHERE table_schema = current_schema()")
         tables = {row[0] for row in cur.fetchall()}
 
-    assert "users_user" in tables, (
-        f"`users_user` table missing. Found: {sorted(tables)}"
-    )
-    assert "auth_user" not in tables, (
-        "`auth_user` table exists — custom AUTH_USER_MODEL is not in effect"
-    )
+    assert "users_user" in tables, f"`users_user` table missing. Found: {sorted(tables)}"
+    assert "auth_user" not in tables, "`auth_user` table exists — custom AUTH_USER_MODEL is not in effect"
 
 
 @pytest.mark.django_db
@@ -645,10 +636,7 @@ def test_local_pk_columns_are_uuid():
         else:
             non_uuid_pk.append((table_name, data_type))
 
-    assert uuid_rows, (
-        "No `id` column with data_type=uuid found on local tables — "
-        "UUID PKs didn't land"
-    )
+    assert uuid_rows, "No `id` column with data_type=uuid found on local tables — " "UUID PKs didn't land"
     # Allow exactly one local table (VoteBudget) to skip the UUID PK.
     # That model exists for the quadratic-vote credit ledger and uses
     # Django's default BigAutoField. If anything else drops out of

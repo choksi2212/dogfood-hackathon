@@ -34,5 +34,27 @@ judge_c_HEADER      = "Cookie: session=UsIPvCy0Y94cMekzHLfogQtA6trT27enIxt0vEl5m
 participant_HEADER  = "Cookie: session=zd8Xt3K6up2GDnvJDUIb5NIue7yYuTFe-QdoiExnwyw"
 
 # Tiers we claim. Honesty over breadth.
+# Tiers we claim. Honesty over breadth.
 [tiers]
-claimed = ["t1", "t2"]
+claimed = ["t1", "t2", "t3"]
+
+# Bonus challenges we have built and tested. Each bonus name maps to
+# the deliverable file + the test that defends it.
+#
+#   normalization_proof — apps/normalization/proof.py + tests/normalization/
+#                         including the rank-movement proof on unbalanced
+#                         bipartite graphs. Demo proof at repo root:
+#                         normalization-proof.txt
+#   pairwise_mode       — apps/pairwise/fit.py (Bradley-Terry MM with
+#                         phantom prior) + tests/pairwise/
+#   threat_model        — THREAT-MODEL.md at repo root. Covers all five
+#                         primary attacks named in the spec (sybil votes,
+#                         ballot stuffing, scraping, collusion, deadline
+#                         gaming). Defenses verified by tests/security/.
+#   api_first           — openapi.yaml at repo root + /api/schema/.
+#                         Every UI action is in the spec (see tests/
+#                         conformance/test_openapi.py::test_no_undocumented_
+#                         paths_in_urlconf). New endpoints (e.g. T3
+#                         comments) added with documented schemas.
+[bonuses]
+claimed = ["normalization_proof", "pairwise_mode", "threat_model", "api_first"]

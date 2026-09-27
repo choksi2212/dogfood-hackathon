@@ -10,13 +10,13 @@ process.
 Run with:
     docker compose exec web pytest tests/smoke/ -v
 """
+
 from __future__ import annotations
 
 import io
 
 import pytest
 from django.core.management import call_command
-
 
 # ALLOWED_HOSTS in dev defaults to "localhost,127.0.0.1,web".
 # The Django test client's default HTTP_HOST is "testserver", which is

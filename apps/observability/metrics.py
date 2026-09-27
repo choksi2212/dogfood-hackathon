@@ -8,14 +8,25 @@ text format by hand.
 Buckets for the request-duration histogram mirror the
 ``prometheus_client`` HTTP histogram (5 ms → 10 s, 11 buckets).
 """
+
 from __future__ import annotations
 
 import threading
 from collections import defaultdict
-from typing import Iterable
+from collections.abc import Iterable
 
 LATENCY_BUCKETS_MS: tuple[float, ...] = (
-    5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
+    5,
+    10,
+    25,
+    50,
+    100,
+    250,
+    500,
+    1000,
+    2500,
+    5000,
+    10000,
 )
 
 
@@ -42,9 +53,7 @@ class _Counter:
         label_names = _LABEL_NAMES[self._name]
         for labels, value in items:
             if labels:
-                rendered = ",".join(
-                    f'{k}="{_escape(v)}"' for k, v in zip(label_names, labels)
-                )
+                rendered = ",".join(f'{k}="{_escape(v)}"' for k, v in zip(label_names, labels, strict=False))
                 yield f"{self._name}{{{rendered}}} {value}"
             else:
                 yield f"{self._name} {value}"
@@ -79,40 +88,20 @@ class _Histogram:
         with self._lock:
             all_labels = sorted(set(self._counts.keys()))
         for labels in all_labels:
-            rendered_labels = ",".join(
-                f'{k}="{_escape(v)}"' for k, v in zip(label_names, labels)
-            )
+            rendered_labels = ",".join(f'{k}="{_escape(v)}"' for k, v in zip(label_names, labels, strict=False))
             cum = 0.0
             for le in self._buckets:
                 cum = self._buckets_acc.get((labels, le), 0.0)
                 if labels:
-                    yield (
-                        self._name + "_bucket{"
-                        + rendered_labels
-                        + ',le="' + str(le) + '"} ' + str(cum)
-                    )
+                    yield (self._name + "_bucket{" + rendered_labels + ',le="' + str(le) + '"} ' + str(cum))
                 else:
-                    yield (
-                        self._name + '_bucket{le="' + str(le) + '"} ' + str(cum)
-                    )
+                    yield (self._name + '_bucket{le="' + str(le) + '"} ' + str(cum))
             if labels:
-                yield (
-                    self._name + "_bucket{" + rendered_labels
-                    + ',le="+Inf"} ' + str(self._counts[labels])
-                )
-                yield (
-                    self._name + "_sum{" + rendered_labels
-                    + "} " + str(self._sums[labels])
-                )
-                yield (
-                    self._name + "_count{" + rendered_labels
-                    + "} " + str(self._counts[labels])
-                )
+                yield (self._name + "_bucket{" + rendered_labels + ',le="+Inf"} ' + str(self._counts[labels]))
+                yield (self._name + "_sum{" + rendered_labels + "} " + str(self._sums[labels]))
+                yield (self._name + "_count{" + rendered_labels + "} " + str(self._counts[labels]))
             else:
-                yield (
-                    self._name + '_bucket{le="+Inf"} '
-                    + str(self._counts[labels])
-                )
+                yield (self._name + '_bucket{le="+Inf"} ' + str(self._counts[labels]))
                 yield self._name + "_sum " + str(self._sums[labels])
                 yield self._name + "_count " + str(self._counts[labels])
 

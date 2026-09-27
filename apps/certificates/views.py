@@ -1,9 +1,6 @@
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
-from apps.events.permissions import IsOrganizer
-from apps.submissions.models import Submission
-
 from .models import Certificate
 
 

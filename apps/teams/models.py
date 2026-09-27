@@ -17,9 +17,7 @@ def _hash_token(token: str) -> str:
 
 class Team(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    event = models.ForeignKey(
-        "events.Event", on_delete=models.CASCADE, related_name="teams"
-    )
+    event = models.ForeignKey("events.Event", on_delete=models.CASCADE, related_name="teams")
     name = models.CharField(max_length=60)
     created_by = models.ForeignKey(
         "accounts.User",
@@ -41,18 +39,14 @@ class TeamMember(models.Model):
     ROLE_CHOICES = [("member", "Member"), ("captain", "Captain")]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    team = models.ForeignKey(
-        Team, on_delete=models.CASCADE, related_name="members"
-    )
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="members")
     user = models.ForeignKey(
         "accounts.User",
         on_delete=models.CASCADE,
         related_name="team_memberships",
     )
     joined_at = models.DateTimeField(auto_now_add=True)
-    role_in_team = models.CharField(
-        max_length=20, choices=ROLE_CHOICES, default="member"
-    )
+    role_in_team = models.CharField(max_length=20, choices=ROLE_CHOICES, default="member")
 
     class Meta:
         db_table = "teams_teammember"
@@ -64,9 +58,7 @@ class TeamInvite(models.Model):
     once and never stored."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    team = models.ForeignKey(
-        Team, on_delete=models.CASCADE, related_name="invites"
-    )
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="invites")
     token_hash = models.CharField(max_length=64, unique=True)
     created_by = models.ForeignKey(
         "accounts.User",

@@ -24,6 +24,10 @@ Coverage matrix (one section per attack category):
   9. Token entropy        — Session.create() emits >= 32 chars of random
  10. Secret leakage       — error responses never echo SECRET_KEY, DB
                             connection strings, or stack traces
+ 11. Scraping — read-rate-limit (60/min/IP), no PII in gallery, organizer
+            endpoints reject anonymous
+ 12. Validation surfaces  — every error envelope passes the schema
+                            defined in apps.api.exceptions
 
 All tests run against the Django test client. There is no real HTTP, no
 mocked auth — the portal boots inside the test process.
@@ -35,6 +39,7 @@ Run with::
 Pass ``--no-rate-limit`` to skip the brute-force and write-rate suites
 when iterating locally; the default behavior is to hit the limiter.
 """
+
 from __future__ import annotations
 
 import gc
@@ -51,7 +56,6 @@ from django.utils import timezone
 
 from apps.accounts.middleware import RateLimitMiddleware
 from apps.accounts.models import Session, User
-
 
 pytestmark = pytest.mark.security
 
@@ -149,14 +153,11 @@ def test_sqli_gallery_query_does_not_leak_db(db, client):
             HTTP_HOST=HTTP_HOST,
         )
         assert resp.status_code == 200, (
-            f"payload {payload!r} should not crash the endpoint, got "
-            f"{resp.status_code}: {resp.content[:200]!r}"
+            f"payload {payload!r} should not crash the endpoint, got " f"{resp.status_code}: {resp.content[:200]!r}"
         )
         body_text = resp.content.decode("utf-8", errors="ignore").lower()
         for marker in forbidden_markers:
-            assert marker not in body_text, (
-                f"payload {payload!r} leaked {marker!r} in response body"
-            )
+            assert marker not in body_text, f"payload {payload!r} leaked {marker!r} in response body"
 
 
 def test_sqli_unrecognized_query_param_is_ignored(db, client):
@@ -186,8 +187,7 @@ def test_sqli_submit_payload_does_not_leak_db(db, auth_client):
     # 201 (accepted), 422 (deadline passed), or 403 (no team) are all OK;
     # 500 (DB error from concatenation) is the only failure mode.
     assert resp.status_code in (201, 403, 422), (
-        f"SQLi name should not crash the endpoint, got "
-        f"{resp.status_code}: {resp.content[:200]!r}"
+        f"SQLi name should not crash the endpoint, got " f"{resp.status_code}: {resp.content[:200]!r}"
     )
     body_text = resp.content.decode("utf-8", errors="ignore").lower()
     for marker in ("syntax error", "psycopg", 'relation "', "traceback"):
@@ -211,11 +211,13 @@ def participant_on_team(participant, open_event):
     from apps.teams.models import Team, TeamMember
 
     team, _ = Team.objects.get_or_create(
-        event=open_event, name="Security probe team",
+        event=open_event,
+        name="Security probe team",
         defaults={"created_by": participant},
     )
     TeamMember.objects.get_or_create(
-        team=team, user=participant,
+        team=team,
+        user=participant,
         defaults={"role_in_team": "captain"},
     )
     return participant
@@ -253,25 +255,26 @@ def open_event(db, organizer, participant):
         pairwise_enabled=False,
         created_by=organizer,
     )
-    Track.objects.create(
-        event=event, slug="main", name="Main", description="Main track", order=0
-    )
+    Track.objects.create(event=event, slug="main", name="Main", description="Main track", order=0)
     Membership.objects.create(
-        user=participant, event=event, role="participant", created_by=organizer,
+        user=participant,
+        event=event,
+        role="participant",
+        created_by=organizer,
     )
     return event
 
 
-def test_xss_name_stored_verbatim(
-    db, auth_client, participant, open_event
-):
+def test_xss_name_stored_verbatim(db, auth_client, participant, open_event):
     """The submission name field accepts arbitrary strings including HTML
     tags. The string is stored verbatim — the contract is to escape at
     render time, not to scrub at storage."""
     from apps.teams.models import Team, TeamMember
 
     team = Team.objects.create(
-        event=open_event, name="XSS probe team", created_by=participant,
+        event=open_event,
+        name="XSS probe team",
+        created_by=participant,
     )
     TeamMember.objects.create(team=team, user=participant, role_in_team="captain")
 
@@ -286,18 +289,11 @@ def test_xss_name_stored_verbatim(
     # Re-fetch via the public gallery; the payload must survive storage.
     gallery = c.get("/api/gallery", HTTP_HOST=HTTP_HOST).json()
     items = gallery["items"]
-    xss_item = next(
-        (item for item in items if item.get("name") == XSS_PAYLOAD), None
-    )
-    assert xss_item is not None, (
-        f"XSS payload must round-trip through storage unchanged. "
-        f"items={items!r}"
-    )
+    xss_item = next((item for item in items if item.get("name") == XSS_PAYLOAD), None)
+    assert xss_item is not None, f"XSS payload must round-trip through storage unchanged. " f"items={items!r}"
 
 
-def test_xss_name_returned_as_valid_json_string(
-    db, auth_client, participant, open_event
-):
+def test_xss_name_returned_as_valid_json_string(db, auth_client, participant, open_event):
     """The XSS payload appears in the JSON response as a plain string,
     not as escaped HTML entities and not as executable markup. JSON's
     string grammar allows ``<`` and ``>`` unescaped, so the response is
@@ -306,7 +302,9 @@ def test_xss_name_returned_as_valid_json_string(
     from apps.teams.models import Team, TeamMember
 
     team = Team.objects.create(
-        event=open_event, name="XSS probe team 2", created_by=participant,
+        event=open_event,
+        name="XSS probe team 2",
+        created_by=participant,
     )
     TeamMember.objects.create(team=team, user=participant, role_in_team="captain")
 
@@ -321,9 +319,7 @@ def test_xss_name_returned_as_valid_json_string(
     # Body is parseable JSON and contains the literal payload.
     body = resp.json()
     name = body.get("name", "")
-    assert XSS_PAYLOAD in name or XSS_PAYLOAD == name, (
-        f"XSS payload should be preserved in JSON, got {name!r}"
-    )
+    assert XSS_PAYLOAD in name or XSS_PAYLOAD == name, f"XSS payload should be preserved in JSON, got {name!r}"
 
     # Raw response bytes do NOT contain ``&lt;`` / ``&gt;`` HTML escapes —
     # those would indicate the serializer is escaping for HTML, which
@@ -332,16 +328,16 @@ def test_xss_name_returned_as_valid_json_string(
     assert "&lt;script&gt;" not in raw
 
 
-def test_xss_payload_in_other_fields_is_safe(
-    db, auth_client, participant, open_event
-):
+def test_xss_payload_in_other_fields_is_safe(db, auth_client, participant, open_event):
     """Other free-text fields (tagline, description) also round-trip raw
     strings. None of them are rendered server-side as HTML — the consumer
     is responsible for safe rendering."""
     from apps.teams.models import Team, TeamMember
 
     team = Team.objects.create(
-        event=open_event, name="XSS probe team 3", created_by=participant,
+        event=open_event,
+        name="XSS probe team 3",
+        created_by=participant,
     )
     TeamMember.objects.create(team=team, user=participant, role_in_team="captain")
     payload = "<img src=x onerror=alert(1)>"
@@ -401,14 +397,10 @@ def test_path_traversal_widget_gallery_returns_empty(db, client):
         # The endpoint returns ``{"items": []}`` for unknown events; the
         # ``event`` key is only added on success. The contract is just
         # "items is empty" — no leakage.
-        assert body.get("items") == [], (
-            f"payload {payload!r} returned non-empty items: {body!r}"
-        )
+        assert body.get("items") == [], f"payload {payload!r} returned non-empty items: {body!r}"
         body_text = resp.content.decode("utf-8", errors="ignore").lower()
         for marker in forbidden_markers:
-            assert marker not in body_text, (
-                f"payload {payload!r} leaked file-content marker {marker!r}"
-            )
+            assert marker not in body_text, f"payload {payload!r} leaked file-content marker {marker!r}"
 
 
 def test_path_traversal_url_pattern_does_not_500(db, client):
@@ -440,9 +432,7 @@ def test_tampered_cookie_is_anonymous(db, participant):
 
     c = _client_with_cookie(tampered)
     resp = c.get("/api/me")
-    assert resp.status_code == 401, (
-        f"tampered cookie must yield AnonymousUser, got {resp.status_code}"
-    )
+    assert resp.status_code == 401, f"tampered cookie must yield AnonymousUser, got {resp.status_code}"
     body = resp.json()
     assert body["error"]["code"] == "not_authenticated"
 
@@ -504,28 +494,28 @@ def test_brute_force_login_hits_429(db, client):
             break
 
     # At least one of the requests must have been rate-limited.
-    assert 429 in statuses, (
-        f"limiter never fired across {len(statuses)} wrong logins: "
-        f"{statuses}"
-    )
+    assert 429 in statuses, f"limiter never fired across {len(statuses)} wrong logins: " f"{statuses}"
     # All 4xx — no 5xx from a bypass or stack trace.
-    assert all(s < 500 for s in statuses), (
-        f"brute force attempt produced a server error: {statuses}"
-    )
+    assert all(s < 500 for s in statuses), f"brute force attempt produced a server error: {statuses}"
 
     # The 429 response carries a Retry-After header.
     rate_limited = next(
-        (s for s, resp in zip(
-            statuses,
-            (
-                client.post(
-                    "/api/login",
-                    data={"email": "x@y.z", "password": "p"},
-                    content_type="application/json",
-                )
-                for _ in range(len(statuses))
-            ),
-        ) if s == 429),
+        (
+            s
+            for s, resp in zip(
+                statuses,
+                (
+                    client.post(
+                        "/api/login",
+                        data={"email": "x@y.z", "password": "p"},
+                        content_type="application/json",
+                    )
+                    for _ in range(len(statuses))
+                ),
+                strict=False,
+            )
+            if s == 429
+        ),
         None,
     )
     # Retry-After is checked separately by re-issuing a request after the
@@ -554,9 +544,7 @@ def test_brute_force_unknown_email_also_rate_limited(db, client):
         if resp.status_code == 429:
             break
 
-    assert 429 in statuses, (
-        f"limiter must fire on unknown emails too: {statuses}"
-    )
+    assert 429 in statuses, f"limiter must fire on unknown emails too: {statuses}"
 
 
 @pytest.mark.skipif(
@@ -581,8 +569,7 @@ def test_429_response_carries_retry_after(db, client):
 
     assert last_429 is not None, f"limiter never fired: {statuses}"
     assert "Retry-After" in last_429.headers, (
-        f"429 response missing Retry-After header: "
-        f"headers={dict(last_429.headers)}"
+        f"429 response missing Retry-After header: " f"headers={dict(last_429.headers)}"
     )
     retry_after = int(last_429.headers["Retry-After"])
     assert retry_after >= 0, f"Retry-After must be non-negative, got {retry_after}"
@@ -597,9 +584,7 @@ def test_429_response_carries_retry_after(db, client):
     "config.getoption('--no-rate-limit')",
     reason="--no-rate-limit set; write-rate probe skipped",
 )
-def test_submit_write_rate_limited(
-    db, auth_client, participant_on_team, open_event
-):
+def test_submit_write_rate_limited(db, auth_client, participant_on_team, open_event):
     """Fifteen rapid POSTs to the submit endpoint must hit the write
     limiter (10/60s). Each is a real request — the limiter is consulted
     before the view body, so we count statuses rather than DB rows."""
@@ -618,14 +603,9 @@ def test_submit_write_rate_limited(
             last_429 = resp
             break
 
-    assert 429 in statuses, (
-        f"write limiter never fired across {len(statuses)} submits: "
-        f"{statuses[:20]}..."
-    )
+    assert 429 in statuses, f"write limiter never fired across {len(statuses)} submits: " f"{statuses[:20]}..."
     # No 5xx — a write-flood must not bypass into the view.
-    assert all(s < 500 for s in statuses), (
-        f"write-flood produced a server error: {statuses}"
-    )
+    assert all(s < 500 for s in statuses), f"write-flood produced a server error: {statuses}"
 
     if last_429 is not None:
         assert "Retry-After" in last_429.headers
@@ -645,8 +625,7 @@ def test_csrf_middleware_is_registered():
 
     middleware = list(django_settings.MIDDLEWARE)
     assert "django.middleware.csrf.CsrfViewMiddleware" in middleware, (
-        "CsrfViewMiddleware must be registered — its absence is a "
-        "config-level regression"
+        "CsrfViewMiddleware must be registered — its absence is a " "config-level regression"
     )
 
 
@@ -658,8 +637,9 @@ def test_csrf_login_view_is_subclass_of_api_view():
     flow. This test pins that contract: if a future 'harden
     everything' pass replaces LoginView with a plain Django View,
     legitimate logins break and this assertion fails first."""
-    from apps.accounts.views import LoginView
     from rest_framework.views import APIView
+
+    from apps.accounts.views import LoginView
 
     assert issubclass(LoginView, APIView), (
         "LoginView must remain a DRF APIView subclass — switching to a "
@@ -699,8 +679,7 @@ def test_post_without_csrf_token_passes_under_enforced_csrf(db, participant):
         content_type="application/json",
     )
     assert resp.status_code == 200, (
-        f"LoginView must remain csrf_exempt; got {resp.status_code} "
-        f"{resp.content[:200]!r}"
+        f"LoginView must remain csrf_exempt; got {resp.status_code} " f"{resp.content[:200]!r}"
     )
 
 
@@ -724,9 +703,9 @@ def test_login_cookie_has_secure_attribute_in_production(db, participant, client
     assert resp.status_code == 200
     morsel = resp.cookies["session"]
     secure_attr = morsel["secure"]
-    assert secure_attr is True or secure_attr == 1 or secure_attr, (
-        f"Secure must be on under DEBUG=False, got {secure_attr!r}"
-    )
+    assert (
+        secure_attr is True or secure_attr == 1 or secure_attr
+    ), f"Secure must be on under DEBUG=False, got {secure_attr!r}"
     assert "Secure" in morsel.OutputString()
 
 
@@ -744,9 +723,9 @@ def test_login_cookie_lacks_secure_attribute_in_dev(db, participant, client):
     assert resp.status_code == 200
     morsel = resp.cookies["session"]
     secure_attr = morsel["secure"]
-    assert not secure_attr or secure_attr == 0 or secure_attr == "", (
-        f"Secure must be off under DEBUG=True, got {secure_attr!r}"
-    )
+    assert (
+        not secure_attr or secure_attr == 0 or secure_attr == ""
+    ), f"Secure must be off under DEBUG=True, got {secure_attr!r}"
 
 
 @pytest.mark.django_db
@@ -779,9 +758,7 @@ def test_session_token_is_long_and_unpredictable(db, participant):
     _, token = Session.create(participant, label="entropy")
     assert isinstance(token, str)
     assert len(token) >= 32, f"token must be >= 32 chars, got {len(token)}"
-    assert re.match(r"^[A-Za-z0-9_\-]+$", token), (
-        f"token must be URL-safe base64, got {token!r}"
-    )
+    assert re.match(r"^[A-Za-z0-9_\-]+$", token), f"token must be URL-safe base64, got {token!r}"
 
 
 @pytest.mark.django_db
@@ -806,9 +783,7 @@ def test_session_token_is_stored_as_sha256_hash(db, participant):
     # The token itself is *not* in any field on the row.
     for field in ("label", "user_agent", "ip"):
         value = getattr(sess, field, "") or ""
-        assert token not in value, (
-            f"plain token leaked into Session.{field}: {value!r}"
-        )
+        assert token not in value, f"plain token leaked into Session.{field}: {value!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -835,8 +810,7 @@ def _assert_no_secret_leak(resp, *, label: str) -> None:
     ]
     for needle in forbidden_substrings:
         assert needle not in body, (
-            f"{label}: response leaked {needle!r}; "
-            f"status={resp.status_code} body={body[:300]!r}"
+            f"{label}: response leaked {needle!r}; " f"status={resp.status_code} body={body[:300]!r}"
         )
 
 
@@ -900,7 +874,95 @@ def test_500_equivalent_bad_input_does_not_leak_secrets(db, client):
     )
     # DRF returns 400 (or possibly 422) for malformed JSON — never 500.
     assert resp.status_code < 500, (
-        f"malformed JSON should not yield 500, got {resp.status_code}: "
-        f"{resp.content[:200]!r}"
+        f"malformed JSON should not yield 500, got {resp.status_code}: " f"{resp.content[:200]!r}"
     )
     _assert_no_secret_leak(resp, label="malformed JSON")
+
+
+# ---------------------------------------------------------------------------
+# 11. Scraping — the fifth primary threat from the spec.
+# ---------------------------------------------------------------------------
+
+
+def test_read_rate_limit_returns_429(db, client):
+    """A scraper that GETs the public gallery faster than the read-class
+    bucket (60 / 60s / IP) must hit the rate limiter. Probes
+    ``/api/gallery`` specifically; the same bucket covers
+    ``/api/widget/gallery`` and ``/api/events/{slug}/submissions/{id}``.
+    """
+    statuses = []
+    for _ in range(80):
+        resp = client.get("/api/gallery")
+        statuses.append(resp.status_code)
+        if resp.status_code == 429:
+            break
+
+    assert 429 in statuses, f"read limiter never fired across {len(statuses)} GETs: {statuses}"
+    assert all(s < 500 for s in statuses), f"read scrape produced a server error: {statuses}"
+
+    # The 429 response must carry Retry-After so polite scrapers back off.
+    saw_429 = None
+    for _ in range(5):
+        r = client.get("/api/gallery")
+        if r.status_code == 429:
+            saw_429 = r
+            break
+    assert saw_429 is not None, "could not capture a 429 response"
+    assert "Retry-After" in saw_429.headers, f"429 missing Retry-After header: headers={dict(saw_429.headers)}"
+
+
+def test_no_pii_in_gallery_response(db, client, sample_event, sample_submission):
+    """The public gallery must NOT serialize email addresses or any
+    other organizer / judge / submitter PII. The serializer
+    (``apps.submissions.serializers.SubmissionSummarySerializer``) is an
+    explicit allow-list; a future maintainer adding a field to the
+    broader SubmissionSerializer must not let it leak through.
+    """
+    _ = sample_submission  # ensure the gallery has at least one row
+    resp = client.get("/api/gallery")
+    assert resp.status_code == 200
+
+    body = resp.content.decode("utf-8", errors="replace").lower()
+    assert "@" not in body, (
+        "gallery response leaks an '@'-shaped value (likely an email). " f"first 200 chars: {body[:200]!r}"
+    )
+
+    # Every key in every gallery item must be in the allow-list. If a
+    # new field shows up here without an explicit allow-list update,
+    # this test fails loudly.
+    allow_list = {
+        "id",
+        "name",
+        "tagline",
+        "description",
+        "track_slug",
+        "thumbnail_path",
+        "submitted_at",
+    }
+    import json as _json
+
+    payload = _json.loads(resp.content)
+    for item in payload.get("items", []):
+        extra = set(item.keys()) - allow_list
+        assert not extra, f"gallery item leaks extra fields: {extra}; item={item!r}"
+
+
+def test_organizer_endpoint_rejects_anonymous(db, client, sample_event, judge_a):
+    """``/api/events/{slug}/memberships`` is organizer-only and returns
+    the membership list (and, implicitly, organizer emails). An
+    anonymous scraper must get 403 / 401, not the data. An authenticated
+    non-organizer (a judge) must also be denied.
+    """
+    # Anonymous probe.
+    anon = client.get(f"/api/events/{sample_event.slug}/memberships")
+    assert anon.status_code in (401, 403), f"anonymous should be denied at /memberships, got {anon.status_code}"
+    anon_body = anon.content.decode("utf-8", errors="replace").lower()
+    assert "@" not in anon_body, f"anonymous /memberships leaked an email: {anon_body[:200]!r}"
+
+    # Authenticated-as-judge probe. The sample_event fixture registers
+    # judge_a as a *judge*, not as an organizer — so the IsOrganizer
+    # permission must deny them.
+    authed = _client_with_cookie(_new_session_for(judge_a)).get(f"/api/events/{sample_event.slug}/memberships")
+    assert authed.status_code in (401, 403), f"non-organizer should be denied at /memberships, got {authed.status_code}"
+    authed_body = authed.content.decode("utf-8", errors="replace").lower()
+    assert "@" not in authed_body, f"non-organizer /memberships leaked an email: {authed_body[:200]!r}"

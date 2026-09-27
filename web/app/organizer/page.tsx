@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import Link from "next/link";
 import { api } from "@/lib/api/client";
 import { AssignmentPanel, BulkInvitePanel, NormalizationPanel } from "./actions";
 import styles from "./organizer.module.css";
@@ -17,8 +18,15 @@ export default async function OrganizerPage() {
 
   return (
     <div>
-      <h1>{event.name}</h1>
-      <p className={styles.lede}>{event.description}</p>
+      <div className={styles.titleRow}>
+        <div>
+          <h1>{event.name}</h1>
+          <p className={styles.lede}>{event.description}</p>
+        </div>
+        <Link href="/organizer/results" className={styles.resultsLink}>
+          Voting results &amp; audit log →
+        </Link>
+      </div>
 
       <div className={styles.overview}>
         <div>

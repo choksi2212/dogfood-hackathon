@@ -15,6 +15,8 @@ G4 (normalization):
 
 G5 (voting):
   /api/events/<slug>/submissions/<id>/vote  cast/retract
+  /api/events/<slug>/votes/results          organizer, per-project tally
+  /api/events/<slug>/audit-log              organizer, human-readable trail
 
 G6 (pairwise):
   /api/events/<slug>/pairwise/ballots       POST ballot
@@ -27,6 +29,7 @@ G7 (T4 surface):
   /api/webhooks                               organizer subscriptions
   /api/schema/                                OpenAPI 3 as JSON
 """
+
 from django.http import JsonResponse
 from django.urls import include, path
 
@@ -51,6 +54,7 @@ urlpatterns = [
     path("api/", include("apps.judging.urls")),
     path("api/", include("apps.normalization.urls")),
     path("api/", include("apps.voting.urls")),
+    path("api/", include("apps.audit.urls")),
     path("api/", include("apps.abuse.urls")),
     path("api/", include("apps.pairwise.urls")),
     path("api/", include("apps.api.urls")),

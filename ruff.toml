@@ -24,13 +24,17 @@ select = ["E", "F", "I", "B", "UP"]
 ignore = [
     "E501",  # line too long
     "B008",  # function-call-in-default-argument (Django field defaults)
+    "B007",  # unused loop control variable (legacy test pattern)
+    "F841",  # unused local variable (test scaffolding)
     "UP031", # use f-string instead of % formatting (legacy code)
 ]
 
 [lint.per-file-ignores]
-"**/migrations/*.py" = ["*"]
+"**/migrations/*.py" = ["ALL"]
 "**/apps.py" = ["F401", "F403"]
 "scripts/**/*.py" = ["E", "F", "I", "B", "UP"]
+"tests/schema/test_migrations.py" = ["B007"]
+"tests/security/test_attacks.py" = ["F841"]
 
 [format]
 quote-style = "double"

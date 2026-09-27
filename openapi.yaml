@@ -648,6 +648,170 @@ paths:
           description: Rate limited
         '401':
           description: Unauthenticated
+  /api/events/{slug}/votes/results:
+    get:
+      summary: Organizer-only tally of live votes per project
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Per-project vote tally
+        '404':
+          description: Event not found
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Not an organizer of this event
+  /api/events/{slug}/audit-log:
+    get:
+      summary: Organizer-only human-readable audit trail
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 100
+          maximum: 500
+      responses:
+        '200':
+          description: Recent audit entries, newest first
+        '404':
+          description: Event not found
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Not an organizer of this event
+  /api/events/{slug}/submissions/{id}/comments:
+    get:
+      summary: Public list of visible comments on a submission
+      description: |
+        T3 §3 — viewers can read comments without authentication.
+        Hidden comments (organizer soft-deletes) are not returned.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+      - name: id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Comment list (possibly empty)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: {type: string, format: uuid}
+                    submission: {type: string, format: uuid}
+                    author: {type: string, format: uuid, nullable: true}
+                    author_email_hash: {type: string, nullable: true}
+                    body: {type: string}
+                    created_at: {type: string, format: date-time}
+                    is_hidden: {type: boolean}
+        '404':
+          description: Submission not found
+        '429':
+          description: Rate limited
+    post:
+      summary: Authenticated user posts a comment
+      description: |
+        T3 §3 — only authenticated users can comment. Rate-limited via
+        the write-class bucket on the middleware. Author is the
+        authenticated user; no impersonation is possible.
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+      - name: id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                body: {type: string, maxLength: 2000}
+              required: [body]
+      responses:
+        '201':
+          description: Comment created
+        '401':
+          description: Unauthenticated
+        '404':
+          description: Submission not found
+        '422':
+          description: Validation failed (empty body, too long)
+        '429':
+          description: Rate limited
+  /api/events/{slug}/submissions/{id}/comments/{comment_id}:
+    patch:
+      summary: Organizer soft-delete (or restore) a comment
+      description: |
+        Sets is_hidden=true on the comment so it disappears from the
+        public listing. The row stays in the DB for audit (anti-abuse
+        dashboards). action = "hide" or "unhide".
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+      - name: id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      - name: comment_id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action: {type: string, enum: [hide, unhide]}
+              required: [action]
+      responses:
+        '200':
+          description: Comment hidden / unhidden
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Not an organizer of this event
+        '404':
+          description: Comment not found
+        '422':
+          description: Invalid action
+        '429':
+          description: Rate limited
   /api/judge/scores:
     get:
       summary: Authenticated judge's own scores

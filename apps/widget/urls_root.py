@@ -1,4 +1,5 @@
 """URLs at the project root: /widget.js (mounted via include() at root)."""
+
 from django.urls import path
 
 from . import views

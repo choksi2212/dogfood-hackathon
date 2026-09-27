@@ -4,20 +4,41 @@ One line of JSON per log record. Stable keys, ISO-8601 timestamps,
 ``extra`` fields merged into the top-level object so log shippers
 can index them without grok rules.
 """
+
 from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Iterable
+from collections.abc import Iterable
+from datetime import UTC, datetime
 
-_RESERVED_RECORD_ATTRS = frozenset({
-    "name", "msg", "args", "levelname", "levelno", "pathname",
-    "filename", "module", "exc_info", "exc_text", "stack_info",
-    "lineno", "funcName", "created", "msecs", "relativeCreated",
-    "thread", "threadName", "processName", "process", "asctime",
-    "message", "taskName",
-})
+_RESERVED_RECORD_ATTRS = frozenset(
+    {
+        "name",
+        "msg",
+        "args",
+        "levelname",
+        "levelno",
+        "pathname",
+        "filename",
+        "module",
+        "exc_info",
+        "exc_text",
+        "stack_info",
+        "lineno",
+        "funcName",
+        "created",
+        "msecs",
+        "relativeCreated",
+        "thread",
+        "threadName",
+        "processName",
+        "process",
+        "asctime",
+        "message",
+        "taskName",
+    }
+)
 
 
 class JsonFormatter(logging.Formatter):
@@ -35,8 +56,7 @@ class JsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         payload: dict = {
-            "ts": datetime.fromtimestamp(record.created, tz=timezone.utc)
-                .isoformat(timespec="milliseconds"),
+            "ts": datetime.fromtimestamp(record.created, tz=UTC).isoformat(timespec="milliseconds"),
             "level": record.levelname,
             "logger": record.name,
             "msg": record.getMessage(),
@@ -61,9 +81,9 @@ class JsonFormatter(logging.Formatter):
 
 def _safe(value: object) -> object:
     """Coerce unknown objects into JSON-safe primitives."""
-    if value is None or isinstance(value, (bool, int, float, str)):
+    if value is None or isinstance(value, bool | int | float | str):
         return value
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return [_safe(v) for v in value]
     if isinstance(value, dict):
         return {str(k): _safe(v) for k, v in value.items()}

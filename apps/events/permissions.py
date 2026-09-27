@@ -19,9 +19,7 @@ def _has_role(request, event, role):
         return False
     if getattr(request.user, "is_admin_role", False):
         return True
-    return Membership.objects.filter(
-        user=request.user, event=event, role=role
-    ).exists()
+    return Membership.objects.filter(user=request.user, event=event, role=role).exists()
 
 
 class IsInEvent(BasePermission):
@@ -33,9 +31,7 @@ class IsInEvent(BasePermission):
             return False
         if getattr(request.user, "is_admin_role", False):
             return True
-        return Membership.objects.filter(
-            user=request.user, event=event
-        ).exists()
+        return Membership.objects.filter(user=request.user, event=event).exists()
 
 
 class IsParticipant(IsInEvent):

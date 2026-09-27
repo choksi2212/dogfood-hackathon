@@ -1,8 +1,4 @@
-import secrets
-from datetime import timedelta
-
 from django.conf import settings
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -72,6 +68,17 @@ class RegisterView(APIView):
 
 
 class LoginView(APIView):
+    """Mint a new session for the user.
+
+    Note: we do NOT delete prior sessions here. Multiple logins (e.g.
+    laptop + phone) coexist — the same user can have N active
+    sessions at once. Old sessions stay valid until they expire or
+    the user explicitly logs one out via ``LogoutView``. Deleting
+    prior sessions on every login would race when two concurrent
+    logins hit at the same time, and would also break the legitimate
+    multi-device case.
+    """
+
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -92,7 +99,6 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        Session.objects.filter(user=user).delete()
         ip, ua = _client_meta(request)
         _, token = Session.create(user, label="login", ip=ip, user_agent=ua)
 

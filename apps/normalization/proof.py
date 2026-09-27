@@ -44,6 +44,7 @@ Format (per JUDGING.md §3.7):
     connectivity: required; reported
     z-score: rejected (divides by zero on sigma=0 raters)
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -53,7 +54,7 @@ if TYPE_CHECKING:
     from .models import NormalizationRun
 
 
-def generate_proof(run: "NormalizationRun", result: "FitResult") -> str:
+def generate_proof(run: NormalizationRun, result: FitResult) -> str:
     """Render the proof text. Pure function — no DB, no IO. Caller is
     responsible for writing the result to disk and / or storing it on
     `run.proof_text`."""
@@ -61,7 +62,7 @@ def generate_proof(run: "NormalizationRun", result: "FitResult") -> str:
     lines: list[str] = []
     lines.append("DOGFOOD normalization proof")
     lines.append(f"event: {run.event.slug}")
-    lines.append(f"method: two-way additive, alternating means")
+    lines.append("method: two-way additive, alternating means")
     lines.append(f"created_at: {run.created_at.isoformat()}")
     lines.append(f"raw_sigma: {run.raw_sigma:.2f}")
     lines.append(f"normalized_sigma: {run.normalized_sigma:.2f}")
@@ -88,10 +89,7 @@ def generate_proof(run: "NormalizationRun", result: "FitResult") -> str:
         else:
             arrow = "="
             sign = 0
-        lines.append(
-            f"{s['project_id']}  {s['rank_before']}  {s['rank_after']}  "
-            f"{arrow} {sign}"
-        )
+        lines.append(f"{s['project_id']}  {s['rank_before']}  {s['rank_after']}  " f"{arrow} {sign}")
     lines.append("")
 
     lines.append("per-project:")
@@ -118,10 +116,7 @@ def generate_proof(run: "NormalizationRun", result: "FitResult") -> str:
     if zero_var:
         lines.append("Zero-variance raters:")
         for b in zero_var:
-            lines.append(
-                f"  {b['judge_id']}: leverage=0.00, n_reviews={b['n_reviews']} "
-                f"- no ranking signal"
-            )
+            lines.append(f"  {b['judge_id']}: leverage=0.00, n_reviews={b['n_reviews']} " f"- no ranking signal")
         lines.append("")
 
     lines.append("Method:")

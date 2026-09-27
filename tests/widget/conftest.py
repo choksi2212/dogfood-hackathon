@@ -27,6 +27,7 @@ duplicate-key errors and missing-relation errors during migration.
 This conftest.py is local to tests/widget/ — it only affects test
 discovery inside this directory.
 """
+
 from __future__ import annotations
 
 from django.urls import path

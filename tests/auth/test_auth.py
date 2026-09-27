@@ -16,6 +16,7 @@ shared `auth_client` (already in the project conftest) and an autouse
 fixture that clears the in-process RateLimitMiddleware bucket between
 tests so the 10/60s write limit does not leak across tests.
 """
+
 from __future__ import annotations
 
 import gc
@@ -29,7 +30,6 @@ from django.utils import timezone
 
 from apps.accounts.middleware import RateLimitMiddleware
 from apps.accounts.models import Session
-
 
 pytestmark = pytest.mark.auth
 
@@ -175,9 +175,7 @@ def test_expired_session_is_purged(participant, db):
     c = client_class_with_cookie(token)
     resp = c.get("/api/me")
     assert resp.status_code == 401
-    assert Session.objects.count() == 0, (
-        "expired session must be hard-deleted, not just ignored"
-    )
+    assert Session.objects.count() == 0, "expired session must be hard-deleted, not just ignored"
 
 
 def client_class_with_cookie(token):
@@ -217,9 +215,9 @@ def test_sliding_renewal_extends_expires_at(participant, db):
     sess.refresh_from_db()
     assert sess.expires_at > before, "expires_at must move forward"
     delta = sess.expires_at - timezone.now()
-    assert timedelta(days=13, hours=23) < delta < timedelta(days=14, hours=1), (
-        f"sliding TTL should be ~14 days, got {delta}"
-    )
+    assert (
+        timedelta(days=13, hours=23) < delta < timedelta(days=14, hours=1)
+    ), f"sliding TTL should be ~14 days, got {delta}"
 
 
 @pytest.mark.django_db
@@ -313,7 +311,6 @@ def test_login_with_valid_credentials_sets_cookie(participant, client):
 @pytest.mark.django_db
 def test_login_with_wrong_password_returns_401(participant, client):
     """A correct email but wrong password returns 401 and no session row."""
-    from apps.accounts.models import User
 
     # All pre-existing sessions for this user are removed on successful
     # login (see LoginView), but failed logins should not touch them.
@@ -395,9 +392,9 @@ def test_login_cookie_is_httponly(participant, client):
     morsel = resp.cookies["session"]
     # Django uses the empty string for httponly=True on morsels — check via
     # the underlying output.
-    assert morsel["httponly"] is True or morsel["httponly"] == 1 or morsel["httponly"] == "", (
-        f"session cookie must be HttpOnly, got httponly={morsel['httponly']!r}"
-    )
+    assert (
+        morsel["httponly"] is True or morsel["httponly"] == 1 or morsel["httponly"] == ""
+    ), f"session cookie must be HttpOnly, got httponly={morsel['httponly']!r}"
     # Belt-and-braces: serialize and look for the flag in the header.
     assert "HttpOnly" in morsel.OutputString()
 
@@ -445,6 +442,7 @@ def test_login_cookie_is_not_secure_when_debug_true(participant, client):
     """DEBUG=True (the dev/test default) must NOT set Secure — otherwise the
     cookie would not be sent over plain-HTTP localhost during dev/acceptance."""
     import os
+
     from django.conf import settings
 
     # The cookie policy mirrors `not settings.DEBUG`. We assert against
@@ -460,9 +458,9 @@ def test_login_cookie_is_not_secure_when_debug_true(participant, client):
     morsel = resp.cookies["session"]
     # morsel['secure'] is "" when False, truthy when True.
     secure_attr = morsel["secure"]
-    assert not secure_attr or secure_attr == 0 or secure_attr == "", (
-        f"Secure must be off under DEBUG=True, got {secure_attr!r}"
-    )
+    assert (
+        not secure_attr or secure_attr == 0 or secure_attr == ""
+    ), f"Secure must be off under DEBUG=True, got {secure_attr!r}"
 
 
 @pytest.mark.django_db
@@ -477,9 +475,9 @@ def test_login_cookie_is_secure_when_debug_false(participant, client):
     assert resp.status_code == 200
     morsel = resp.cookies["session"]
     secure_attr = morsel["secure"]
-    assert secure_attr is True or secure_attr == 1 or secure_attr, (
-        f"Secure must be on under DEBUG=False, got {secure_attr!r}"
-    )
+    assert (
+        secure_attr is True or secure_attr == 1 or secure_attr
+    ), f"Secure must be on under DEBUG=False, got {secure_attr!r}"
     assert "Secure" in morsel.OutputString()
 
 

@@ -8,19 +8,24 @@ T3 surfaces (later):
   POST /api/events/<slug>/submissions/<id>/review-comment (T3 comments)
   POST /api/events/<slug>/submissions/<id>/vote (T3 voting)
 """
+
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.events.decorators import deadline_gated
 from apps.events.models import Event, Track
-from apps.events.permissions import IsParticipant
+from apps.events.permissions import IsOrganizer, IsParticipant
 from apps.teams.models import TeamMember
 
-from .models import Submission
-from .serializers import SubmissionSerializer, SubmissionSummarySerializer
+from .models import Comment, Submission
+from .serializers import (
+    CommentSerializer,
+    SubmissionSerializer,
+    SubmissionSummarySerializer,
+)
 
 
 class GalleryView(APIView):
@@ -173,6 +178,7 @@ class SubmitView(APIView):
         team_id = request.data.get("team_id")
         if team_id:
             from apps.teams.models import Team
+
             try:
                 team = Team.objects.get(id=team_id, event=event)
             except Team.DoesNotExist:
@@ -197,11 +203,7 @@ class SubmitView(APIView):
                 )
             return team
 
-        member = (
-            TeamMember.objects.filter(user=request.user, team__event=event)
-            .select_related("team")
-            .first()
-        )
+        member = TeamMember.objects.filter(user=request.user, team__event=event).select_related("team").first()
         if member is None:
             return Response(
                 {
@@ -213,3 +215,126 @@ class SubmitView(APIView):
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
         return member.team
+
+
+class CommentListCreateView(APIView):
+    """T3 §3 — Comments on gallery projects.
+
+    GET  /api/events/<slug>/submissions/<id>/comments
+        — Public, paginated. Returns ``[hidden=False]`` rows ordered by
+          created_at. The hidden-by-organizer flag hides moderation
+          takedowns but does not reveal them.
+
+    POST /api/events/<slug>/submissions/<id>/comments
+        — Authenticated, rate-limited via the write-class bucket on
+          the middleware. Body: ``{"body": "<=2000 chars"}``. The
+          author is the authenticated user; no impersonation possible.
+
+    Comments are NOT auto-moderated — the anti-abuse app surfaces
+    top suspicious IPs and organizers can soft-delete (is_hidden=true)
+    a comment via PATCH below.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug, id):
+        try:
+            submission = Submission.objects.get(id=id, event__slug=slug)
+        except Submission.DoesNotExist:
+            return Response(
+                {"error": {"code": "not_found", "message": "Submission not found."}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        comments = (
+            Comment.objects.filter(submission=submission, is_hidden=False)
+            .select_related("author")
+            .order_by("created_at")
+        )
+        return Response(CommentSerializer(comments, many=True).data)
+
+    def post(self, request, slug, id):
+        if not request.user or not getattr(request.user, "is_authenticated", False):
+            return Response(
+                {
+                    "error": {
+                        "code": "not_authenticated",
+                        "message": "Authentication required to comment.",
+                    }
+                },
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        try:
+            submission = Submission.objects.get(id=id, event__slug=slug)
+        except Submission.DoesNotExist:
+            return Response(
+                {"error": {"code": "not_found", "message": "Submission not found."}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        body = (request.data.get("body") or "").strip()
+        if not body:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_failed",
+                        "message": "body is required.",
+                    }
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+        if len(body) > 2000:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_failed",
+                        "message": "body must be <= 2000 characters.",
+                    }
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
+        comment = Comment.objects.create(submission=submission, author=request.user, body=body)
+        return Response(CommentSerializer(comment).data, status=status.HTTP_201_CREATED)
+
+
+class CommentModerateView(APIView):
+    """PATCH /api/events/<slug>/submissions/<id>/comments/<comment_id>
+    — Organizer-only soft-delete. Sets is_hidden=true + hidden_by =
+    the organizer. The comment disappears from public listings
+    (GET returns 404 because the row no longer matches
+    ``is_hidden=False``) but stays in the DB for audit.
+    """
+
+    permission_classes = [IsAuthenticated, IsOrganizer]
+
+    def patch(self, request, slug, id, comment_id):
+        from .models import Comment
+
+        try:
+            comment = Comment.objects.get(id=comment_id, submission_id=id)
+        except Comment.DoesNotExist:
+            return Response(
+                {"error": {"code": "not_found", "message": "Comment not found."}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        action = request.data.get("action", "hide")
+        if action == "hide":
+            comment.is_hidden = True
+            comment.hidden_by = request.user
+            comment.save(update_fields=["is_hidden", "hidden_by", "updated_at"])
+            return Response({"id": str(comment.id), "is_hidden": True})
+        if action == "unhide":
+            comment.is_hidden = False
+            comment.hidden_by = None
+            comment.save(update_fields=["is_hidden", "hidden_by", "updated_at"])
+            return Response({"id": str(comment.id), "is_hidden": False})
+        return Response(
+            {
+                "error": {
+                    "code": "validation_failed",
+                    "message": "action must be 'hide' or 'unhide'.",
+                }
+            },
+            status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )

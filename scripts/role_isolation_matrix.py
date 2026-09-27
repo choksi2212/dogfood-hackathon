@@ -8,6 +8,7 @@ actual report. Run from repo root with the portal up:
   docker compose exec web python scripts/role_isolation_matrix.py \\
       .dogfood.toml role-isolation-matrix.txt
 """
+
 from __future__ import annotations
 
 import json
@@ -44,21 +45,21 @@ def main() -> int:
 
     actors = {
         "organizer": cookie_value(auth["organizer_HEADER"]),
-        "judge_a":   cookie_value(auth["judge_a_HEADER"]),
-        "judge_b":   cookie_value(auth["judge_b_HEADER"]),
-        "judge_c":   cookie_value(auth["judge_c_HEADER"]),
+        "judge_a": cookie_value(auth["judge_a_HEADER"]),
+        "judge_b": cookie_value(auth["judge_b_HEADER"]),
+        "judge_c": cookie_value(auth["judge_c_HEADER"]),
         "participant": cookie_value(auth["participant_HEADER"]),
-        "anonymous":  None,
+        "anonymous": None,
     }
     if "judge_c_HEADER" not in auth:
         actors.pop("judge_c", None)
 
     cells = [
-        ("own_scores",  "GET",  cfg["routes"]["judge_scores"]),
-        ("peer_scores", "GET",  cfg["routes"]["peer_scores"]),
-        ("csv_export",  "GET",  cfg["routes"]["csv_export"]),
-        ("gallery",     "GET",  cfg["routes"]["gallery"]),
-        ("submit",      "POST", cfg["routes"]["submit"]),
+        ("own_scores", "GET", cfg["routes"]["judge_scores"]),
+        ("peer_scores", "GET", cfg["routes"]["peer_scores"]),
+        ("csv_export", "GET", cfg["routes"]["csv_export"]),
+        ("gallery", "GET", cfg["routes"]["gallery"]),
+        ("submit", "POST", cfg["routes"]["submit"]),
     ]
 
     results: dict[tuple[str, str], tuple[int, str]] = {}
@@ -97,21 +98,21 @@ def main() -> int:
     lines.append("")
 
     expected = {
-        ("own_scores", "judge_a"):      "200",
-        ("own_scores", "judge_b"):      "200",
-        ("own_scores", "judge_c"):      "200",
+        ("own_scores", "judge_a"): "200",
+        ("own_scores", "judge_b"): "200",
+        ("own_scores", "judge_c"): "200",
         ("own_scores", "participant"): "401/403",
-        ("peer_scores", "judge_a"):     "401/403",
-        ("peer_scores", "judge_b"):     "401/403",
-        ("peer_scores", "judge_c"):     "401/403",
+        ("peer_scores", "judge_a"): "401/403",
+        ("peer_scores", "judge_b"): "401/403",
+        ("peer_scores", "judge_c"): "401/403",
         ("peer_scores", "participant"): "401/403",
-        ("csv_export", "organizer"):    "200",
-        ("csv_export", "judge_a"):      "401/403",
-        ("csv_export", "judge_b"):      "401/403",
-        ("csv_export", "judge_c"):      "401/403",
+        ("csv_export", "organizer"): "200",
+        ("csv_export", "judge_a"): "401/403",
+        ("csv_export", "judge_b"): "401/403",
+        ("csv_export", "judge_c"): "401/403",
         ("csv_export", "participant"): "401/403",
-        ("gallery", "anonymous"):       "200",
-        ("submit", "participant"):      "4xx (deadline_passed)",
+        ("gallery", "anonymous"): "200",
+        ("submit", "participant"): "4xx (deadline_passed)",
     }
 
     lines.append("Expected vs actual:")
@@ -122,14 +123,15 @@ def main() -> int:
         status, body = results[(actor, cell)]
         actual = f"{status}" + (" (deadline_passed)" if status == 422 else "")
         match = (
-            expected_val == "200" and status == 200
-            or expected_val == "401/403" and status in (401, 403)
-            or expected_val.startswith("4xx") and 400 <= status < 500
+            expected_val == "200"
+            and status == 200
+            or expected_val == "401/403"
+            and status in (401, 403)
+            or expected_val.startswith("4xx")
+            and 400 <= status < 500
         )
         marker = "OK " if match else "X  "
-        lines.append(
-            f"  [{marker}] {actor:12s} {cell:12s} expected={expected_val:24s} actual={actual}"
-        )
+        lines.append(f"  [{marker}] {actor:12s} {cell:12s} expected={expected_val:24s} actual={actual}")
         if not match:
             mismatches += 1
             lines.append(f"           detail: {body[:200]}")

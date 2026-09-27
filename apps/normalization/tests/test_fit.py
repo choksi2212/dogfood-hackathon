@@ -11,6 +11,7 @@ solution has not regressed, a disconnected-graph test, and a sigma-shrink
 test that proves the FIG. 03 story (raw sigma > normalized sigma when
 judges have systematic bias AND the design is incomplete).
 """
+
 from __future__ import annotations
 
 import math
@@ -26,7 +27,7 @@ def _pearson(xs, ys):
         return 0.0
     mean_x = sum(xs) / n
     mean_y = sum(ys) / n
-    cov = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys)) / n
+    cov = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys, strict=False)) / n
     var_x = sum((x - mean_x) ** 2 for x in xs) / n
     var_y = sum((y - mean_y) ** 2 for y in ys) / n
     if var_x == 0 or var_y == 0:
@@ -50,11 +51,7 @@ class TestNormalizationFit(unittest.TestCase):
         for p_idx in range(n_projects):
             judge_indices = random.sample(range(n_judges), reviews_per_project)
             for j_idx in judge_indices:
-                value = (
-                    true_q[f"p{p_idx}"]
-                    + true_b[f"j{j_idx}"]
-                    + random.gauss(0, 0.1)
-                )
+                value = true_q[f"p{p_idx}"] + true_b[f"j{j_idx}"] + random.gauss(0, 0.1)
                 scores.append(
                     {
                         "project_id": f"p{p_idx}",
@@ -139,9 +136,7 @@ class TestNormalizationFit(unittest.TestCase):
         self.assertIn("p1", result.q)
         self.assertIn("p2", result.q)
         # n_reviews in the result counts the DEDUPED cells, not the raw rows
-        self.assertEqual(
-            result.n_reviews, 4, msg="expected 4 deduped cells"
-        )  # (p1,j1), (p1,j2), (p2,j1), (p2,j2)
+        self.assertEqual(result.n_reviews, 4, msg="expected 4 deduped cells")  # (p1,j1), (p1,j2), (p2,j1), (p2,j2)
 
     def test_normalization_handles_disconnected_graph(self):
         """Two islands -- (p1, j1) and (p2, j2) -- with no crossing edges.
@@ -197,10 +192,7 @@ class TestNormalizationFit(unittest.TestCase):
         self.assertLess(
             result.normalized_sigma,
             result.raw_sigma,
-            msg=(
-                f"raw={result.raw_sigma}, "
-                f"normalized={result.normalized_sigma}"
-            ),
+            msg=(f"raw={result.raw_sigma}, " f"normalized={result.normalized_sigma}"),
         )
         # And the judges' biases point in opposite directions.
         self.assertGreater(result.b["j_high"], 0)

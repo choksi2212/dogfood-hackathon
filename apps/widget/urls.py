@@ -1,4 +1,5 @@
 """URLs under /api/widget/* (gallery endpoint)."""
+
 from django.urls import path
 
 from . import views

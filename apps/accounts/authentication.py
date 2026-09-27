@@ -4,6 +4,7 @@ authentication class populates it; with no DEFAULT_AUTHENTICATION_CLASSES,
 `request.user.is_authenticated` would explode on None. We read the user
 that apps.accounts.middleware.SessionMiddleware already resolved.
 """
+
 from rest_framework.authentication import BaseAuthentication
 
 
@@ -22,7 +23,9 @@ class CookieSessionAuthentication(BaseAuthentication):
     the specific unguarded call site, not the shared authenticator."""
 
     def authenticate(self, request):
-        user = getattr(request._request, "user", None) if hasattr(request, "_request") else getattr(request, "user", None)
+        user = (
+            getattr(request._request, "user", None) if hasattr(request, "_request") else getattr(request, "user", None)
+        )
         if user is None or not getattr(user, "is_authenticated", False):
             return None
         return (user, None)

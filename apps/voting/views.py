@@ -4,6 +4,7 @@ Endpoints (under /api/):
 
   POST   /api/events/<slug>/submissions/<id>/vote   cast or update a ballot
   DELETE /api/events/<slug>/submissions/<id>/vote   retract a ballot
+  GET    /api/events/<slug>/votes/results           organizer-only tally
 
 Both are deadline-gated: voting opens at ``submissions_close_at`` (i.e.
 once the registration window has closed). The vote window is not
@@ -18,22 +19,23 @@ Mode semantics (see ``Event.voting_mode``):
                   the cost is ``n**2`` credits out of a 100-credit event
                   budget for that voter.
 """
+
 import hashlib
 
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.audit.helpers import log as audit_log
 from apps.events.decorators import deadline_gated
 from apps.events.models import Event
+from apps.events.permissions import IsOrganizer
 from apps.submissions.models import Submission
 
 from .models import Vote, VoteAudit, VoteBudget
-
 
 QUADRATIC_BUDGET = 100
 SIMPLE_VOTE_VALUE = 1
@@ -131,9 +133,7 @@ class VoteView(APIView):
         if user_is_authed:
             from apps.teams.models import TeamMember
 
-            if TeamMember.objects.filter(
-                team=project.team, user=user
-            ).exists():
+            if TeamMember.objects.filter(team=project.team, user=user).exists():
                 return Response(
                     {
                         "error": {
@@ -167,10 +167,7 @@ class VoteView(APIView):
                     {
                         "error": {
                             "code": "validation_failed",
-                            "message": (
-                                "`votes` must be between 1 and "
-                                f"{MAX_QUADRATIC_BALLOT} (inclusive)."
-                            ),
+                            "message": ("`votes` must be between 1 and " f"{MAX_QUADRATIC_BALLOT} (inclusive)."),
                         }
                     },
                     status=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -184,19 +181,11 @@ class VoteView(APIView):
         delta = 0
         if event.voting_mode == "quadratic":
             cost = n_votes * n_votes
-            previous = Vote.objects.filter(
-                event=event, project=project, voter_key=voter_key
-            ).first()
-            previous_cost = (
-                previous.votes * previous.votes
-                if previous and previous.retracted_at is None
-                else 0
-            )
+            previous = Vote.objects.filter(event=event, project=project, voter_key=voter_key).first()
+            previous_cost = previous.votes * previous.votes if previous and previous.retracted_at is None else 0
             delta = cost - previous_cost
             spent = (
-                VoteBudget.objects.filter(
-                    event=event, voter_key=voter_key
-                )
+                VoteBudget.objects.filter(event=event, voter_key=voter_key)
                 .values_list("spent_credits", flat=True)
                 .first()
                 or 0
@@ -206,10 +195,7 @@ class VoteView(APIView):
                     {
                         "error": {
                             "code": "validation_failed",
-                            "message": (
-                                f"Exceeds {QUADRATIC_BUDGET}-credit "
-                                "quadratic budget."
-                            ),
+                            "message": (f"Exceeds {QUADRATIC_BUDGET}-credit " "quadratic budget."),
                         }
                     },
                     status=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -217,9 +203,7 @@ class VoteView(APIView):
 
         with transaction.atomic():
             if event.voting_mode == "quadratic":
-                budget, _ = VoteBudget.objects.select_for_update().get_or_create(
-                    event=event, voter_key=voter_key
-                )
+                budget, _ = VoteBudget.objects.select_for_update().get_or_create(event=event, voter_key=voter_key)
                 budget.spent_credits += delta
                 budget.save(update_fields=["spent_credits", "updated_at"])
 
@@ -255,9 +239,7 @@ class VoteView(APIView):
                 "votes": n_votes,
                 "mode": event.voting_mode,
                 "spent_credits": (
-                    VoteBudget.objects.get(
-                        event=event, voter_key=voter_key
-                    ).spent_credits
+                    VoteBudget.objects.get(event=event, voter_key=voter_key).spent_credits
                     if event.voting_mode == "quadratic"
                     else None
                 ),
@@ -297,9 +279,7 @@ class VoteView(APIView):
 
         with transaction.atomic():
             try:
-                vote = Vote.objects.select_for_update().get(
-                    event=event, project=project, voter_key=voter_key
-                )
+                vote = Vote.objects.select_for_update().get(event=event, project=project, voter_key=voter_key)
             except Vote.DoesNotExist:
                 return Response(
                     {
@@ -317,9 +297,7 @@ class VoteView(APIView):
 
             if event.voting_mode == "quadratic":
                 refund = vote.votes * vote.votes
-                budget = VoteBudget.objects.select_for_update().get(
-                    event=event, voter_key=voter_key
-                )
+                budget = VoteBudget.objects.select_for_update().get(event=event, voter_key=voter_key)
                 budget.spent_credits = max(0, budget.spent_credits - refund)
                 budget.save(update_fields=["spent_credits", "updated_at"])
 
@@ -341,3 +319,69 @@ class VoteView(APIView):
         )
 
         return Response({"retracted": True, "vote_id": str(vote.id)})
+
+
+class VoteResultsView(APIView):
+    """GET /api/events/<slug>/votes/results — organizer-only tally of
+    live votes per project.
+
+    Retracted ballots contribute zero (see Vote.effective_votes); a
+    project with only retracted votes still appears with vote_count 0
+    rather than being omitted, so the organizer can see the full
+    submission set. `results_visible` mirrors whether the event's
+    results window has opened yet — the frontend uses it to decide
+    whether to show tallies to anyone other than the organizer (who
+    can always see them, same as every other role-isolation cell)."""
+
+    permission_classes = [IsAuthenticated, IsOrganizer]
+
+    def get(self, request, slug):
+        try:
+            event = Event.objects.get(slug=slug)
+        except Event.DoesNotExist:
+            return Response(
+                {
+                    "error": {
+                        "code": "not_found",
+                        "message": f"Event {slug!r} not found.",
+                    }
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        projects = Submission.objects.filter(event=event, status="submitted")
+        tally = {
+            str(p.id): {
+                "project_id": str(p.id),
+                "project_name": p.name,
+                "vote_count": 0,
+                "total_votes": 0,
+            }
+            for p in projects
+        }
+
+        live_votes = Vote.objects.filter(
+            event=event, project__in=projects, retracted_at__isnull=True
+        )
+        for v in live_votes:
+            row = tally.get(str(v.project_id))
+            if row is None:
+                continue
+            row["vote_count"] += 1
+            row["total_votes"] += v.votes
+
+        results = sorted(
+            tally.values(), key=lambda r: r["total_votes"], reverse=True
+        )
+
+        return Response(
+            {
+                "event_slug": event.slug,
+                "voting_mode": event.voting_mode,
+                "results_visible": (
+                    event.results_at is None
+                    or timezone.now() >= event.results_at
+                ),
+                "results": results,
+            }
+        )

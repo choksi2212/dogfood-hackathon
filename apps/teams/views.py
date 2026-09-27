@@ -3,7 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.events.models import Event, Membership
+from apps.events.models import Event
 from apps.events.permissions import IsParticipant
 
 from .models import Team, TeamInvite, TeamMember
@@ -15,9 +15,7 @@ class TeamCreateView(APIView):
     def post(self, request, slug):
         event = Event.objects.get(slug=slug)
 
-        if TeamMember.objects.filter(
-            user=request.user, team__event=event
-        ).exists():
+        if TeamMember.objects.filter(user=request.user, team__event=event).exists():
             return Response(
                 {
                     "error": {
@@ -46,9 +44,7 @@ class InviteCreateView(APIView):
     def post(self, request, slug, id):
         team = Team.objects.get(id=id, event__slug=slug)
 
-        if not TeamMember.objects.filter(
-            team=team, user=request.user, role_in_team="captain"
-        ).exists():
+        if not TeamMember.objects.filter(team=team, user=request.user, role_in_team="captain").exists():
             return Response(
                 {
                     "error": {
@@ -83,14 +79,14 @@ class JoinTeamView(APIView):
 
     def post(self, request):
         from .models import TeamMember as TM
+
         token = request.data.get("token", "")
         from .models import _hash_token
+
         token_hash = _hash_token(token)
 
         try:
-            invite = TeamInvite.objects.select_related("team__event").get(
-                token_hash=token_hash
-            )
+            invite = TeamInvite.objects.select_related("team__event").get(token_hash=token_hash)
         except TeamInvite.DoesNotExist:
             return Response(
                 {"error": {"code": "gone", "message": "Invalid invite token."}},
@@ -98,6 +94,7 @@ class JoinTeamView(APIView):
             )
 
         from django.utils import timezone
+
         if invite.consumed_at or invite.expires_at < timezone.now():
             return Response(
                 {

@@ -1,5 +1,6 @@
 import type {
   AssignmentRunResponse,
+  AuditLogResponse,
   BulkInviteResponse,
   CertificateResponse,
   EventDetail,
@@ -19,6 +20,7 @@ import type {
   SubmitResponse,
   User,
   VoteResponse,
+  VoteResultsResponse,
   WidgetGalleryResponse,
 } from "./types";
 
@@ -284,5 +286,43 @@ export async function mockWidgetGallery(): Promise<WidgetGalleryResponse> {
       track_slug: s.track_slug,
     })),
     event: "sample-hack-2026",
+  };
+}
+
+export async function mockVoteResults(): Promise<VoteResultsResponse> {
+  return {
+    event_slug: "sample-hack-2026",
+    voting_mode: "simple",
+    results_visible: true,
+    results: [
+      { project_id: "mock-1", project_name: "Quokka", vote_count: 3, total_votes: 3 },
+      { project_id: "mock-2", project_name: "Wombat Watch", vote_count: 1, total_votes: 1 },
+    ],
+  };
+}
+
+export async function mockAuditLog(): Promise<AuditLogResponse> {
+  return {
+    event_slug: "sample-hack-2026",
+    entries: [
+      {
+        id: "mock-1",
+        actor_email: "participant@dogfood.local",
+        action: "vote.cast",
+        target_type: "Vote",
+        target_id: "mock-vote-1",
+        result: "success",
+        created_at: "2026-09-27T00:00:00Z",
+      },
+      {
+        id: "mock-2",
+        actor_email: null,
+        action: "vote.retract",
+        target_type: "Vote",
+        target_id: "mock-vote-2",
+        result: "success",
+        created_at: "2026-09-27T00:01:00Z",
+      },
+    ],
   };
 }

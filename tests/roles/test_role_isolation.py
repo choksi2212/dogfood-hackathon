@@ -22,6 +22,7 @@ The matrix below is the source of truth.  If you change a route's
 expected status, update both the matrix here and the table in
 ``docs/TESTING-ROLES.md`` in the same commit.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -36,7 +37,6 @@ from apps.judging.assignment import run_assignment
 from apps.judging.models import JudgeAssignment, Score
 from apps.submissions.models import Submission
 from apps.teams.models import Team, TeamMember
-
 
 # ---------------------------------------------------------------------------
 # Matrix — the source of truth for the role isolation contract.
@@ -68,12 +68,12 @@ ROUTES = [
         "POST",
         "/api/events/{slug}/submit",
         {
-            "organizer": 403,        # wrong role
-            "judge_a": 403,          # wrong role
-            "judge_b": 403,          # wrong role
-            "judge_c": 403,          # wrong role
-            "participant": 422,      # deadline passed (sample_event window)
-            "anonymous": 401,        # no auth
+            "organizer": 403,  # wrong role
+            "judge_a": 403,  # wrong role
+            "judge_b": 403,  # wrong role
+            "judge_c": 403,  # wrong role
+            "participant": 422,  # deadline passed (sample_event window)
+            "anonymous": 401,  # no auth
         },
     ),
     (
@@ -81,11 +81,11 @@ ROUTES = [
         "GET",
         "/api/judge/scores",
         {
-            "organizer": 403,        # not a judge for any event
+            "organizer": 403,  # not a judge for any event
             "judge_a": 200,
             "judge_b": 200,
             "judge_c": 200,
-            "participant": 403,      # not a judge
+            "participant": 403,  # not a judge
             "anonymous": 401,
         },
     ),
@@ -94,12 +94,12 @@ ROUTES = [
         "GET",
         "/api/judge/peer-scores",
         {
-            "organizer": 403,        # graded cell — denies everyone
+            "organizer": 403,  # graded cell — denies everyone
             "judge_a": 403,
             "judge_b": 403,
             "judge_c": 403,
             "participant": 403,
-            "anonymous": 401,        # no auth
+            "anonymous": 401,  # no auth
         },
     ),
     (
@@ -108,7 +108,7 @@ ROUTES = [
         "/api/csv_export",
         {
             "organizer": 200,
-            "judge_a": 403,          # not an organizer
+            "judge_a": 403,  # not an organizer
             "judge_b": 403,
             "judge_c": 403,
             "participant": 403,
@@ -120,7 +120,7 @@ ROUTES = [
         "POST",
         "/api/events/{slug}/normalize",
         {
-            "organizer": 201,        # 201 Created when bipartite graph is connected
+            "organizer": 201,  # 201 Created when bipartite graph is connected
             "judge_a": 403,
             "judge_b": 403,
             "judge_c": 403,
@@ -133,7 +133,7 @@ ROUTES = [
         "POST",
         "/api/events/{slug}/assignments/run",
         {
-            "organizer": 200,        # returns assignment result envelope
+            "organizer": 200,  # returns assignment result envelope
             "judge_a": 403,
             "judge_b": 403,
             "judge_c": 403,
@@ -146,8 +146,8 @@ ROUTES = [
         "GET",
         "/api/webhooks",
         {
-            "organizer": 200,        # organizers can list webhooks for events they organize
-            "judge_a": 403,          # not an organizer
+            "organizer": 200,  # organizers can list webhooks for events they organize
+            "judge_a": 403,  # not an organizer
             "judge_b": 403,
             "judge_c": 403,
             "participant": 403,
@@ -186,12 +186,7 @@ def _seed_scores_for_event(event) -> None:
     leaves the second call with a no-op effect because the ORM uses
     update_or_create.
     """
-    organizer = (
-        Membership.objects.filter(event=event, role="organizer")
-        .select_related("user")
-        .first()
-        .user
-    )
+    organizer = Membership.objects.filter(event=event, role="organizer").select_related("user").first().user
 
     result = run_assignment(
         event=event,
@@ -209,9 +204,7 @@ def _seed_scores_for_event(event) -> None:
     for assignment in JudgeAssignment.objects.filter(batch_id=batch_id):
         # Deterministic but distinct value per (assignment, criterion).
         seed_value = int(
-            hashlib.sha256(
-                f"{assignment.judge_id}-{assignment.project_id}".encode()
-            ).hexdigest()[:8],
+            hashlib.sha256(f"{assignment.judge_id}-{assignment.project_id}".encode()).hexdigest()[:8],
             16,
         )
         for i, criterion in enumerate(criteria):
@@ -227,11 +220,7 @@ def _seed_scores_for_event(event) -> None:
 # Flatten (route, actor) into a list of parametrize ids so each cell is
 # its own test. We also expose the route config and the actor label so
 # the test body can pull the expected status and dispatch the request.
-_CELLS = [
-    pytest.param(route_id, actor, id=f"{route_id}__{actor}")
-    for route_id, _, _, _ in ROUTES
-    for actor in ACTORS
-]
+_CELLS = [pytest.param(route_id, actor, id=f"{route_id}__{actor}") for route_id, _, _, _ in ROUTES for actor in ACTORS]
 
 
 # ---------------------------------------------------------------------------
@@ -396,9 +385,7 @@ def test_cross_judge_read_denied(auth_client, actor, querystring):
     own).  There is no ``?judge=`` magic that could weaken that.
     """
     c = auth_client[actor]
-    response = c.get(
-        f"/api/judge/scores{querystring}", REMOTE_ADDR="10.99.0.1"
-    )
+    response = c.get(f"/api/judge/scores{querystring}", REMOTE_ADDR="10.99.0.1")
 
     assert response.status_code == 403, (
         f"cross-judge read leaked: actor={actor!r} "
@@ -425,9 +412,7 @@ def test_gallery_is_public(client):
     dedicated test.
     """
     response = client.get("/api/gallery", REMOTE_ADDR="10.99.0.42")
-    assert response.status_code == 200, (
-        f"gallery broke for anonymous: expected=200 got={response.status_code}"
-    )
+    assert response.status_code == 200, f"gallery broke for anonymous: expected=200 got={response.status_code}"
 
 
 @pytest.mark.roles
@@ -446,14 +431,8 @@ def test_peer_scores_always_denies(auth_client, client):
             REMOTE_ADDR=f"10.99.1.{ord(actor[0])}",
         )
         assert response.status_code == 403, (
-            f"peer_scores leaked for {actor!r}: "
-            f"expected=403 got={response.status_code}"
+            f"peer_scores leaked for {actor!r}: " f"expected=403 got={response.status_code}"
         )
 
-    response = client.get(
-        "/api/judge/peer-scores", REMOTE_ADDR="10.99.1.255"
-    )
-    assert response.status_code == 401, (
-        f"peer_scores leaked for anonymous: "
-        f"expected=401 got={response.status_code}"
-    )
+    response = client.get("/api/judge/peer-scores", REMOTE_ADDR="10.99.1.255")
+    assert response.status_code == 401, f"peer_scores leaked for anonymous: " f"expected=401 got={response.status_code}"

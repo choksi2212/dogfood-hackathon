@@ -17,6 +17,7 @@ These endpoints are PUBLIC. No auth header, no CSRF, no session cookie.
 The whole point is that someone else's website can drop a <script> tag
 in their page and have our feed show up.
 """
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -99,20 +100,18 @@ def widget_event(db, organizer):
         ),
     )
     Track.objects.update_or_create(
-        event=event, slug="main",
+        event=event,
+        slug="main",
         defaults={"name": "Main", "description": "Main track", "order": 0},
     )
     Track.objects.update_or_create(
-        event=event, slug="wildcard",
+        event=event,
+        slug="wildcard",
         defaults={"name": "Wildcard", "description": "Anything goes", "order": 1},
     )
-    rubric, _ = Rubric.objects.update_or_create(
-        event=event, defaults={"name": "Default"}
-    )
+    rubric, _ = Rubric.objects.update_or_create(event=event, defaults={"name": "Default"})
     RubricCriterion.objects.filter(rubric=rubric).delete()
-    for order, (name, weight) in enumerate(
-        [("Innovation", "0.400"), ("Execution", "0.350"), ("Impact", "0.250")]
-    ):
+    for order, (name, weight) in enumerate([("Innovation", "0.400"), ("Execution", "0.350"), ("Impact", "0.250")]):
         RubricCriterion.objects.create(
             rubric=rubric,
             name=name,
@@ -124,7 +123,8 @@ def widget_event(db, organizer):
         )
     # organizer gets an organizer membership so they can create teams.
     Membership.objects.update_or_create(
-        user=organizer, event=event,
+        user=organizer,
+        event=event,
         defaults={"role": "organizer", "created_by": organizer},
     )
     return event
@@ -143,17 +143,17 @@ def _make_team(event, organizer, name: str) -> Team:
         password=DEMO_PASSWORD,
     )
     Membership.objects.create(
-        user=captain, event=event,
-        role="participant", created_by=organizer,
+        user=captain,
+        event=event,
+        role="participant",
+        created_by=organizer,
     )
     team = Team.objects.create(event=event, name=name, created_by=captain)
     TeamMember.objects.create(team=team, user=captain, role_in_team="captain")
     return team
 
 
-def _make_submission(
-    event, track, organizer, name: str, *, status: str = "submitted"
-) -> Submission:
+def _make_submission(event, track, organizer, name: str, *, status: str = "submitted") -> Submission:
     """Create a team + submission in one go. Default status is 'submitted'."""
     team = _make_team(event, organizer, name)
     return Submission.objects.create(
@@ -204,6 +204,7 @@ def test_widget_js_no_auth_required(client):
     assert response.status_code == 200
     # And confirm a different anonymous client also gets it.
     from django.test import Client
+
     anon = Client()
     response2 = anon.get("/widget.js")
     assert response2.status_code == 200
@@ -275,9 +276,7 @@ def test_widget_gallery_bogus_event_returns_empty_not_404(client):
     JSON-shaped empty response is much easier to handle than a 404
     page.
     """
-    response = client.get(
-        "/api/widget/gallery", {"event": "does-not-exist"}
-    )
+    response = client.get("/api/widget/gallery", {"event": "does-not-exist"})
     assert response.status_code == 200
     data = response.json()
     # Per the widget spec, the response should also echo back the
@@ -293,9 +292,7 @@ def test_widget_gallery_bogus_event_returns_empty_not_404(client):
 
 
 @pytest.mark.django_db
-def test_widget_gallery_only_submitted_excludes_drafts_and_withdrawn(
-    client, widget_event, widget_track, organizer
-):
+def test_widget_gallery_only_submitted_excludes_drafts_and_withdrawn(client, widget_event, widget_track, organizer):
     """Withdrawn and draft submissions are not in the widget feed.
 
     Only status='submitted' is exposed. Drafts aren't ready yet;
@@ -321,9 +318,7 @@ def test_widget_gallery_only_submitted_excludes_drafts_and_withdrawn(
 
 
 @pytest.mark.django_db
-def test_widget_gallery_caps_at_24_items(
-    client, widget_event, widget_track, organizer
-):
+def test_widget_gallery_caps_at_24_items(client, widget_event, widget_track, organizer):
     """The widget caps at 24 items per event — keeps the rendered list
     short enough for any reasonable embed surface."""
     for i in range(30):
@@ -341,6 +336,7 @@ def test_widget_gallery_no_auth_required(client, widget_event, widget_track, org
     _make_submission(widget_event, widget_track, organizer, "Anon Project")
 
     from django.test import Client
+
     anon = Client()  # no cookies, no headers
     response = anon.get("/api/widget/gallery", {"event": widget_event.slug})
     assert response.status_code == 200
