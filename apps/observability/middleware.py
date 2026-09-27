@@ -27,6 +27,12 @@ import re
 import time
 import uuid
 from contextvars import ContextVar
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Callable
+
+    from django.http import HttpRequest, HttpResponse
 
 _request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
 
@@ -49,7 +55,7 @@ def _coerce_request_id(raw: str | None) -> str:
     return cleaned or uuid.uuid4().hex
 
 
-def _route_pattern(request) -> str:
+def _route_pattern(request: "HttpRequest") -> str:
     """Resolve the request to its URL pattern, falling back to the
     raw path. The match attribute is populated once Django's URL
     resolver has matched the request."""
@@ -62,16 +68,19 @@ def _route_pattern(request) -> str:
 class RequestCorrelationMiddleware:
     """Stamp a request_id, time the request, emit metrics + a log line."""
 
-    def __init__(self, get_response):
+    def __init__(self, get_response: "Callable[[HttpRequest], HttpResponse]") -> None:
         self.get_response = get_response
         self.logger = logging.getLogger("observability.request")
 
-    def __call__(self, request):
+    def __call__(self, request: "HttpRequest") -> "HttpResponse":
         request_id = _coerce_request_id(
             request.META.get(_REQUEST_ID_HEADER)
         )
         token = _request_id_var.set(request_id)
-        request.request_id = request_id
+        # ``request_id`` is set on the request for downstream code
+        # (logging context, audit entries). django-stubs doesn't know
+        # about it because it's a runtime addition.
+        request.request_id = request_id  # type: ignore[attr-defined]
         start = time.monotonic()
 
         from . import metrics

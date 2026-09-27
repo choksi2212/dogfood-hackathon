@@ -13,12 +13,12 @@ not Django.
 """
 from __future__ import annotations
 
-from django.http import HttpResponse
+from django.http import HttpRequest, HttpResponse
 from django.views.decorators.http import require_GET
 
 
 @require_GET
-def metrics(_request):
+def metrics(_request: HttpRequest) -> HttpResponse:
     body = render()
     return HttpResponse(body, content_type="text/plain; version=0.0.4")
 
@@ -32,5 +32,5 @@ def render() -> str:
 
 
 @require_GET
-def ping(_request):
+def ping(_request: HttpRequest) -> HttpResponse:
     return HttpResponse(b"pong\n", content_type="text/plain")

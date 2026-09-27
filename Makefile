@@ -63,3 +63,9 @@ test-%:
 test-cov:
 	$(COMPOSE) exec -T web pytest tests/ --cov=apps --cov-report=html --cov-report=term-missing
 	@echo "HTML coverage: reports/htmlcov/index.html"
+
+# Type safety (mypy + django-stubs + djangorestframework-stubs).
+# Strict on the new code (apps.observability, apps.billing); lax on
+# legacy apps until each gets annotated.
+types:
+	$(COMPOSE) exec -T web mypy apps/ --config-file mypy.ini

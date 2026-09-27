@@ -22,6 +22,13 @@ postgres ``unique_violation`` exception.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from apps.accounts.models import User
+    from apps.events.models import Event
+
+    from .models import Plan
 
 
 @dataclass(frozen=True)
@@ -45,7 +52,7 @@ def _check_cap(current: int, limit: int | None) -> QuotaResult:
     return QuotaResult(ok=True)
 
 
-def check_event_quota(organizer) -> QuotaResult:
+def check_event_quota(organizer: "User") -> QuotaResult:
     """Can ``organizer`` create one more Event under their current plan?
 
     The "current plan" is the lowest-quota plan across all the
@@ -85,7 +92,7 @@ def check_event_quota(organizer) -> QuotaResult:
     return _check_cap(accounts.count(), most_restrictive_limit)
 
 
-def check_submission_quota(event) -> QuotaResult:
+def check_submission_quota(event: "Event") -> QuotaResult:
     """Can ``event`` accept one more submission under its plan?"""
     from apps.submissions.models import Submission
 
@@ -94,7 +101,7 @@ def check_submission_quota(event) -> QuotaResult:
     return _check_cap(current, limit)
 
 
-def check_judge_quota(event) -> QuotaResult:
+def check_judge_quota(event: "Event") -> QuotaResult:
     """Can ``event`` accept one more judge membership under its plan?"""
     from apps.events.models import Membership
 
@@ -103,7 +110,9 @@ def check_judge_quota(event) -> QuotaResult:
     return _check_cap(current, limit)
 
 
-def _limit_for(event, *, attr: str = "max_submissions_per_event"):
+def _limit_for(
+    event: "Event", *, attr: str = "max_submissions_per_event"
+) -> int | None:
     account = getattr(event, "billing", None)
     if account is None or account.plan is None:
         return None  # No billing → unlimited (free tier default)
@@ -112,7 +121,7 @@ def _limit_for(event, *, attr: str = "max_submissions_per_event"):
 
 # --- Coordinator-facing defaults --------------------------------------------
 
-DEFAULT_FREE_PLAN = {
+DEFAULT_FREE_PLAN: dict[str, Any] = {
     "name": "free",
     "display_name": "Free (Trial)",
     "monthly_price_cents": 0,
@@ -121,7 +130,7 @@ DEFAULT_FREE_PLAN = {
     "max_submissions_per_event": 50,
 }
 
-DEFAULT_PRO_PLAN = {
+DEFAULT_PRO_PLAN: dict[str, Any] = {
     "name": "pro",
     "display_name": "Pro",
     "monthly_price_cents": 9900,
@@ -130,7 +139,7 @@ DEFAULT_PRO_PLAN = {
     "max_submissions_per_event": 500,
 }
 
-DEFAULT_ENTERPRISE_PLAN = {
+DEFAULT_ENTERPRISE_PLAN: dict[str, Any] = {
     "name": "enterprise",
     "display_name": "Enterprise",
     "monthly_price_cents": 99000,
@@ -165,7 +174,7 @@ def seed_default_plans() -> list:
     return created
 
 
-def default_free_plan():
+def default_free_plan() -> "Plan":
     from .models import Plan
 
     return Plan.objects.get(name="free")
