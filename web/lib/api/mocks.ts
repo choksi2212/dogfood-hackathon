@@ -1,6 +1,7 @@
 import type {
   AssignmentRunResponse,
   BulkInviteResponse,
+  CertificateResponse,
   EventDetail,
   GalleryResponse,
   JudgeScoresResponse,
@@ -18,6 +19,7 @@ import type {
   SubmitResponse,
   User,
   VoteResponse,
+  WidgetGalleryResponse,
 } from "./types";
 
 const MOCK_SUBMISSIONS: GalleryResponse["items"] = [
@@ -255,5 +257,32 @@ export async function mockPairwiseRanking(): Promise<PairwiseRankingResponse> {
         ties: 0,
       },
     ],
+  };
+}
+
+export async function mockCertificate(publicId: string): Promise<CertificateResponse> {
+  return {
+    public_id: publicId,
+    submission_id: "mock-1",
+    issued_at: "2026-09-27T00:00:00Z",
+    signed_payload: {
+      submission_id: "mock-1",
+      name: "Quokka",
+      event_slug: "sample-hack-2026",
+    },
+    signature: "mockmocksignaturemocksignaturemocksignaturemocksignature",
+    signature_algorithm: "HMAC-SHA256",
+  };
+}
+
+export async function mockWidgetGallery(): Promise<WidgetGalleryResponse> {
+  return {
+    items: MOCK_SUBMISSIONS.map((s) => ({
+      id: s.id,
+      name: s.name,
+      tagline: s.tagline,
+      track_slug: s.track_slug,
+    })),
+    event: "sample-hack-2026",
   };
 }

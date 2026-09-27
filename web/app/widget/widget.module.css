@@ -1,0 +1,41 @@
+.lede {
+  color: var(--muted);
+  margin-top: var(--space-2);
+  max-width: 60ch;
+}
+
+.lede code {
+  background: var(--surface);
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
+.sectionTitle {
+  margin-top: var(--space-5);
+  margin-bottom: var(--space-2);
+}
+
+.snippet {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  overflow-x: auto;
+  font-size: 0.85rem;
+  max-width: 640px;
+  white-space: pre;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-top: var(--space-1);
+}
+
+.previewFrame {
+  margin-top: var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  max-width: 640px;
+}

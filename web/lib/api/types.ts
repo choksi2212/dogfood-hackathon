@@ -215,6 +215,29 @@ export type ScoreSubmitResponse = {
   submitted_at: string;
 };
 
+// Matches apps/certificates/views.py certificate_view response.
+export type CertificateResponse = {
+  public_id: string;
+  submission_id: string;
+  issued_at: string;
+  signed_payload: Record<string, unknown>;
+  signature: string;
+  signature_algorithm: string;
+};
+
+// Matches apps/widget/views.py widget_gallery response.
+export type WidgetGalleryItem = {
+  id: string;
+  name: string;
+  tagline: string;
+  track_slug: string;
+};
+
+export type WidgetGalleryResponse = {
+  items: WidgetGalleryItem[];
+  event: string;
+};
+
 export class ApiError extends Error {
   code: string;
   status: number;

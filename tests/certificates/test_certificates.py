@@ -384,29 +384,19 @@ class TestCertificateModel:
 
 # --- View tests ------------------------------------------------------------
 #
-# NOTE on URL: the spec calls for `/api/certificates/<public_id>` (as
-# documented in `config/urls.py`'s module docstring and used in
-# `apps/api/views.py`). However, the mounted URL pattern in
-# `apps/certificates/urls.py` is currently `path("<str:public_id>", ...)`
-# under `path("api/", include(...))` — i.e. the actual route is
-# `/api/<public_id>`, missing the `certificates/` prefix. This is a
-# pre-existing routing bug; the agent that owns `apps/certificates/*` and
-# `config/*` must fix it. We test against the actual working URL
-# (`/api/<public_id>`) so these tests pass today, and we flag the bug
-# in `docs/TESTING-CERTIFICATES.md`.
+# Was `/api/<public_id>` — config/urls.py mounted apps.certificates.urls
+# directly under `path("api/", ...)` instead of `path("api/certificates/",
+# ...)`, missing the `certificates/` prefix the spec and every other doc
+# reference call for. Fixed; see docs/TESTING-CERTIFICATES.md.
 
 
 @pytest.mark.django_db
 @pytest.mark.certificates
 @pytest.mark.usefixtures("organizer", "judge_a", "judge_b", "judge_c", "participant")
 class TestCertificateView:
-    """`GET /api/<public_id>` via the Django test client.
+    """`GET /api/certificates/<public_id>` via the Django test client."""
 
-    (The spec'd URL is `/api/certificates/<public_id>`; the routing
-    pattern is missing the `certificates/` prefix — see note above.)
-    """
-
-    CERT_URL = "/api/{public_id}"  # current actual route
+    CERT_URL = "/api/certificates/{public_id}"
 
     def _issue(self, submission, event_slug):
         payload = _payload_for(submission, event_slug=event_slug)

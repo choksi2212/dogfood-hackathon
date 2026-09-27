@@ -25,6 +25,8 @@ export default function RootLayout({
               <Link href="/vote">Vote</Link>
               <Link href="/judge">Judge</Link>
               <Link href="/pairwise">Pairwise</Link>
+              <Link href="/certificates">Certificates</Link>
+              <Link href="/widget">Widget</Link>
               <Link href="/organizer">Organizer</Link>
               <Link href="/login">Log in</Link>
             </nav>
