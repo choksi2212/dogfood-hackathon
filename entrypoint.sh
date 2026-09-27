@@ -19,5 +19,23 @@ done
 echo "[entrypoint] postgres ready, running migrations..."
 python manage.py migrate --noinput
 
+# Requirement #1 is "docker compose up brings up a working, SEEDED
+# portal" — not "...and then you run one more command." Import the
+# official fixtures.json automatically so a bare `docker compose up`
+# is enough. Every boot re-imports (idempotent — see import_fixtures),
+# which also means session cookies rotate each restart; that's the
+# same "paste the printed cookies into .dogfood.toml" step spec.md's
+# own walkthrough describes. Set SKIP_SEED=1 to skip (e.g. CI runs
+# that seed explicitly at a chosen point instead).
+if [ "${SKIP_SEED:-0}" != "1" ]; then
+    if [ -f "fixtures.json" ]; then
+        echo "[entrypoint] seeding from fixtures.json..."
+        python manage.py import_fixtures
+    else
+        echo "[entrypoint] fixtures.json not found, falling back to seed_fixtures..."
+        python manage.py seed_fixtures
+    fi
+fi
+
 echo "[entrypoint] starting: $@"
 exec "$@"
