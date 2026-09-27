@@ -7,6 +7,7 @@ Routes (under /api/billing/):
   POST /api/billing/account/<slug>/upgrade organizer-only, swap plan
                                           + write an Invoice row
 """
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -68,13 +69,9 @@ class BillingAccountView(APIView):
                 "plan": account.plan.name,
                 "status": account.status,
                 "current_period_start": (
-                    account.current_period_start.isoformat()
-                    if account.current_period_start else None
+                    account.current_period_start.isoformat() if account.current_period_start else None
                 ),
-                "current_period_end": (
-                    account.current_period_end.isoformat()
-                    if account.current_period_end else None
-                ),
+                "current_period_end": (account.current_period_end.isoformat() if account.current_period_end else None),
             }
         )
 

@@ -14,6 +14,7 @@ If we can't satisfy the invariants in one pass, we retry with a different
 seed (offset) up to 10 times before giving up. With the seeded dataset
 of ~12 submissions and ~3 judges, the algorithm converges in 1 try.
 """
+
 import random
 from collections import defaultdict
 
@@ -36,14 +37,8 @@ def run_assignment(
     created_by=None,
     max_retries: int = 10,
 ):
-    projects = list(
-        Submission.objects.filter(event=event, status="submitted").select_related(
-            "team", "track"
-        )
-    )
-    judges = list(
-        Membership.objects.filter(event=event, role="judge").select_related("user")
-    )
+    projects = list(Submission.objects.filter(event=event, status="submitted").select_related("team", "track"))
+    judges = list(Membership.objects.filter(event=event, role="judge").select_related("user"))
 
     if not projects:
         raise AssignmentError("Need at least one submitted project.")
@@ -59,10 +54,7 @@ def run_assignment(
         projects_per_judge = per_judge_max
 
     # judge_id -> set of team_ids they may NOT review (their own teams).
-    judge_blacklist = {
-        m.user_id: set(m.user.team_memberships.values_list("team_id", flat=True))
-        for m in judges
-    }
+    judge_blacklist = {m.user_id: set(m.user.team_memberships.values_list("team_id", flat=True)) for m in judges}
 
     last_error = None
     for attempt in range(max_retries):
@@ -73,9 +65,7 @@ def run_assignment(
         ok = True
 
         # Sort projects deterministically by (track, name).
-        sorted_projects = sorted(
-            projects, key=lambda p: (p.track.order, p.name)
-        )
+        sorted_projects = sorted(projects, key=lambda p: (p.track.order, p.name))
 
         for project in sorted_projects:
             candidates = [
@@ -87,8 +77,7 @@ def run_assignment(
             if len(candidates) < reviews_per_project:
                 ok = False
                 last_error = (
-                    f"only {len(candidates)} eligible judges for "
-                    f"project {project.id} (need {reviews_per_project})"
+                    f"only {len(candidates)} eligible judges for " f"project {project.id} (need {reviews_per_project})"
                 )
                 break
 
@@ -130,16 +119,11 @@ def run_assignment(
         return {
             "batch_id": str(batch.id),
             "n_assignments": len(assignments),
-            "judges_with_zero_projects": [
-                str(j.user_id)
-                for j in judges
-                if judge_load[j.user_id] == 0
-            ],
+            "judges_with_zero_projects": [str(j.user_id) for j in judges if judge_load[j.user_id] == 0],
             "seed_used": seed + attempt,
             "attempts": attempt + 1,
         }
 
     raise AssignmentError(
-        f"Could not produce a valid assignment after {max_retries} retries. "
-        f"Last error: {last_error}"
+        f"Could not produce a valid assignment after {max_retries} retries. " f"Last error: {last_error}"
     )

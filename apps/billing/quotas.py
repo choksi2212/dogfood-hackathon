@@ -19,6 +19,7 @@ Quotas are enforced at the request boundary, not via DB constraints.
 This is intentional: a denied event creation is a clear 422, not a
 postgres ``unique_violation`` exception.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -52,7 +53,7 @@ def _check_cap(current: int, limit: int | None) -> QuotaResult:
     return QuotaResult(ok=True)
 
 
-def check_event_quota(organizer: "User") -> QuotaResult:
+def check_event_quota(organizer: User) -> QuotaResult:
     """Can ``organizer`` create one more Event under their current plan?
 
     The "current plan" is the lowest-quota plan across all the
@@ -84,15 +85,13 @@ def check_event_quota(organizer: "User") -> QuotaResult:
         plan_limit = account.plan.max_events
         if most_restrictive_limit is None:
             most_restrictive_limit = plan_limit
-        elif plan_limit is not None and (
-            most_restrictive_limit is None or plan_limit < most_restrictive_limit
-        ):
+        elif plan_limit is not None and (most_restrictive_limit is None or plan_limit < most_restrictive_limit):
             most_restrictive_limit = plan_limit
 
     return _check_cap(accounts.count(), most_restrictive_limit)
 
 
-def check_submission_quota(event: "Event") -> QuotaResult:
+def check_submission_quota(event: Event) -> QuotaResult:
     """Can ``event`` accept one more submission under its plan?"""
     from apps.submissions.models import Submission
 
@@ -101,7 +100,7 @@ def check_submission_quota(event: "Event") -> QuotaResult:
     return _check_cap(current, limit)
 
 
-def check_judge_quota(event: "Event") -> QuotaResult:
+def check_judge_quota(event: Event) -> QuotaResult:
     """Can ``event`` accept one more judge membership under its plan?"""
     from apps.events.models import Membership
 
@@ -110,9 +109,7 @@ def check_judge_quota(event: "Event") -> QuotaResult:
     return _check_cap(current, limit)
 
 
-def _limit_for(
-    event: "Event", *, attr: str = "max_submissions_per_event"
-) -> int | None:
+def _limit_for(event: Event, *, attr: str = "max_submissions_per_event") -> int | None:
     account = getattr(event, "billing", None)
     if account is None or account.plan is None:
         return None  # No billing → unlimited (free tier default)
@@ -143,7 +140,7 @@ DEFAULT_ENTERPRISE_PLAN: dict[str, Any] = {
     "name": "enterprise",
     "display_name": "Enterprise",
     "monthly_price_cents": 99000,
-    "max_events": None,           # unlimited
+    "max_events": None,  # unlimited
     "max_judges_per_event": None,
     "max_submissions_per_event": None,
 }
@@ -174,7 +171,7 @@ def seed_default_plans() -> list:
     return created
 
 
-def default_free_plan() -> "Plan":
+def default_free_plan() -> Plan:
     from .models import Plan
 
     return Plan.objects.get(name="free")

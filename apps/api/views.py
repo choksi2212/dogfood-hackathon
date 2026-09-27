@@ -1,11 +1,11 @@
 """Webhook + OpenAPI views (T4 surface)."""
+
 import secrets
 from functools import lru_cache
 from pathlib import Path
 
 import yaml
-from django.http import HttpResponse, JsonResponse
-from rest_framework import status
+from django.http import JsonResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -24,7 +24,6 @@ OPENAPI_YAML_PATH = Path(__file__).resolve().parents[2] / "openapi.yaml"
 def _openapi_spec() -> dict:
     with OPENAPI_YAML_PATH.open() as fh:
         return yaml.safe_load(fh)
-
 
 
 class OpenAPISchemaView(APIView):
@@ -47,9 +46,7 @@ class WebhookListCreateView(APIView):
         # wrong signal (200 with []).
         if not (
             getattr(request.user, "is_admin_role", False)
-            or Membership.objects.filter(
-                user=request.user, role="organizer"
-            ).exists()
+            or Membership.objects.filter(user=request.user, role="organizer").exists()
         ):
             return Response(
                 {"error": {"code": "forbidden", "message": "Not an organizer."}},

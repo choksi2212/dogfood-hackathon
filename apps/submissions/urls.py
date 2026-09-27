@@ -9,4 +9,14 @@ urlpatterns = [
         views.SubmitView.as_view(),
         name="submit",
     ),
+    path(
+        "events/<slug:slug>/submissions/<uuid:id>/comments",
+        views.CommentListCreateView.as_view(),
+        name="comments",
+    ),
+    path(
+        "events/<slug:slug>/submissions/<uuid:id>/comments/<uuid:comment_id>",
+        views.CommentModerateView.as_view(),
+        name="moderate_comment",
+    ),
 ]

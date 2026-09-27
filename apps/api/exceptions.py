@@ -4,8 +4,8 @@ judge-console and the run.py checker can match against known shapes.
 Envelope:
   { "error": { "code": "...", "message": "...", "detail": {...} } }
 """
-from rest_framework.views import exception_handler
 
+from rest_framework.views import exception_handler
 
 _CODE_BY_STATUS = {
     400: "bad_request",

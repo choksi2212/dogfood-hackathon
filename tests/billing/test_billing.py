@@ -3,6 +3,7 @@
 Marker: ``@pytest.mark.smoke`` (closest existing; billing is part of
 the public + organizer surfaces).
 """
+
 from __future__ import annotations
 
 import json
@@ -10,11 +11,9 @@ import json
 import pytest
 from django.test import Client
 
-from apps.billing.models import BillingAccount, Invoice, Plan
+from apps.billing.models import BillingAccount, Invoice
 from apps.billing.quotas import (
     check_event_quota,
-    check_judge_quota,
-    check_submission_quota,
     seed_default_plans,
 )
 
@@ -86,7 +85,9 @@ def test_event_quota_fails_when_at_limit(organizer, seeded_plants):
             pairwise_enabled=False,
         )
         BillingAccount.objects.create(
-            event=event, plan=seeded_plants[0], status="trial",
+            event=event,
+            plan=seeded_plants[0],
+            status="trial",
         )
     result = check_event_quota(organizer)
     assert not result.ok
@@ -105,7 +106,8 @@ def test_account_get_seeds_default(client, organizer, sample_event, seeded_plant
     from apps.events.models import Membership
 
     Membership.objects.update_or_create(
-        user=organizer, event=sample_event,
+        user=organizer,
+        event=sample_event,
         defaults={"role": "organizer", "created_by": organizer},
     )
 
@@ -122,13 +124,12 @@ def test_account_get_seeds_default(client, organizer, sample_event, seeded_plant
 
 
 @pytest.mark.django_db
-def test_upgrade_plan_writes_invoice(
-    client, organizer, sample_event, seeded_plants
-):
+def test_upgrade_plan_writes_invoice(client, organizer, sample_event, seeded_plants):
     from apps.events.models import Membership
 
     Membership.objects.update_or_create(
-        user=organizer, event=sample_event,
+        user=organizer,
+        event=sample_event,
         defaults={"role": "organizer", "created_by": organizer},
     )
 
@@ -155,13 +156,12 @@ def test_upgrade_plan_writes_invoice(
 
 
 @pytest.mark.django_db
-def test_upgrade_to_unknown_plan_404(
-    client, organizer, sample_event, seeded_plants
-):
+def test_upgrade_to_unknown_plan_404(client, organizer, sample_event, seeded_plants):
     from apps.events.models import Membership
 
     Membership.objects.update_or_create(
-        user=organizer, event=sample_event,
+        user=organizer,
+        event=sample_event,
         defaults={"role": "organizer", "created_by": organizer},
     )
     resp = client.post(
@@ -179,7 +179,8 @@ def test_upgrade_idempotent(client, organizer, sample_event, seeded_plants):
     from apps.events.models import Membership
 
     Membership.objects.update_or_create(
-        user=organizer, event=sample_event,
+        user=organizer,
+        event=sample_event,
         defaults={"role": "organizer", "created_by": organizer},
     )
     cookie = f"session={_issue_session(organizer)}"
@@ -201,9 +202,7 @@ def test_upgrade_idempotent(client, organizer, sample_event, seeded_plants):
 
 
 @pytest.mark.django_db
-def test_non_organizer_cannot_upgrade(
-    client, judge_a, sample_event, seeded_plants
-):
+def test_non_organizer_cannot_upgrade(client, judge_a, sample_event, seeded_plants):
     cookie = f"session={_issue_session(judge_a)}"
     resp = client.post(
         f"/api/billing/account/{sample_event.slug}/upgrade",

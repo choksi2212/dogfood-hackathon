@@ -25,6 +25,7 @@ Scenarios covered:
   4. An empty ballot list should not blow up -- every requested
      project gets theta = 0 and a stable ordering.
 """
+
 from __future__ import annotations
 
 import math
@@ -64,32 +65,30 @@ def test_unanimous_ranking_recovers_preferred_order():
     ballots = []
     # Five voters, each making all six pairwise comparisons.
     for _ in range(5):
-        ballots.extend([
-            _ballot("1", "2", "left"),
-            _ballot("1", "3", "left"),
-            _ballot("1", "4", "left"),
-            _ballot("2", "3", "left"),
-            _ballot("2", "4", "left"),
-            _ballot("3", "4", "left"),
-        ])
+        ballots.extend(
+            [
+                _ballot("1", "2", "left"),
+                _ballot("1", "3", "left"),
+                _ballot("1", "4", "left"),
+                _ballot("2", "3", "left"),
+                _ballot("2", "4", "left"),
+                _ballot("3", "4", "left"),
+            ]
+        )
 
     fit = bradley_terry(ballots, projects)
     order = _ranking_order(fit)
 
-    assert order == ["1", "2", "3", "4"], (
-        "expected 1 > 2 > 3 > 4, got {}; theta = {}".format(order, fit["theta"])
-    )
+    assert order == ["1", "2", "3", "4"], "expected 1 > 2 > 3 > 4, got {}; theta = {}".format(order, fit["theta"])
 
     # Sanity: theta should be strictly decreasing top-to-bottom.
     thetas = [fit["theta"][p] for p in order]
-    assert all(thetas[k] > thetas[k + 1] for k in range(len(thetas) - 1)), (
-        "theta values not strictly decreasing: {}".format(thetas)
-    )
+    assert all(
+        thetas[k] > thetas[k + 1] for k in range(len(thetas) - 1)
+    ), f"theta values not strictly decreasing: {thetas}"
 
     # The fit should converge well within the iteration budget.
-    assert fit["converged"], (
-        "fit did not converge in {} iters".format(fit["iterations"])
-    )
+    assert fit["converged"], "fit did not converge in {} iters".format(fit["iterations"])
 
 
 def test_tie_between_two_projects_keeps_them_close():
@@ -115,9 +114,7 @@ def test_tie_between_two_projects_keeps_them_close():
 
     # On a 100-vote pair with 50/50 split, the difference should be
     # tiny -- within a fraction of a logit.
-    assert diff_12 < 0.2, (
-        "|theta_1 - theta_2| = {:.4f}; expected near 0 for 50/50 split".format(diff_12)
-    )
+    assert diff_12 < 0.2, f"|theta_1 - theta_2| = {diff_12:.4f}; expected near 0 for 50/50 split"
 
 
 def test_unseen_project_gets_finite_theta():
@@ -130,8 +127,8 @@ def test_unseen_project_gets_finite_theta():
         _ballot("a", "b", "left"),
     ]
     fit = bradley_terry(ballots, projects)
-    assert math.isfinite(fit["theta"]["c"]), (
-        "theta for unseen project 'c' should be finite, got {}".format(fit["theta"]["c"])
+    assert math.isfinite(fit["theta"]["c"]), "theta for unseen project 'c' should be finite, got {}".format(
+        fit["theta"]["c"]
     )
 
 
@@ -140,8 +137,8 @@ def test_empty_ballot_list_is_well_defined():
     stable and reproducible (sorted by id as a tie-breaker)."""
     projects = ["b", "a", "c"]
     fit = bradley_terry([], projects)
-    assert all(fit["theta"][p] == 0.0 for p in projects), (
-        "expected all theta = 0 for empty ballot list, got {}".format(fit["theta"])
+    assert all(fit["theta"][p] == 0.0 for p in projects), "expected all theta = 0 for empty ballot list, got {}".format(
+        fit["theta"]
     )
     assert _ranking_order(fit) == ["a", "b", "c"]
 
@@ -156,9 +153,7 @@ def test_ties_split_credit():
         ballots.append(_ballot("1", "2", "tie"))
     fit = bradley_terry(ballots, projects)
     diff_12 = abs(fit["theta"]["1"] - fit["theta"]["2"])
-    assert diff_12 < 1e-6, (
-        "|theta_1 - theta_2| = {:.6f}; expected 0 for all-ties".format(diff_12)
-    )
+    assert diff_12 < 1e-6, f"|theta_1 - theta_2| = {diff_12:.6f}; expected 0 for all-ties"
     assert fit["ties"]["1"] == 20
     assert fit["ties"]["2"] == 20
     assert fit["wins"]["1"] == 0
@@ -170,9 +165,8 @@ def test_fit_returns_required_keys():
     must be present."""
     projects = ["a", "b"]
     fit = bradley_terry([_ballot("a", "b", "left")], projects)
-    for key in ("theta", "wins", "losses", "ties",
-                "iterations", "converged", "ranking"):
-        assert key in fit, "missing key {!r} in fit result".format(key)
+    for key in ("theta", "wins", "losses", "ties", "iterations", "converged", "ranking"):
+        assert key in fit, f"missing key {key!r} in fit result"
     assert isinstance(fit["converged"], bool)
     assert isinstance(fit["iterations"], int)
     assert fit["iterations"] >= 1
@@ -183,25 +177,24 @@ def test_fit_returns_required_keys():
 
 
 def _run_all():
-    tests = [v for k, v in globals().items()
-             if k.startswith("test_") and callable(v)]
+    tests = [v for k, v in globals().items() if k.startswith("test_") and callable(v)]
     failures = 0
     for t in tests:
         try:
             t()
         except AssertionError as e:
             failures += 1
-            print("FAIL {}: {}".format(t.__name__, e))
+            print(f"FAIL {t.__name__}: {e}")
         except Exception:
             failures += 1
-            print("ERROR {}:".format(t.__name__))
+            print(f"ERROR {t.__name__}:")
             import traceback
+
             traceback.print_exc()
         else:
-            print("PASS {}".format(t.__name__))
+            print(f"PASS {t.__name__}")
     print()
-    print("{} passed / {} failed / {} total".format(
-        len(tests) - failures, failures, len(tests)))
+    print(f"{len(tests) - failures} passed / {failures} failed / {len(tests)} total")
     if failures:
         sys.exit(1)
 

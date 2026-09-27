@@ -1,11 +1,11 @@
 """Widget endpoints: /widget.js (script shim) and /api/widget/gallery (JSON)."""
+
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
 
 from apps.events.models import Event
 from apps.submissions.models import Submission
-
 
 WIDGET_JS = """(function() {
   var cfg = window.DOGFOOD_WIDGET || {};
@@ -49,10 +49,7 @@ def widget_gallery(request):
     except Event.DoesNotExist:
         return JsonResponse({"items": []})
 
-    qs = (
-        Submission.objects.filter(event=event, status="submitted")
-        .order_by("track__order", "name")
-    )
+    qs = Submission.objects.filter(event=event, status="submitted").order_by("track__order", "name")
     items = [
         {
             "id": str(s.id),

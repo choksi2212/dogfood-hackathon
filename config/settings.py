@@ -3,6 +3,7 @@
 All config is env-driven so the same image runs in dev, CI, and the
 judge's machine. Defaults are dev-safe; production must override via env.
 """
+
 import os
 from pathlib import Path
 
@@ -16,11 +17,7 @@ SECRET_KEY = os.environ.get(
 )
 DEBUG = os.environ.get("DJANGO_DEBUG", "false").lower() == "true"
 ALLOWED_HOSTS = [
-    h.strip()
-    for h in os.environ.get(
-        "DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,web"
-    ).split(",")
-    if h.strip()
+    h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,web").split(",") if h.strip()
 ]
 
 # --- Apps --------------------------------------------------------------------

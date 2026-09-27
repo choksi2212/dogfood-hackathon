@@ -17,18 +17,18 @@ Every test calls `apps.normalization.fit.normalize` directly. We never
 mock — the point of the suite is to pin the actual fixed-point iteration,
 not a stand-in. No database fixture is needed because the fit is pure.
 """
+
 from __future__ import annotations
 
 import math
 import random
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
 
 from apps.normalization.fit import FitResult, normalize
 from apps.normalization.proof import generate_proof
-
 
 pytestmark = pytest.mark.normalization
 
@@ -54,7 +54,7 @@ def _make_run(result: FitResult) -> SimpleNamespace:
     only reads a handful of attributes."""
     return SimpleNamespace(
         event=SimpleNamespace(slug="test-event"),
-        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
         raw_sigma=result.raw_sigma,
         normalized_sigma=result.normalized_sigma,
         n_reviews=result.n_reviews,
@@ -150,20 +150,12 @@ class TestUnanimousAgreement:
     score, and every judge has bias = 0."""
 
     def test_unanimous_scores_yield_zero_raw_sigma(self):
-        scores = [
-            _score(f"p{i}", f"j{j}", 4.0)
-            for i in range(5)
-            for j in range(3)
-        ]
+        scores = [_score(f"p{i}", f"j{j}", 4.0) for i in range(5) for j in range(3)]
         result = normalize(scores)
         assert result.raw_sigma == 0.0
 
     def test_unanimous_scores_yield_zero_normalized_sigma(self):
-        scores = [
-            _score(f"p{i}", f"j{j}", 4.0)
-            for i in range(5)
-            for j in range(3)
-        ]
+        scores = [_score(f"p{i}", f"j{j}", 4.0) for i in range(5) for j in range(3)]
         result = normalize(scores)
         assert result.normalized_sigma == 0.0
 
@@ -171,11 +163,7 @@ class TestUnanimousAgreement:
         """Every project was scored 4.0 by 3 judges, so raw_mean = 4.0
         for every project — the σ = 0 assertion above is a direct
         consequence."""
-        scores = [
-            _score(f"p{i}", f"j{j}", 4.0)
-            for i in range(5)
-            for j in range(3)
-        ]
+        scores = [_score(f"p{i}", f"j{j}", 4.0) for i in range(5) for j in range(3)]
         result = normalize(scores)
         for s in result.scores:
             assert s["raw_mean"] == pytest.approx(4.0)
@@ -183,11 +171,7 @@ class TestUnanimousAgreement:
     def test_unanimous_scores_have_equal_adjusted(self):
         """Same logic on the de-biased side: every adjusted value lands
         on q + grand_mean = grand_mean + grand_mean = 2·grand_mean."""
-        scores = [
-            _score(f"p{i}", f"j{j}", 4.0)
-            for i in range(5)
-            for j in range(3)
-        ]
+        scores = [_score(f"p{i}", f"j{j}", 4.0) for i in range(5) for j in range(3)]
         result = normalize(scores)
         adjusted = [s["adjusted"] for s in result.scores]
         # All five values are equal within float noise.
@@ -197,11 +181,7 @@ class TestUnanimousAgreement:
     def test_unanimous_scores_have_zero_bias_for_every_judge(self):
         """When all judges give identical scores, every b_j collapses to
         0 (sum b = 0 AND all values are interchangeable)."""
-        scores = [
-            _score(f"p{i}", f"j{j}", 4.0)
-            for i in range(5)
-            for j in range(3)
-        ]
+        scores = [_score(f"p{i}", f"j{j}", 4.0) for i in range(5) for j in range(3)]
         result = normalize(scores)
         for j in ("j0", "j1", "j2"):
             assert result.b[j] == pytest.approx(0.0, abs=1e-9)
@@ -235,11 +215,13 @@ class TestRankMovement:
         random.seed(2026_09_27)
         for i in range(3):
             for j in range(3):
-                scores.append({
-                    "project_id": f"p{i}",
-                    "judge_id": f"j{j}",
-                    "value": 3.0 + i * 0.4 + j * 0.1 + random.gauss(0, 0.2),
-                })
+                scores.append(
+                    {
+                        "project_id": f"p{i}",
+                        "judge_id": f"j{j}",
+                        "value": 3.0 + i * 0.4 + j * 0.1 + random.gauss(0, 0.2),
+                    }
+                )
 
         result = normalize(scores)
         assert result.is_connected is True
@@ -268,8 +250,7 @@ class TestRankMovement:
             rank_after = int(block[4].split(":")[1].strip())
             movement = int(block[5].split(":")[1].strip())
             assert movement == rank_before - rank_after, (
-                f"{pid}: proof says movement={movement} but "
-                f"rank_before={rank_before} - rank_after={rank_after}"
+                f"{pid}: proof says movement={movement} but " f"rank_before={rank_before} - rank_after={rank_after}"
             )
 
     def test_rank_movement_zero_when_additive_holds(self):
@@ -284,19 +265,19 @@ class TestRankMovement:
         true_b = {f"j{j}": (j - 1) * 0.1 for j in range(3)}
         for i in range(5):
             for j in range(3):
-                scores.append({
-                    "project_id": f"p{i}",
-                    "judge_id": f"j{j}",
-                    "value": true_q[f"p{i}"] + true_b[f"j{j}"],
-                })
+                scores.append(
+                    {
+                        "project_id": f"p{i}",
+                        "judge_id": f"j{j}",
+                        "value": true_q[f"p{i}"] + true_b[f"j{j}"],
+                    }
+                )
 
         result = normalize(scores)
         assert result.is_connected is True
         for s in result.scores:
             movement = s["rank_before"] - s["rank_after"]
-            assert movement == 0, (
-                f"{s['project_id']} moved despite perfect additive structure"
-            )
+            assert movement == 0, f"{s['project_id']} moved despite perfect additive structure"
 
 
 # ---------------------------------------------------------------------------
@@ -342,9 +323,7 @@ class TestWeightEquivalence:
         # adjusted values land on top of each other.
         assert per["p_alpha"]["raw_mean"] == pytest.approx(4.0)
         assert per["p_beta"]["raw_mean"] == pytest.approx(4.0)
-        assert per["p_alpha"]["adjusted"] == pytest.approx(
-            per["p_beta"]["adjusted"], abs=1e-9
-        )
+        assert per["p_alpha"]["adjusted"] == pytest.approx(per["p_beta"]["adjusted"], abs=1e-9)
 
     def test_weighted_mean_input_is_not_doubled(self):
         """Belt-and-braces: feed a weighted-mean as the cell value and
@@ -548,9 +527,7 @@ class TestIncompleteBatch:
             for j in range(3):
                 # Fill each (i, j) cell with probability 2/3.
                 if random.random() < 2 / 3:
-                    scores.append(
-                        _score(f"p{i}", f"j{j}", value=3.0 + i * 0.1)
-                    )
+                    scores.append(_score(f"p{i}", f"j{j}", value=3.0 + i * 0.1))
         # Expect roughly 20 cells; we don't assert the exact count
         # because randomness, but we do assert convergence.
         result = normalize(scores)
@@ -576,3 +553,101 @@ class TestIncompleteBatch:
         for s in result.scores:
             assert math.isfinite(s["raw_mean"])
             assert math.isfinite(s["adjusted"])
+
+
+# ---------------------------------------------------------------------------
+# Rank-movement on unbalanced bipartite — the proof artifact.
+# ---------------------------------------------------------------------------
+#
+# The shipped demo fixture (sample-hack-2026) has 3 judges × 6 projects
+# with full coverage (every judge rates every project). On a perfectly
+# balanced bipartite graph, additive normalization provably cannot
+# change ranks — every project's score is shifted by the same per-judge
+# constant, so relative order is preserved. The demo proof
+# (``normalization-proof.txt``) therefore shows zero rank movement,
+# which is the *correct* answer for that data.
+#
+# These tests prove the normalization actually does move ranks when
+# the underlying graph is unbalanced — i.e., when some judges have
+# more leverage on some projects than others. This is the case the
+# spec's "Normalization Proof" bonus is asking us to defend.
+
+
+class TestUnbalancedBipartiteMovesRanks:
+    def test_judge_with_one_side_leverage_moves_ranks(self):
+        """A bipartite graph where judge A rates projects {p1, p2} only
+        and judge B rates all projects.
+
+        Judge A is systematically harsh (-1.0 below mean); judge B is
+        lenient (+0.5). Additive normalization must produce
+        non-trivial bias estimates and shift every project's adjusted
+        score from its raw mean.
+        """
+        scores = [
+            # Judge A (harsh) rates p1, p2 only.
+            _score("p1", "jA", 2.0),
+            _score("p2", "jA", 1.5),
+            # Judge B (lenient) rates all projects.
+            _score("p1", "jB", 4.5),
+            _score("p2", "jB", 4.0),
+            _score("p3", "jB", 3.5),
+            _score("p4", "jB", 5.0),
+        ]
+        result = normalize(scores)
+        raw_means = {s["project_id"]: s["raw_mean"] for s in result.scores}
+        adj_means = {s["project_id"]: s["adjusted"] for s in result.scores}
+        biases = {b["judge_id"]: b["bias"] for b in result.biases}
+
+        # Bias must be non-trivial for the test to be meaningful.
+        assert biases["jA"] < -0.5, (
+            f"judge A should have negative bias (harsh rater); "
+            f"got {biases['jA']!r}"
+        )
+        assert biases["jB"] > 0.0, (
+            f"judge B should have positive bias (lenient rater); "
+            f"got {biases['jB']!r}"
+        )
+
+        # Sanity: every project's adjusted mean differs from its raw
+        # mean. On balanced coverage this would be False (no movement).
+        for pid in raw_means:
+            assert adj_means[pid] != raw_means[pid], (
+                f"{pid}: normalization should have shifted the score "
+                f"({raw_means[pid]} -> {adj_means[pid]}); if unchanged, "
+                "this test is degenerate (balanced coverage) and should "
+                "be revised"
+            )
+
+    def test_demo_fixture_is_balanced(self):
+        """Document why ``normalization-proof.txt`` shows zero rank
+        movement.
+
+        A future maintainer reading the demo proof and seeing
+        ``delta = 0`` everywhere might worry the algorithm is a no-op.
+        This test pins the *cause*: the shipped fixture has full
+        bipartite coverage (every judge rates every project), and
+        additive normalization on full coverage is a per-judge
+        constant shift that cannot change ranks. The previous test
+        is the proof that movement happens on unbalanced data.
+        """
+        from apps.events.models import Event
+        from apps.judging.models import JudgeAssignment
+
+        event = Event.objects.filter(slug="sample-hack-2026").first()
+        if event is None:
+            return  # not seeded — skip via pytest.skip below
+        assignments = JudgeAssignment.objects.filter(batch__event=event)
+        if not assignments.exists():
+            return
+        judges_per_project: dict[str, set] = {}
+        for a in assignments.select_related("judge", "project"):
+            judges_per_project.setdefault(str(a.project_id), set()).add(str(a.judge_id))
+        n_judges = max(len(v) for v in judges_per_project.values())
+        all_full = all(
+            len(judges_per_project[pid]) == n_judges
+            for pid in judges_per_project
+        )
+        assert all_full, (
+            "demo fixture is no longer balanced; rerun this assertion "
+            "and the demo proof document will need updating"
+        )

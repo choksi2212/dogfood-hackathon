@@ -9,6 +9,7 @@ old runs are kept for audit. The proof text is stored on the run's
 `proof_text` field and also returned in the response so the caller can
 write it to disk at submission time.
 """
+
 from __future__ import annotations
 
 from django.db import transaction

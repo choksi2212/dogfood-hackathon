@@ -15,6 +15,7 @@ A judge with zero-variance ratings gets `leverage = 0` and `bias` left at
 the recentered mean (0); they still appear in `JudgeBias` so the row count
 is stable across runs.
 """
+
 import uuid
 
 from django.db import models
@@ -58,9 +59,7 @@ class NormalizedScore(models.Model):
     """One project's calibrated score inside a run."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    run = models.ForeignKey(
-        NormalizationRun, on_delete=models.CASCADE, related_name="scores"
-    )
+    run = models.ForeignKey(NormalizationRun, on_delete=models.CASCADE, related_name="scores")
     project_id = models.CharField(max_length=64)
     raw_mean = models.FloatField()
     adjusted = models.FloatField()
@@ -78,9 +77,7 @@ class JudgeBias(models.Model):
     the row count matches the input."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    run = models.ForeignKey(
-        NormalizationRun, on_delete=models.CASCADE, related_name="biases"
-    )
+    run = models.ForeignKey(NormalizationRun, on_delete=models.CASCADE, related_name="biases")
     judge_id = models.CharField(max_length=64)
     bias = models.FloatField()
     n_reviews = models.IntegerField()

@@ -12,6 +12,7 @@ Routes (under /api/):
                                                           (the graded cell — see IsOwnJudge)
   GET   /api/csv_export                                organizer
 """
+
 from __future__ import annotations
 
 import csv
@@ -19,7 +20,6 @@ import csv
 from django.db import transaction
 from django.http import StreamingHttpResponse
 from django.utils import timezone
-from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -28,12 +28,10 @@ from apps.accounts.models import User
 from apps.events.decorators import deadline_gated
 from apps.events.models import Event, Membership, RubricCriterion
 from apps.events.permissions import IsOrganizer
-from apps.submissions.models import Submission
 
 from .assignment import run_assignment
 from .models import JudgeAssignment, Review, Score
 from .permissions import IsAssignedJudge, IsOwnJudge
-
 
 # --- Organizer-facing -------------------------------------------------------
 
@@ -109,11 +107,8 @@ class MyBatchView(APIView):
                 status=403,
             )
 
-        assignments = (
-            JudgeAssignment.objects.filter(
-                judge=request.user, batch__event=event
-            )
-            .select_related("project__team", "project__track")
+        assignments = JudgeAssignment.objects.filter(judge=request.user, batch__event=event).select_related(
+            "project__team", "project__track"
         )
 
         projects = []
@@ -125,8 +120,7 @@ class MyBatchView(APIView):
                     "name": a.project.name,
                     "tagline": a.project.tagline,
                     "submitted": a.project.status == "submitted",
-                    "reviewed": review is not None
-                    and review.submitted_at is not None,
+                    "reviewed": review is not None and review.submitted_at is not None,
                 }
             )
 
@@ -165,9 +159,7 @@ class JudgeScoresView(APIView):
             return Response(status=403)
 
         assignments = JudgeAssignment.objects.filter(judge=judge)
-        scores = Score.objects.filter(
-            assignment__in=assignments
-        ).select_related("criterion", "assignment__project")
+        scores = Score.objects.filter(assignment__in=assignments).select_related("criterion", "assignment__project")
 
         return Response(
             {
@@ -215,14 +207,10 @@ class ScoreSaveView(APIView):
 
     @deadline_gated("judging_close_at")
     def put(self, request, slug, project_id):
-        assignment = JudgeAssignment.objects.get(
-            judge=request.user, project_id=project_id
-        )
+        assignment = JudgeAssignment.objects.get(judge=request.user, project_id=project_id)
 
         scores_data = request.data.get("scores", [])
-        rubric_criteria = {
-            str(c.id): c for c in RubricCriterion.objects.filter(rubric__event__slug=slug)
-        }
+        rubric_criteria = {str(c.id): c for c in RubricCriterion.objects.filter(rubric__event__slug=slug)}
         for s in scores_data:
             cid = str(s.get("criterion_id"))
             value = int(s.get("value"))
@@ -243,8 +231,7 @@ class ScoreSaveView(APIView):
                         "error": {
                             "code": "validation_failed",
                             "message": (
-                                f"Score {value} for {criterion.name} outside "
-                                f"[{criterion.min}, {criterion.max}]."
+                                f"Score {value} for {criterion.name} outside " f"[{criterion.min}, {criterion.max}]."
                             ),
                         }
                     },
@@ -274,17 +261,11 @@ class ScoreSubmitView(APIView):
     @deadline_gated("judging_close_at")
     @transaction.atomic
     def post(self, request, slug, project_id):
-        assignment = JudgeAssignment.objects.get(
-            judge=request.user, project_id=project_id
-        )
+        assignment = JudgeAssignment.objects.get(judge=request.user, project_id=project_id)
 
         # All required criteria must be scored.
         required_criteria = RubricCriterion.objects.filter(rubric__event__slug=slug)
-        scored_ids = set(
-            Score.objects.filter(assignment=assignment).values_list(
-                "criterion_id", flat=True
-            )
-        )
+        scored_ids = set(Score.objects.filter(assignment=assignment).values_list("criterion_id", flat=True))
         missing = [c for c in required_criteria if c.id not in scored_ids]
         if missing:
             return Response(
@@ -334,9 +315,7 @@ class CSVExportView(APIView):
         # one; multi-event organizers must specify.
         event_slug = request.query_params.get("event_slug")
 
-        organizer_events = Membership.objects.filter(
-            user=request.user, role="organizer"
-        ).select_related("event")
+        organizer_events = Membership.objects.filter(user=request.user, role="organizer").select_related("event")
         is_admin = getattr(request.user, "is_admin_role", False)
 
         if event_slug:
@@ -352,12 +331,7 @@ class CSVExportView(APIView):
                     },
                     status=404,
                 )
-            if not (
-                is_admin
-                or Membership.objects.filter(
-                    user=request.user, event=event, role="organizer"
-                ).exists()
-            ):
+            if not (is_admin or Membership.objects.filter(user=request.user, event=event, role="organizer").exists()):
                 return Response(
                     {
                         "error": {
@@ -404,19 +378,15 @@ class CSVExportView(APIView):
                     status=404,
                 )
 
-        assignments = (
-            JudgeAssignment.objects.filter(batch__event=event)
-            .select_related("judge", "project", "batch")
+        assignments = JudgeAssignment.objects.filter(batch__event=event).select_related("judge", "project", "batch")
+        scores = Score.objects.filter(assignment__in=assignments).select_related(
+            "criterion", "assignment__judge", "assignment__project"
         )
-        scores = Score.objects.filter(
-            assignment__in=assignments
-        ).select_related("criterion", "assignment__judge", "assignment__project")
 
         def rows():
             writer = csv.writer(_Echo())
             yield writer.writerow(
-                ["event_slug", "project_id", "project_name", "judge_email",
-                 "criterion_name", "score", "weight"]
+                ["event_slug", "project_id", "project_name", "judge_email", "criterion_name", "score", "weight"]
             )
             for s in scores:
                 yield writer.writerow(
@@ -432,7 +402,5 @@ class CSVExportView(APIView):
                 )
 
         response = StreamingHttpResponse(rows(), content_type="text/csv")
-        response["Content-Disposition"] = (
-            f'attachment; filename="scores-{event.slug}.csv"'
-        )
+        response["Content-Disposition"] = f'attachment; filename="scores-{event.slug}.csv"'
         return response

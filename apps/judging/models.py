@@ -9,6 +9,7 @@ The graded surface lives here:
   - Review is the judge's free-form comment + submission timestamp. We
     require submitted_at before scores are released to the dashboard.
 """
+
 import uuid
 
 from django.db import models
@@ -19,9 +20,7 @@ class JudgeBatch(models.Model):
     create a new batch; old ones stay around for audit."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    event = models.ForeignKey(
-        "events.Event", on_delete=models.CASCADE, related_name="judge_batches"
-    )
+    event = models.ForeignKey("events.Event", on_delete=models.CASCADE, related_name="judge_batches")
     seed = models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
@@ -42,9 +41,7 @@ class JudgeAssignment(models.Model):
     `reviews_per_project` times across all judges in a batch."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    batch = models.ForeignKey(
-        JudgeBatch, on_delete=models.CASCADE, related_name="assignments"
-    )
+    batch = models.ForeignKey(JudgeBatch, on_delete=models.CASCADE, related_name="assignments")
     judge = models.ForeignKey(
         "accounts.User",
         on_delete=models.CASCADE,
@@ -71,9 +68,7 @@ class JudgeInvite(models.Model):
     email; the invitee accepts by clicking a link with a token."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    event = models.ForeignKey(
-        "events.Event", on_delete=models.CASCADE, related_name="judge_invites"
-    )
+    event = models.ForeignKey("events.Event", on_delete=models.CASCADE, related_name="judge_invites")
     email = models.EmailField()
     token_hash = models.CharField(max_length=64, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -96,9 +91,7 @@ class Score(models.Model):
     """One integer score per (assignment, criterion)."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    assignment = models.ForeignKey(
-        JudgeAssignment, on_delete=models.CASCADE, related_name="scores"
-    )
+    assignment = models.ForeignKey(JudgeAssignment, on_delete=models.CASCADE, related_name="scores")
     criterion = models.ForeignKey(
         "events.RubricCriterion",
         on_delete=models.CASCADE,
@@ -118,9 +111,7 @@ class Review(models.Model):
     to the dashboard."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    assignment = models.OneToOneField(
-        JudgeAssignment, on_delete=models.CASCADE, related_name="review"
-    )
+    assignment = models.OneToOneField(JudgeAssignment, on_delete=models.CASCADE, related_name="review")
     comment = models.TextField(blank=True)
     submitted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

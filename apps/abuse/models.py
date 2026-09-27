@@ -10,6 +10,7 @@ Resolution lifecycle::
     pending   → upheld      (organizer confirms abuse; target is sanctioned)
     pending   → dismissed   (organizer rejects the report)
 """
+
 import uuid
 
 from django.db import models
@@ -33,9 +34,7 @@ class AbuseFlag(models.Model):
         related_name="abuse_flags",
     )
     reason = models.CharField(max_length=200)
-    status = models.CharField(
-        max_length=10, choices=STATUS_CHOICES, default="pending"
-    )
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
     created_at = models.DateTimeField(auto_now_add=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
     resolver = models.ForeignKey(

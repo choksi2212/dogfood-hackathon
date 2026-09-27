@@ -8,6 +8,7 @@ Every fixture here is read-only — agents must not edit this file.
 If a new fixture is needed, add it; if an existing one is wrong,
 propose a fix rather than mutating in place.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -28,7 +29,6 @@ from apps.events.models import (
 )
 from apps.submissions.models import Submission
 from apps.teams.models import Team, TeamMember
-
 
 DEMO_PASSWORD = "dogfood-dev-password"
 EVENT_SLUG = "sample-hack-2026"
@@ -154,21 +154,19 @@ def sample_event(db, organizer, judge_a, judge_b, judge_c, participant):
         ),
     )
     main, _ = Track.objects.update_or_create(
-        event=event, slug="main",
+        event=event,
+        slug="main",
         defaults={"name": "Main", "description": "Main track", "order": 0},
     )
     wildcard, _ = Track.objects.update_or_create(
-        event=event, slug="wildcard",
+        event=event,
+        slug="wildcard",
         defaults={"name": "Wildcard", "description": "Anything goes", "order": 1},
     )
 
-    rubric, _ = Rubric.objects.update_or_create(
-        event=event, defaults={"name": "Default"}
-    )
+    rubric, _ = Rubric.objects.update_or_create(event=event, defaults={"name": "Default"})
     RubricCriterion.objects.filter(rubric=rubric).delete()
-    for order, (name, weight) in enumerate(
-        [("Innovation", "0.400"), ("Execution", "0.350"), ("Impact", "0.250")]
-    ):
+    for order, (name, weight) in enumerate([("Innovation", "0.400"), ("Execution", "0.350"), ("Impact", "0.250")]):
         RubricCriterion.objects.create(
             rubric=rubric,
             name=name,
@@ -187,7 +185,8 @@ def sample_event(db, organizer, judge_a, judge_b, judge_c, participant):
         (participant, "participant"),
     ]:
         Membership.objects.update_or_create(
-            user=user, event=event,
+            user=user,
+            event=event,
             defaults={"role": role, "created_by": organizer},
         )
 
@@ -202,14 +201,20 @@ def sample_team(db, sample_event, organizer):
         password=DEMO_PASSWORD,
     )
     Membership.objects.create(
-        user=captain, event=sample_event,
-        role="participant", created_by=organizer,
+        user=captain,
+        event=sample_event,
+        role="participant",
+        created_by=organizer,
     )
     team = Team.objects.create(
-        event=sample_event, name="Test Team", created_by=captain,
+        event=sample_event,
+        name="Test Team",
+        created_by=captain,
     )
     TeamMember.objects.create(
-        team=team, user=captain, role_in_team="captain",
+        team=team,
+        user=captain,
+        role_in_team="captain",
     )
     return team
 

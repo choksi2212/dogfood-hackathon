@@ -20,6 +20,7 @@ Each test below moves a deadline on the fixture event and asserts the
 gate (or state machine) reacts at the boundary — ``just-before``,
 ``at``, ``just-after``.
 """
+
 from __future__ import annotations
 
 import json
@@ -32,7 +33,6 @@ from freezegun import freeze_time
 
 from apps.events.models import Event
 from apps.judging.models import JudgeAssignment, JudgeBatch
-
 
 pytestmark = pytest.mark.deadlines
 
@@ -65,7 +65,9 @@ def _ensure_assignment(event, submission, judge, organizer):
         projects_per_judge=4,
     )
     JudgeAssignment.objects.create(
-        batch=batch, judge=judge, project=submission,
+        batch=batch,
+        judge=judge,
+        project=submission,
     )
 
 
@@ -112,9 +114,7 @@ def test_me_batch_before_judging_open_returns_403(auth_client, sample_event, jud
     ``now < judging_open_at``. (Distinct from the decorator's 422.)"""
     now = timezone.now()
     _patch_event(sample_event, judging_open_at=now + timedelta(hours=1))
-    resp = auth_client["judge_a"].get(
-        f"/api/events/{sample_event.slug}/me/batch"
-    )
+    resp = auth_client["judge_a"].get(f"/api/events/{sample_event.slug}/me/batch")
     assert resp.status_code == 403, resp.content
     body = resp.json()
     assert body["error"]["code"] == "deadline_not_open"
@@ -125,9 +125,7 @@ def test_me_batch_before_judging_open_returns_403(auth_client, sample_event, jud
 # ---------------------------------------------------------------------------
 
 
-def test_score_save_after_close_returns_422(
-    auth_client, sample_event, sample_submission, judge_a, organizer
-):
+def test_score_save_after_close_returns_422(auth_client, sample_event, sample_submission, judge_a, organizer):
     """``judging_close_at = now - 1 second``. PUT scores → ``422``
     via the decorator."""
     _ensure_assignment(sample_event, sample_submission, judge_a, organizer)
@@ -136,18 +134,14 @@ def test_score_save_after_close_returns_422(
     criterion = sample_event.rubric.criteria.first()
     resp = auth_client["judge_a"].put(
         f"/api/events/{sample_event.slug}/me/batch/{sample_submission.id}/scores",
-        data=json.dumps(
-            {"scores": [{"criterion_id": str(criterion.id), "value": 3}]}
-        ),
+        data=json.dumps({"scores": [{"criterion_id": str(criterion.id), "value": 3}]}),
         content_type="application/json",
     )
     assert resp.status_code == 422, resp.content
     assert resp.json()["error"]["code"] == "deadline_passed"
 
 
-def test_score_save_exactly_at_close_returns_422(
-    auth_client, sample_event, sample_submission, judge_a, organizer
-):
+def test_score_save_exactly_at_close_returns_422(auth_client, sample_event, sample_submission, judge_a, organizer):
     """``judging_close_at = now - 1 microsecond``. Boundary test —
     the decorator's strict ``>`` triggers immediately past the line."""
     _ensure_assignment(sample_event, sample_submission, judge_a, organizer)
@@ -156,9 +150,7 @@ def test_score_save_exactly_at_close_returns_422(
     criterion = sample_event.rubric.criteria.first()
     resp = auth_client["judge_a"].put(
         f"/api/events/{sample_event.slug}/me/batch/{sample_submission.id}/scores",
-        data=json.dumps(
-            {"scores": [{"criterion_id": str(criterion.id), "value": 3}]}
-        ),
+        data=json.dumps({"scores": [{"criterion_id": str(criterion.id), "value": 3}]}),
         content_type="application/json",
     )
     assert resp.status_code == 422, resp.content
@@ -170,9 +162,7 @@ def test_score_save_exactly_at_close_returns_422(
 # ---------------------------------------------------------------------------
 
 
-def test_vote_after_submissions_close_returns_422(
-    auth_client, sample_event, sample_submission
-):
+def test_vote_after_submissions_close_returns_422(auth_client, sample_event, sample_submission):
     """sample_event's ``submissions_close_at`` is already in the past;
     the vote endpoint's ``@deadline_gated("submissions_close_at")``
     decorator fires ``422 deadline_passed``.
@@ -191,9 +181,7 @@ def test_vote_after_submissions_close_returns_422(
     assert resp.json()["error"]["code"] == "deadline_passed"
 
 
-def test_vote_exactly_at_submissions_close_returns_422(
-    auth_client, sample_event, sample_submission
-):
+def test_vote_exactly_at_submissions_close_returns_422(auth_client, sample_event, sample_submission):
     """``submissions_close_at = now - 1 microsecond`` boundary.
     The decorator's strict ``>`` triggers at the line."""
     now = timezone.now()

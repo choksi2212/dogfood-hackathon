@@ -4,6 +4,7 @@ The actual `request` object is the natural place to derive the actor, event,
 and IP from; we read off it lazily so that views which don't have a request
 (management commands, signals) can still pass a target.
 """
+
 from .models import AuditEvent
 
 
@@ -29,6 +30,7 @@ def _event_from_request(request):
         slug = request.resolver_match.kwargs.get("slug")
     if slug:
         from apps.events.models import Event
+
         try:
             return Event.objects.get(slug=slug)
         except Event.DoesNotExist:

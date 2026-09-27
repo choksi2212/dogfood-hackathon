@@ -19,11 +19,11 @@ each side and a half-loss for each side.
 The function is intentionally pure Python -- no Django, no I/O -- so it
 can be unit-tested without a database.
 """
+
 from __future__ import annotations
 
 import math
 from collections import defaultdict
-
 
 PHANTOM_PRIOR = 0.5  # half-win, half-loss against an imaginary opponent
 
@@ -83,45 +83,45 @@ def bradley_terry(
     # n_ij[i][j] is the count of times i beat j (a tie counts 0.5).
 
     for b in ballots:
-        l = str(b.get("left_id") or b.get("left") or "")
-        r = str(b.get("right_id") or b.get("right") or "")
+        left_id = str(b.get("left_id") or b.get("left") or "")
+        right_id = str(b.get("right_id") or b.get("right") or "")
         w = b.get("winner")
-        if not l or not r or l == r or w not in ("left", "right", "tie"):
+        if not left_id or not right_id or left_id == right_id or w not in ("left", "right", "tie"):
             # Bad row -- skip rather than poison the whole fit.
             continue
-        if l not in proj_set or r not in proj_set:
+        if left_id not in proj_set or right_id not in proj_set:
             # Stale ballot referencing a project not in the current
             # set; skip it (caller can pre-filter if they want
             # stricter behaviour).
             continue
         if w == "left":
-            wins[l] += 1
-            losses[r] += 1
-            n_ij[l][r] += 1.0
+            wins[left_id] += 1
+            losses[right_id] += 1
+            n_ij[left_id][right_id] += 1.0
         elif w == "right":
-            wins[r] += 1
-            losses[l] += 1
-            n_ij[r][l] += 1.0
+            wins[right_id] += 1
+            losses[left_id] += 1
+            n_ij[right_id][left_id] += 1.0
         else:  # tie
-            ties[l] += 1
-            ties[r] += 1
-            n_ij[l][r] += 0.5
-            n_ij[r][l] += 0.5
+            ties[left_id] += 1
+            ties[right_id] += 1
+            n_ij[left_id][right_id] += 0.5
+            n_ij[right_id][left_id] += 0.5
 
     # --- Initial theta via closed-form p_i = (wins + phantom) / (losses + phantom) -
     theta = {p: 0.0 for p in projects}
     p = {}
     for proj in projects:
         w = wins[proj]
-        l = losses[proj]
-        if w == 0 and l == 0:
+        loss_count = losses[proj]
+        if w == 0 and loss_count == 0:
             # Never seen: start at 1.0 so log(1) = 0.
             ratio = 1.0
-        elif l == 0:
+        elif loss_count == 0:
             # Undefeated (with phantom prior, can't actually be 0).
             ratio = w + PHANTOM_PRIOR
         else:
-            ratio = (w + PHANTOM_PRIOR) / (l + PHANTOM_PRIOR)
+            ratio = (w + PHANTOM_PRIOR) / (loss_count + PHANTOM_PRIOR)
         p[proj] = ratio
         theta[proj] = _safe_log(ratio)
     # Centre theta at zero.

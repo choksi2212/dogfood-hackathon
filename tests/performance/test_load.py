@@ -53,6 +53,7 @@ How to run
     # Single test
     docker compose exec web pytest tests/performance/ -v -k gallery
 """
+
 from __future__ import annotations
 
 import statistics
@@ -66,7 +67,6 @@ from django.test import Client
 from apps.events.models import Membership, RubricCriterion
 from apps.judging.assignment import run_assignment
 from apps.judging.models import JudgeAssignment, Score
-
 
 pytestmark = pytest.mark.performance
 
@@ -127,8 +127,10 @@ def _seed_scores(event, organizer):
     """
     organizer_membership = Membership.objects.get(event=event, role="organizer")
     run_assignment(
-        event=event, seed=42,
-        reviews_per_project=2, projects_per_judge=2,
+        event=event,
+        seed=42,
+        reviews_per_project=2,
+        projects_per_judge=2,
         created_by=organizer_membership.user,
     )
     criteria = list(RubricCriterion.objects.filter(rubric__event=event))
@@ -169,7 +171,10 @@ def _drain_streaming(response) -> int:
 
 
 def test_gallery_load_average_under_100ms(
-    auth_client, sample_team, sample_submission, client,
+    auth_client,
+    sample_team,
+    sample_submission,
+    client,
 ):
     """1 000 sequential GETs against /api/gallery.
 
@@ -198,10 +203,7 @@ def test_gallery_load_average_under_100ms(
         f"avg={avg_ms:.2f}ms p50={p50_ms:.2f}ms p99={p99_ms:.2f}ms "
         f"min={min(samples_ms):.2f}ms max={max(samples_ms):.2f}ms"
     )
-    assert avg_ms < GALLERY_AVG_MS_BUDGET, (
-        f"gallery avg {avg_ms:.2f}ms exceeds "
-        f"{GALLERY_AVG_MS_BUDGET}ms budget"
-    )
+    assert avg_ms < GALLERY_AVG_MS_BUDGET, f"gallery avg {avg_ms:.2f}ms exceeds " f"{GALLERY_AVG_MS_BUDGET}ms budget"
 
 
 # ---------------------------------------------------------------------------
@@ -232,10 +234,7 @@ def test_healthz_load_average_under_50ms(client):
         f"avg={avg_ms:.2f}ms p99={p99_ms:.2f}ms "
         f"min={min(samples_ms):.2f}ms max={max(samples_ms):.2f}ms"
     )
-    assert avg_ms < HEALTHZ_AVG_MS_BUDGET, (
-        f"healthz avg {avg_ms:.2f}ms exceeds "
-        f"{HEALTHZ_AVG_MS_BUDGET}ms budget"
-    )
+    assert avg_ms < HEALTHZ_AVG_MS_BUDGET, f"healthz avg {avg_ms:.2f}ms exceeds " f"{HEALTHZ_AVG_MS_BUDGET}ms budget"
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +243,11 @@ def test_healthz_load_average_under_50ms(client):
 
 
 def test_judge_scores_load_average_latency(
-    auth_client, sample_event, sample_team, sample_submission, organizer,
+    auth_client,
+    sample_event,
+    sample_team,
+    sample_submission,
+    organizer,
 ):
     """100 GETs against /api/judge/scores as judge_a.
 
@@ -261,7 +264,8 @@ def test_judge_scores_load_average_latency(
     for idx in range(100):
         start = time.perf_counter()
         response = judge_client.get(
-            JUDGE_SCORES_URL, REMOTE_ADDR=_perf_ip(idx),
+            JUDGE_SCORES_URL,
+            REMOTE_ADDR=_perf_ip(idx),
         )
         elapsed_ms = (time.perf_counter() - start) * 1000.0
         assert response.status_code == 200, response.content
@@ -285,7 +289,11 @@ def test_judge_scores_load_average_latency(
 
 
 def test_csv_export_under_1s_per_request(
-    auth_client, sample_event, sample_team, sample_submission, organizer,
+    auth_client,
+    sample_event,
+    sample_team,
+    sample_submission,
+    organizer,
 ):
     """100 GETs against /api/csv_export as organizer.
 
@@ -302,7 +310,8 @@ def test_csv_export_under_1s_per_request(
     for idx in range(100):
         start = time.perf_counter()
         response = organizer_client.get(
-            CSV_EXPORT_URL, REMOTE_ADDR=_perf_ip(idx),
+            CSV_EXPORT_URL,
+            REMOTE_ADDR=_perf_ip(idx),
         )
         elapsed_ms = (time.perf_counter() - start) * 1000.0
         assert response.status_code == 200, response.content
@@ -319,8 +328,7 @@ def test_csv_export_under_1s_per_request(
         f"bytes_total={bytes_seen}"
     )
     assert max_ms < CSV_EXPORT_MS_BUDGET, (
-        f"csv_export slowest {max_ms:.2f}ms exceeds "
-        f"{CSV_EXPORT_MS_BUDGET}ms budget"
+        f"csv_export slowest {max_ms:.2f}ms exceeds " f"{CSV_EXPORT_MS_BUDGET}ms budget"
     )
 
 
@@ -331,7 +339,9 @@ def test_csv_export_under_1s_per_request(
 
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_gallery_all_200_no_5xx(
-    auth_client, sample_team, sample_submission,
+    auth_client,
+    sample_team,
+    sample_submission,
 ):
     """10 workers × 100 GETs against /api/gallery.
 
@@ -374,9 +384,7 @@ def test_concurrent_gallery_all_200_no_5xx(
         f"per_worker={CONCURRENT_PER_WORKER} total={n_total} "
         f"200={n_200} 5xx={n_5xx} other={other[:5]}"
     )
-    assert n_5xx == 0, (
-        f"concurrent run produced {n_5xx} 5xx responses under load"
-    )
+    assert n_5xx == 0, f"concurrent run produced {n_5xx} 5xx responses under load"
     assert n_200 == CONCURRENT_WORKERS * CONCURRENT_PER_WORKER, (
         f"expected {CONCURRENT_WORKERS * CONCURRENT_PER_WORKER} 200s, "
         f"got {n_200}; non-200/non-5xx sample: {other[:5]}"
@@ -389,7 +397,10 @@ def test_concurrent_gallery_all_200_no_5xx(
 
 
 def test_gallery_response_size_stable(
-    auth_client, sample_team, sample_submission, client,
+    auth_client,
+    sample_team,
+    sample_submission,
+    client,
 ):
     """Run the gallery in five blocks of 200 GETs.
 

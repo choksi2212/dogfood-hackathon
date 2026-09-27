@@ -34,8 +34,7 @@ class User(AbstractUser):
         related_name="user_set",
         blank=True,
         help_text=(
-            "The groups this user belongs to. A user will get all "
-            "permissions granted to each of their groups."
+            "The groups this user belongs to. A user will get all " "permissions granted to each of their groups."
         ),
         verbose_name="groups",
     )
@@ -73,12 +72,8 @@ class UserGroups(models.Model):
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(
-        "accounts.User", on_delete=models.CASCADE, related_name="user_groups"
-    )
-    group = models.ForeignKey(
-        "auth.Group", on_delete=models.CASCADE, related_name="user_groups"
-    )
+    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="user_groups")
+    group = models.ForeignKey("auth.Group", on_delete=models.CASCADE, related_name="user_groups")
 
     class Meta:
         db_table = "users_user_groups"
@@ -93,9 +88,7 @@ class UserUserPermissions(models.Model):
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(
-        "accounts.User", on_delete=models.CASCADE, related_name="user_user_permissions"
-    )
+    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="user_user_permissions")
     permission = models.ForeignKey(
         "auth.Permission",
         on_delete=models.CASCADE,
@@ -113,9 +106,7 @@ class Session(models.Model):
     script and handed to the checker via .dogfood.toml."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="sessions"
-    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sessions")
     token_hash = models.CharField(max_length=64, unique=True)
     label = models.CharField(max_length=40, blank=True)  # e.g. "organizer", "judge_a"
     created_at = models.DateTimeField(auto_now_add=True)
@@ -146,6 +137,4 @@ class Session(models.Model):
     def lookup(token: str):
         if not token:
             return None
-        return Session.objects.select_related("user").filter(
-            token_hash=_hash_token(token)
-        ).first()
+        return Session.objects.select_related("user").filter(token_hash=_hash_token(token)).first()

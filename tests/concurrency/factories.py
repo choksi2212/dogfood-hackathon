@@ -5,6 +5,7 @@ These builders live alongside ``test_concurrency.py`` rather than in
 fixtures for this suite (the shared ``conftest.py`` is read-only per
 the standing rule in ``tests/conftest.py`` itself).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -27,7 +28,6 @@ from apps.events.models import (
 from apps.judging.models import JudgeAssignment
 from apps.submissions.models import Submission
 from apps.teams.models import Team, TeamMember
-
 
 DEMO_PASSWORD = "dogfood-dev-password"
 EVENT_SLUG = "concurrency-hack"
@@ -70,17 +70,14 @@ def build_event_with_two_projects(*, organizer, judges):
     )
 
     Track.objects.update_or_create(
-        event=event, slug="main",
+        event=event,
+        slug="main",
         defaults={"name": "Main", "description": "Main track", "order": 0},
     )
 
-    rubric, _ = Rubric.objects.update_or_create(
-        event=event, defaults={"name": "Default"}
-    )
+    rubric, _ = Rubric.objects.update_or_create(event=event, defaults={"name": "Default"})
     RubricCriterion.objects.filter(rubric=rubric).delete()
-    for order, (name, weight) in enumerate(
-        [("Innovation", "0.400"), ("Execution", "0.350"), ("Impact", "0.250")]
-    ):
+    for order, (name, weight) in enumerate([("Innovation", "0.400"), ("Execution", "0.350"), ("Impact", "0.250")]):
         RubricCriterion.objects.create(
             rubric=rubric,
             name=name,
@@ -93,9 +90,9 @@ def build_event_with_two_projects(*, organizer, judges):
 
     for user in [organizer, *judges]:
         Membership.objects.update_or_create(
-            user=user, event=event,
-            defaults={"role": "judge" if user in judges else "organizer",
-                      "created_by": organizer},
+            user=user,
+            event=event,
+            defaults={"role": "judge" if user in judges else "organizer", "created_by": organizer},
         )
 
     main = event.tracks.get(slug="main")
@@ -107,14 +104,19 @@ def build_event_with_two_projects(*, organizer, judges):
             password=DEMO_PASSWORD,
         )
         Membership.objects.update_or_create(
-            user=captain, event=event,
+            user=captain,
+            event=event,
             defaults={"role": "participant", "created_by": organizer},
         )
         team = Team.objects.create(
-            event=event, name=f"Team {n}", created_by=captain,
+            event=event,
+            name=f"Team {n}",
+            created_by=captain,
         )
         TeamMember.objects.create(
-            team=team, user=captain, role_in_team="captain",
+            team=team,
+            user=captain,
+            role_in_team="captain",
         )
         Submission.objects.create(
             team=team,
@@ -147,10 +149,14 @@ def build_judge_assignment_for(*, event, judge, project):
     from apps.judging.models import JudgeBatch
 
     batch = JudgeBatch.objects.create(
-        event=event, seed=42, created_by=judge,
+        event=event,
+        seed=42,
+        created_by=judge,
     )
     assignment = JudgeAssignment.objects.create(
-        batch=batch, judge=judge, project=project,
+        batch=batch,
+        judge=judge,
+        project=project,
     )
     return assignment
 
@@ -179,9 +185,7 @@ def auth_login(*, email: str, password: str = DEMO_PASSWORD) -> Client:
         data={"email": email, "password": password},
         content_type="application/json",
     )
-    assert resp.status_code == 200, (
-        f"auth_login failed for {email!r}: {resp.status_code} {resp.content!r}"
-    )
+    assert resp.status_code == 200, f"auth_login failed for {email!r}: {resp.status_code} {resp.content!r}"
     return c
 
 

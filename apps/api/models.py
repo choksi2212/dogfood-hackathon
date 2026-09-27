@@ -1,4 +1,5 @@
 """Webhook subscriptions for organizer-driven event notifications."""
+
 import uuid
 
 from django.db import models

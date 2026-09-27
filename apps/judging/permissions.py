@@ -5,6 +5,7 @@ prevents a judge from reading another judge's scores. The acceptance
 suite's check 5 is `peer_scores as judge_b`; that flow goes through
 this permission.
 """
+
 from rest_framework.permissions import BasePermission
 
 from apps.events.models import Membership
@@ -20,9 +21,7 @@ def _is_judge_for_event(request, view):
     slug = view.kwargs.get("slug")
     if not slug:
         return False
-    return Membership.objects.filter(
-        user=request.user, event__slug=slug, role="judge"
-    ).exists()
+    return Membership.objects.filter(user=request.user, event__slug=slug, role="judge").exists()
 
 
 class IsAssignedJudge(BasePermission):
@@ -35,9 +34,7 @@ class IsAssignedJudge(BasePermission):
         project_id = view.kwargs.get("project_id")
         if not project_id:
             return True
-        return JudgeAssignment.objects.filter(
-            judge=request.user, project_id=project_id
-        ).exists()
+        return JudgeAssignment.objects.filter(judge=request.user, project_id=project_id).exists()
 
 
 class IsOwnJudge(BasePermission):
@@ -69,9 +66,9 @@ class IsOwnJudge(BasePermission):
         if not judge_param:
             return True
 
-        if not Membership.objects.filter(
-            user=cookie_judge, role="judge"
-        ).exists() and not getattr(cookie_judge, "is_admin_role", False):
+        if not Membership.objects.filter(user=cookie_judge, role="judge").exists() and not getattr(
+            cookie_judge, "is_admin_role", False
+        ):
             return False
 
         # Match by UUID.

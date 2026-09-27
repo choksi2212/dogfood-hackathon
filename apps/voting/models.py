@@ -18,6 +18,7 @@ This gives us simple / quadratic voting, retraction, and a tamper-evident
 audit trail. Anti-abuse (fingerprint collisions, rate limits) is handled
 upstream by the proxy and the ``abuse`` app.
 """
+
 import uuid
 
 from django.db import models
@@ -32,9 +33,7 @@ class Vote(models.Model):
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    event = models.ForeignKey(
-        "events.Event", on_delete=models.CASCADE, related_name="votes"
-    )
+    event = models.ForeignKey("events.Event", on_delete=models.CASCADE, related_name="votes")
     project = models.ForeignKey(
         "submissions.Submission",
         on_delete=models.CASCADE,
@@ -90,9 +89,7 @@ class VoteBudget(models.Model):
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    event = models.ForeignKey(
-        "events.Event", on_delete=models.CASCADE, related_name="vote_budgets"
-    )
+    event = models.ForeignKey("events.Event", on_delete=models.CASCADE, related_name="vote_budgets")
     voter_key = models.CharField(max_length=64)
     spent_credits = models.IntegerField(default=0)
     updated_at = models.DateTimeField(auto_now=True)
@@ -119,9 +116,7 @@ class VoteAudit(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    vote = models.ForeignKey(
-        Vote, on_delete=models.CASCADE, related_name="audit_entries"
-    )
+    vote = models.ForeignKey(Vote, on_delete=models.CASCADE, related_name="audit_entries")
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
     at = models.DateTimeField(auto_now_add=True)
     ip = models.GenericIPAddressField(null=True, blank=True)

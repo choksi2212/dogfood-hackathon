@@ -15,6 +15,7 @@ measure.
 See docs/TESTING-PERFORMANCE.md for what each test targets and the
 budgets it asserts.
 """
+
 from __future__ import annotations
 
 import gc

@@ -14,6 +14,7 @@ without a Postgres roundtrip.
 This file is local to the golden suite — it does not touch the root
 tests/conftest.py or pytest.ini.
 """
+
 from __future__ import annotations
 
 import pytest
