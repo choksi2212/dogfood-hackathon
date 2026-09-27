@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "apps.api.apps.ApiConfig",
     "apps.health.apps.HealthConfig",
     "apps.observability.apps.ObservabilityConfig",
+    "apps.billing.apps.BillingConfig",
 ]
 
 # Custom user model

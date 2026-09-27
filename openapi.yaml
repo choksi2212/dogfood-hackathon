@@ -902,3 +902,80 @@ paths:
           description: "Unsupported media type \u2014 request body must be JSON"
         '401':
           description: Unauthenticated
+  /api/billing/plans:
+    get:
+      summary: List available pricing plans
+      responses:
+        '200':
+          description: Plan list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: {type: string, format: uuid}
+                    name: {type: string}
+                    display_name: {type: string}
+                    monthly_price_cents: {type: integer}
+                    max_events: {type: integer, nullable: true}
+                    max_judges_per_event: {type: integer, nullable: true}
+                    max_submissions_per_event: {type: integer, nullable: true}
+                    is_free: {type: boolean}
+        '429':
+          description: Rate limited
+  /api/billing/account/{slug}:
+    get:
+      summary: Current billing account state for an event
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+      responses:
+        '200':
+          description: Account state
+        '403':
+          description: Not an organizer of this event
+        '404':
+          description: Event not found
+        '401':
+          description: Unauthenticated
+        '429':
+          description: Rate limited
+  /api/billing/account/{slug}/upgrade:
+    post:
+      summary: Upgrade or downgrade the event's billing plan
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                plan_name: {type: string}
+      responses:
+        '200':
+          description: Plan changed (or already on that plan)
+        '404':
+          description: Unknown plan
+        '422':
+          description: Validation failed
+        '403':
+          description: Not an organizer of this event
+        '401':
+          description: Unauthenticated
+        '429':
+          description: Rate limited
+        '415':
+          description: "Unsupported media type \u2014 request body must be JSON"
