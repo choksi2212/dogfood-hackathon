@@ -1,4 +1,4 @@
-.PHONY: up up-detached down down-clean logs shell web-shell db-shell migrate reset build seed seed-fresh accept accept-fresh
+.PHONY: up up-detached down down-clean logs shell web-shell db-shell migrate reset build seed seed-fresh accept accept-fresh accept-ci ci lint test test-% test-cov
 
 COMPOSE ?= docker compose
 PYTHON  ?= python3
@@ -69,3 +69,34 @@ test-cov:
 # legacy apps until each gets annotated.
 types:
 	$(COMPOSE) exec -T web mypy apps/ --config-file mypy.ini
+# CI-friendly acceptance runner. No docker compose; runs the script
+# directly against whichever server the caller has already started
+# (the GitHub Actions acceptance workflow starts `manage.py runserver`
+# in the background and then calls this). Honors $DOGFOOD_CONFIG if
+# you want to point at a non-default .dogfood.*.toml.
+accept-ci:
+	@if [ -n "$$DOGFOOD_CONFIG" ]; then \
+		echo "Running acceptance against $$DOGFOOD_CONFIG"; \
+		python acceptance.py "$$DOGFOOD_CONFIG"; \
+	else \
+		echo "Running acceptance against .dogfood.toml"; \
+		python acceptance.py .dogfood.toml; \
+	fi
+
+# `make ci` is what a developer runs locally to mirror the GitHub
+# Actions pipeline: ruff check + ruff format --check + pytest.
+# The acceptance suite is intentionally NOT here — it needs a live
+# server. Run it explicitly via `make accept` (docker compose) or
+# `make accept-ci` against an already-running `runserver`.
+ci: lint
+	python -m pip install --upgrade pip
+	pip install -r requirements.txt
+	python manage.py migrate --noinput
+	pytest tests/ -v --tb=short
+
+# ruff check + ruff format --check. Used by `make ci` and by the
+# lint GitHub Actions workflow.
+lint:
+	@command -v ruff >/dev/null 2>&1 || pip install ruff==0.6.9
+	ruff check .
+	ruff format --check .
