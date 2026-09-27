@@ -1,0 +1,89 @@
+# Alert rules — Prometheus evaluates these every ``evaluation_interval``
+# (15s) and ships firing alerts to Alertmanager.
+#
+# Naming convention: ``Dogfood<Component><Symptom>``. Severity is
+# carried in the ``severity`` label so Alertmanager can route.
+#
+# To add a rule: drop a new entry below. The YAML schema is the
+# standard Prometheus rules_file format.
+
+groups:
+  # --------------------------------------------------------------------
+  # Portal HTTP health
+  # --------------------------------------------------------------------
+  - name: dogfood-portal-http
+    interval: 30s
+    rules:
+      # 5xx rate over 1% across 5 minutes — pages someone.
+      - alert: DogfoodPortalHighErrorRate
+        expr: |
+          sum(rate(http_requests_total{service="portal",status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total{service="portal"}[5m]))
+          > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Portal 5xx rate above 1% for 5 minutes"
+          description: |
+            More than 1% of requests in the last 5 minutes returned a
+            5xx. Check the web container logs and the
+            ``http_request_duration_ms`` p95 panel.
+          runbook: docs/RUNBOOK.md#service-overview
+
+      # p95 latency above 2s for 10 minutes — degraded but not yet
+      # paging.
+      - alert: DogfoodPortalSlowRequests
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(http_request_duration_ms_bucket{service="portal"}[5m]))
+          ) > 2000
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Portal p95 latency above 2s"
+          description: |
+            95th percentile request latency has been above 2 seconds
+            for the last 10 minutes. Slow handlers show up first in
+            the Endpoint Detail dashboard.
+
+      # Scrapes failing — the metrics pipeline is broken.
+      - alert: DogfoodPortalScrapeFailing
+        expr: up{job="dogfood-portal"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Prometheus can't reach the portal /metrics endpoint"
+          description: |
+            The scrape target ``dogfood-portal`` has been down for 2
+            minutes. Either Django is crashed, the network bridge
+            broke, or the rate-limiter is blocking Prometheus.
+
+  # --------------------------------------------------------------------
+  # Capacity / saturation
+  # --------------------------------------------------------------------
+  - name: dogfood-portal-capacity
+    interval: 1m
+    rules:
+      # Sustained concurrency — handler pool saturated, p99 will
+      # climb next.
+      - alert: DogfoodPortalConcurrencySaturation
+        expr: |
+          max_over_time(http_requests_in_progress[5m]) > 50
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Sustained >50 in-flight requests on the portal"
+          description: |
+            Either traffic spike or a slow handler is blocking the
+            pool. Likely next signal: p95 climbs. Scale gunicorn
+            workers if this persists.
