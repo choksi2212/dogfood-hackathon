@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "apps.widget.apps.WidgetConfig",
     "apps.api.apps.ApiConfig",
     "apps.health.apps.HealthConfig",
+    "apps.observability.apps.ObservabilityConfig",
 ]
 
 # Custom user model
@@ -72,6 +73,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "apps.accounts.middleware.AuditMiddleware",
     "apps.accounts.middleware.RateLimitMiddleware",
+    "apps.observability.middleware.RequestCorrelationMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -143,6 +145,29 @@ REST_FRAMEWORK = {
 # --- Logging -----------------------------------------------------------------
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+LOG_FORMAT = os.environ.get("LOG_FORMAT", "json").lower()  # "json" or "simple"
+
+_JSON_LOG_RECORD_KEYS = (
+    "ts",
+    "level",
+    "logger",
+    "msg",
+    "request_id",
+    "user_id",
+    "method",
+    "path",
+    "status",
+    "duration_ms",
+)
+
+
+def _json_formatter():
+    """Late-bound so settings.py doesn't import the app at module load."""
+    from apps.observability.logging import JsonFormatter
+
+    return JsonFormatter(_JSON_LOG_RECORD_KEYS)
+
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -151,11 +176,14 @@ LOGGING = {
             "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
             "datefmt": "%Y-%m-%dT%H:%M:%S%z",
         },
+        "json": {
+            "()": _json_formatter,
+        },
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "formatter": "simple",
+            "formatter": "json" if LOG_FORMAT == "json" else "simple",
         },
     },
     "root": {
@@ -165,6 +193,11 @@ LOGGING = {
     "loggers": {
         "django.db.backends": {
             "level": "WARNING",
+            "handlers": ["console"],
+            "propagate": False,
+        },
+        "observability.request": {
+            "level": "INFO",
             "handlers": ["console"],
             "propagate": False,
         },

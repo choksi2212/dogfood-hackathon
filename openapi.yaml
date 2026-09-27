@@ -81,6 +81,35 @@ paths:
           description: Degraded
         '429':
           description: Rate limited
+  /metrics:
+    get:
+      summary: Prometheus metrics exposition (operator-facing)
+      description: |
+        Counter and histogram metrics for HTTP traffic, request
+        latency, and in-flight request count. Authentication is
+        intentionally absent \u2014 restrict at the network layer.
+      responses:
+        '200':
+          description: Prometheus text-format metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  # HELP http_requests_total ...
+                  # TYPE http_requests_total counter
+                  http_requests_total{method="GET",path="/api/gallery",status="200"} 12.0
+  /observability/ping:
+    get:
+      summary: Cheap liveness probe (no DB roundtrip)
+      responses:
+        '200':
+          description: "pong"
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "pong\n"
   /api/schema/:
     get:
       summary: This OpenAPI 3 spec as JSON
