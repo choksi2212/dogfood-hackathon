@@ -8,11 +8,17 @@ export type Submission = {
   submitted_at: string | null;
 };
 
+// Matches apps/submissions/views.py GalleryView. Default mode is
+// cursor-based ({items, next, page_size}); passing ?page=N switches to
+// the legacy offset mode ({total, page, page_size, items}). The
+// frontend only ever reads `.items`, so this union covers both shapes
+// honestly without the client needing to branch on which one it got.
 export type GalleryResponse = {
-  total: number;
-  page: number;
-  page_size: number;
   items: Submission[];
+  page_size: number;
+  next?: string | null;
+  total?: number;
+  page?: number;
 };
 
 export type SubmitPayload = {
