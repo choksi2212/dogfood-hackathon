@@ -77,9 +77,12 @@ class Comment(models.Model):
     class Meta:
         db_table = "submissions_comment"
         ordering = ["created_at"]
+        # Composite (submission, is_hidden, created_at) replaces the two
+        # narrower indexes — the planner can use it for both the
+        # "fetch all comments for a submission" and "fetch only visible
+        # comments in time order" queries with no extra scans.
         indexes = [
-            models.Index(fields=["submission", "created_at"]),
-            models.Index(fields=["submission", "is_hidden"]),
+            models.Index(fields=["submission", "is_hidden", "created_at"]),
         ]
 
     def __str__(self) -> str:

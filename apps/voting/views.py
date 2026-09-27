@@ -167,7 +167,7 @@ class VoteView(APIView):
                     {
                         "error": {
                             "code": "validation_failed",
-                            "message": ("`votes` must be between 1 and " f"{MAX_QUADRATIC_BALLOT} (inclusive)."),
+                            "message": (f"`votes` must be between 1 and {MAX_QUADRATIC_BALLOT} (inclusive)."),
                         }
                     },
                     status=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -195,7 +195,7 @@ class VoteView(APIView):
                     {
                         "error": {
                             "code": "validation_failed",
-                            "message": (f"Exceeds {QUADRATIC_BUDGET}-credit " "quadratic budget."),
+                            "message": (f"Exceeds {QUADRATIC_BUDGET}-credit quadratic budget."),
                         }
                     },
                     status=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -206,6 +206,9 @@ class VoteView(APIView):
                 budget, _ = VoteBudget.objects.select_for_update().get_or_create(event=event, voter_key=voter_key)
                 budget.spent_credits += delta
                 budget.save(update_fields=["spent_credits", "updated_at"])
+                spent_after = budget.spent_credits
+            else:
+                spent_after = None
 
             vote, _created = Vote.objects.update_or_create(
                 event=event,
@@ -238,11 +241,7 @@ class VoteView(APIView):
                 "vote_id": str(vote.id),
                 "votes": n_votes,
                 "mode": event.voting_mode,
-                "spent_credits": (
-                    VoteBudget.objects.get(event=event, voter_key=voter_key).spent_credits
-                    if event.voting_mode == "quadratic"
-                    else None
-                ),
+                "spent_credits": spent_after,
             },
             status=status.HTTP_201_CREATED,
         )

@@ -38,7 +38,15 @@ def run_assignment(
     max_retries: int = 10,
 ):
     projects = list(Submission.objects.filter(event=event, status="submitted").select_related("team", "track"))
-    judges = list(Membership.objects.filter(event=event, role="judge").select_related("user"))
+    # ``prefetch_related("user__team_memberships")`` collapses what would
+    # otherwise be N queries (``m.user.team_memberships.values_list`` per
+    # judge in the comprehension below) into a single follow-up query.
+    # With ~100 judges that's the difference between 1 query and 101.
+    judges = list(
+        Membership.objects.filter(event=event, role="judge")
+        .select_related("user")
+        .prefetch_related("user__team_memberships")
+    )
 
     if not projects:
         raise AssignmentError("Need at least one submitted project.")
@@ -54,7 +62,7 @@ def run_assignment(
         projects_per_judge = per_judge_max
 
     # judge_id -> set of team_ids they may NOT review (their own teams).
-    judge_blacklist = {m.user_id: set(m.user.team_memberships.values_list("team_id", flat=True)) for m in judges}
+    judge_blacklist = {m.user_id: {tm.team_id for tm in m.user.team_memberships.all()} for m in judges}
 
     last_error = None
     for attempt in range(max_retries):
@@ -77,7 +85,7 @@ def run_assignment(
             if len(candidates) < reviews_per_project:
                 ok = False
                 last_error = (
-                    f"only {len(candidates)} eligible judges for " f"project {project.id} (need {reviews_per_project})"
+                    f"only {len(candidates)} eligible judges for project {project.id} (need {reviews_per_project})"
                 )
                 break
 
@@ -124,6 +132,4 @@ def run_assignment(
             "attempts": attempt + 1,
         }
 
-    raise AssignmentError(
-        f"Could not produce a valid assignment after {max_retries} retries. " f"Last error: {last_error}"
-    )
+    raise AssignmentError(f"Could not produce a valid assignment after {max_retries} retries. Last error: {last_error}")

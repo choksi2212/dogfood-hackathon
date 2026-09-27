@@ -134,7 +134,14 @@ class Membership(models.Model):
     class Meta:
         db_table = "events_membership"
         unique_together = ("user", "event")
-        indexes = [models.Index(fields=["user", "event"])]
+        indexes = [
+            models.Index(fields=["user", "event"]),
+            # ``(user, role)`` is the hot path for IsJudge /
+            # IsOrganizer / IsAssignedJudge — every authenticated
+            # request hits it. Without it the planner falls back to a
+            # bitmap heap scan over the (user, event) index.
+            models.Index(fields=["user", "role"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.user.email} → {self.event.slug} as {self.role}"

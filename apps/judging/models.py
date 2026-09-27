@@ -60,6 +60,11 @@ class JudgeAssignment(models.Model):
         indexes = [
             models.Index(fields=["judge", "batch"]),
             models.Index(fields=["project"]),
+            # ``(judge, project)`` is the hot path for
+            # ``IsAssignedJudge.has_permission`` (every score PUT/POST
+            # hits it). Without this index the planner merges
+            # ``(judge, batch)`` and ``(project)`` and re-filters.
+            models.Index(fields=["judge", "project"]),
         ]
 
 

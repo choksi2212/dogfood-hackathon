@@ -51,6 +51,12 @@ class TeamMember(models.Model):
     class Meta:
         db_table = "teams_teammember"
         unique_together = ("team", "user")
+        # ``(user, team)`` is the lookup direction for the hot path
+        # ``TeamMember.objects.filter(user=...)`` — used by
+        # submissions/views.py:_resolve_team and the self-vote guard in
+        # voting/views.py. unique_together gives us ``(team, user)``
+        # only; without this index the user→team path is a seq scan.
+        indexes = [models.Index(fields=["user", "team"])]
 
 
 class TeamInvite(models.Model):
