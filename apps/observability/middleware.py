@@ -94,6 +94,16 @@ class RequestCorrelationMiddleware:
         duration_ms = (time.monotonic() - start) * 1000.0
         response[_RESPONSE_HEADER] = request_id
 
+        # Cache event tracking — if the view set an X-Cache header,
+        # increment the corresponding counter so Grafana can plot
+        # the hit rate. Only GETs are cached, so we filter on method.
+        cache_status = response.get("X-Cache")
+        if cache_status in ("HIT", "MISS") and request.method == "GET":
+            metrics.CACHE_EVENTS.inc(
+                (cache_status, _route_pattern(request)),
+                1.0,
+            )
+
         user = getattr(request, "user", None)
         user_id = getattr(user, "id", None) if user else None
 
