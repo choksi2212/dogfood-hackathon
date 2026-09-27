@@ -24,6 +24,10 @@ Coverage matrix (one section per attack category):
   9. Token entropy        — Session.create() emits >= 32 chars of random
  10. Secret leakage       — error responses never echo SECRET_KEY, DB
                             connection strings, or stack traces
+ 11. Scraping — read-rate-limit (60/min/IP), no PII in gallery, organizer
+            endpoints reject anonymous
+ 12. Validation surfaces  — every error envelope passes the schema
+                            defined in apps.api.exceptions
 
 All tests run against the Django test client. There is no real HTTP, no
 mocked auth — the portal boots inside the test process.
@@ -873,3 +877,111 @@ def test_500_equivalent_bad_input_does_not_leak_secrets(db, client):
         f"malformed JSON should not yield 500, got {resp.status_code}: " f"{resp.content[:200]!r}"
     )
     _assert_no_secret_leak(resp, label="malformed JSON")
+
+
+# ---------------------------------------------------------------------------
+# 11. Scraping — the fifth primary threat from the spec.
+# ---------------------------------------------------------------------------
+
+
+def test_read_rate_limit_returns_429(db, client):
+    """A scraper that GETs the public gallery faster than the read-class
+    bucket (60 / 60s / IP) must hit the rate limiter. Probes
+    ``/api/gallery`` specifically; the same bucket covers
+    ``/api/widget/gallery`` and ``/api/events/{slug}/submissions/{id}``.
+    """
+    statuses = []
+    for _ in range(80):
+        resp = client.get("/api/gallery")
+        statuses.append(resp.status_code)
+        if resp.status_code == 429:
+            break
+
+    assert 429 in statuses, (
+        f"read limiter never fired across {len(statuses)} GETs: {statuses}"
+    )
+    assert all(s < 500 for s in statuses), (
+        f"read scrape produced a server error: {statuses}"
+    )
+
+    # The 429 response must carry Retry-After so polite scrapers back off.
+    saw_429 = None
+    for _ in range(5):
+        r = client.get("/api/gallery")
+        if r.status_code == 429:
+            saw_429 = r
+            break
+    assert saw_429 is not None, "could not capture a 429 response"
+    assert "Retry-After" in saw_429.headers, (
+        f"429 missing Retry-After header: headers={dict(saw_429.headers)}"
+    )
+
+
+def test_no_pii_in_gallery_response(db, client, sample_event, sample_submission):
+    """The public gallery must NOT serialize email addresses or any
+    other organizer / judge / submitter PII. The serializer
+    (``apps.submissions.serializers.SubmissionSummarySerializer``) is an
+    explicit allow-list; a future maintainer adding a field to the
+    broader SubmissionSerializer must not let it leak through.
+    """
+    _ = sample_submission  # ensure the gallery has at least one row
+    resp = client.get("/api/gallery")
+    assert resp.status_code == 200
+
+    body = resp.content.decode("utf-8", errors="replace").lower()
+    assert "@" not in body, (
+        "gallery response leaks an '@'-shaped value (likely an email). "
+        f"first 200 chars: {body[:200]!r}"
+    )
+
+    # Every key in every gallery item must be in the allow-list. If a
+    # new field shows up here without an explicit allow-list update,
+    # this test fails loudly.
+    allow_list = {
+        "id",
+        "name",
+        "tagline",
+        "description",
+        "track_slug",
+        "thumbnail_path",
+        "submitted_at",
+    }
+    import json as _json
+
+    payload = _json.loads(resp.content)
+    for item in payload.get("items", []):
+        extra = set(item.keys()) - allow_list
+        assert not extra, (
+            f"gallery item leaks extra fields: {extra}; item={item!r}"
+        )
+
+
+def test_organizer_endpoint_rejects_anonymous(db, client, sample_event, judge_a):
+    """``/api/events/{slug}/memberships`` is organizer-only and returns
+    the membership list (and, implicitly, organizer emails). An
+    anonymous scraper must get 403 / 401, not the data. An authenticated
+    non-organizer (a judge) must also be denied.
+    """
+    # Anonymous probe.
+    anon = client.get(f"/api/events/{sample_event.slug}/memberships")
+    assert anon.status_code in (401, 403), (
+        f"anonymous should be denied at /memberships, got {anon.status_code}"
+    )
+    anon_body = anon.content.decode("utf-8", errors="replace").lower()
+    assert "@" not in anon_body, (
+        f"anonymous /memberships leaked an email: {anon_body[:200]!r}"
+    )
+
+    # Authenticated-as-judge probe. The sample_event fixture registers
+    # judge_a as a *judge*, not as an organizer — so the IsOrganizer
+    # permission must deny them.
+    authed = _client_with_cookie(_new_session_for(judge_a)).get(
+        f"/api/events/{sample_event.slug}/memberships"
+    )
+    assert authed.status_code in (401, 403), (
+        f"non-organizer should be denied at /memberships, got {authed.status_code}"
+    )
+    authed_body = authed.content.decode("utf-8", errors="replace").lower()
+    assert "@" not in authed_body, (
+        f"non-organizer /memberships leaked an email: {authed_body[:200]!r}"
+    )

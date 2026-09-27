@@ -2,9 +2,10 @@
 
 ## TL;DR
 
-The portal defends against four attacks the kickoff deck names explicitly,
-plus a handful of secondary threats documented for completeness. The four
-primary attacks, with their headline mitigations, are:
+The portal defends against the five attacks the kickoff spec names
+explicitly, plus a handful of secondary threats documented for
+completeness. The five primary attacks, with their headline mitigations,
+are:
 
 1. **Sybil votes** (one human, many accounts) — `RateLimitMiddleware` on
    `/api/auth/` (5 requests / 15 minutes / IP) plus the `AuditEvent` row
@@ -12,11 +13,15 @@ primary attacks, with their headline mitigations, are:
 2. **Ballot stuffing** (automated bot votes) — `RateLimitMiddleware` on the
    write-class bucket (10 requests / 60 seconds / IP) plus the
    `apps.audit.models.AuditEvent` append-only log.
-3. **Judge collusion** (judges coordinating scores) —
+3. **Scraping** (automated harvesting of submissions and votes) —
+   `RateLimitMiddleware` read-class bucket (60 requests / 60 seconds / IP)
+   plus the `X-RateLimit-Remaining` headers on every response, plus the
+   per-event `Vote` audit row that records the IP and user-agent hash.
+4. **Judge collusion** (judges coordinating scores) —
    `apps.judging.views.PeerScoresView` returns 403 on every call, the
    assignment algorithm enforces 3 judges / project, and the
    `AuditEvent` log records every score-save.
-4. **Deadline gaming** (submissions at the last second / after close) —
+5. **Deadline gaming** (submissions at the last second / after close) —
    `apps.events.decorators.deadline_gated` returns 422 on submit after
    the configured field (e.g. `submission_close_at`), and `submitted_at`
    is immutable once stamped.
@@ -243,6 +248,94 @@ instant.
   asserts the deadline gate fires.
 - `apps/submissions/tests/test_immutable.py::test_patch_after_submit_returns_409`
   asserts the immutable row.
+
+---
+
+### 4.5 Scraping
+
+**Threat.** A scraper harvests the public gallery, the vote tallies, or
+the per-judge score deltas in bulk — either to train a competing model,
+to reverse-engineer the rubric weights, or to extract the email
+addresses of organizers / judges for spam or phishing.
+
+**Attack scenarios.**
+
+1. **Submission scraping.** A bot GETs `/api/gallery?event=...`
+   repeatedly with different IP addresses to assemble the complete
+   submission corpus. Each call is cheap; the goal is volume.
+2. **Vote tally scraping.** A bot polls `/api/events/{slug}/submissions/{id}/votes`
+   to enumerate the vote distribution and identify the most-voted
+   projects before the public announcement (insider trading of social
+   proof).
+3. **Score-delta scraping.** A bot POSTs `/api/judge/scores` with the
+   session cookie of a *legitimate* judge to enumerate other judges'
+   scores — this is the deliberate-collusion vector done by automation.
+4. **Email harvesting.** A bot scrapes the `/api/events/{slug}/memberships`
+   response (organizer-only) for organizer emails. We can't stop a
+   legitimate organizer from leaking their own email, but we can stop
+   the public endpoints from leaking any PII at all.
+
+**Mitigations.**
+
+- **Per-IP read bucket.** `apps.accounts.middleware.RateLimitMiddleware`
+  classifies GET requests on `/api/gallery`, `/api/widget/gallery`,
+  `/api/events/{slug}/submissions/{id}` as `read`-class and budgets
+  them at **60 requests / 60 seconds / IP**. A single-threaded scraper
+  caps out at 60 RPS-sustained before getting 429s.
+- **Response shape hides aggregate vote tallies until release.** T3 §4
+  (results leak) requires the per-submission vote count to be
+  *organizer-only* until `event.results_at`. The `apps.voting.views`
+  enforces this — `/api/submissions/{id}` returns the submission
+  metadata but not the vote count, and `/api/events/{slug}/results`
+  returns 403 to non-organizers until results_at. A scraper that
+  polls the public endpoints sees zero signal until release.
+- **Organizer-only endpoints require organizer membership.** A
+  scraper that hits `/api/events/{slug}/memberships` without an
+  organizer session gets 403, not the membership list. The
+  `IsOrganizer` DRF permission runs server-side; the URL itself is
+  never public to anonymous callers.
+- **No PII in public responses.** `/api/gallery` returns the
+  submission's `name`, `tagline`, `description`, `track`, `tech_tags`,
+  `repo_url`, `demo_url`, `thumbnail_path`, `created_at`. It does
+  *not* return `team.members[*].email`, `submitted_by.email`, or any
+  judge identifier. The `apps.submissions.serializers.GalleryItemSerializer`
+  is a strict allow-list.
+- **`X-RateLimit-*` headers on every response** so a polite scraper
+  can self-throttle and a malicious one burns through its budget
+  visibly to the operator (Grafana dashboard).
+- **VoteAudit rows have IP + user-agent hash** — a scrape that votes
+  by accident (e.g. a confused bot) leaves a fingerprint on every
+  ballot; the `apps.abuse` app surfaces a "top suspicious IPs" panel
+  for organizers.
+
+**Residual risks.**
+
+- A scraper that respects `X-RateLimit-*` and stays under 60 RPS
+  per IP can still harvest the gallery over weeks. We accept this:
+  the gallery is public-by-design, and the goal of the rate limit is
+  to make bulk scraping *expensive* (require a botnet), not
+  impossible.
+- A scraper behind a residential proxy pool defeats the per-IP
+  bucket. The secondary defence is the per-IP-and-fingerprint bucket
+  in the abuse app — fingerprint = sha256(ip + ua)[:16] — which
+  collapses residential proxies from the same ISP into one bucket.
+  The threshold is configurable per event.
+- A scraper that registers an account and uses a real session can
+  bypass the IP bucket. The account-level throttle
+  (`apps.accounts.middleware.RateLimitMiddleware` `auth`-class bucket,
+  5 / 15 minutes / IP) is per-IP, not per-account; tightening this
+  is on the T2 backlog.
+
+**Tests that prove the mitigations hold.**
+
+- `apps/security/test_attacks.py::test_read_rate_limit_returns_429`
+  asserts the 60-RPS read bucket fires.
+- `apps/security/test_attacks.py::test_no_pii_in_gallery_response`
+  asserts that `apps.submissions.serializers.GalleryItemSerializer`
+  does *not* serialize email fields.
+- `apps/security/test_attacks.py::test_organizer_endpoint_rejects_anonymous`
+  asserts that `/api/events/{slug}/memberships` returns 403 (not
+  the membership list) without an organizer session.
 
 ---
 

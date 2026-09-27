@@ -20,6 +20,8 @@ Additive alternating-means fit. Edge cases per PLAN.md §4.
 | Negative bias | Judge scoring below mean has bias < 0 |
 | Convergence within 1000 iterations | iterations ≤ 1000 |
 | Sum-to-zero recentring | sum(b) = 0 |
+| **Unbalanced bipartite moves ranks** | A judge with one-side leverage produces non-trivial bias; every project's adjusted mean differs from raw |
+| **Demo fixture is balanced** | Pins the cause of "delta = 0" in `normalization-proof.txt` — full bipartite coverage means additive normalization is a no-op on ranks (mathematically correct) |
 
 ## Mathematical note
 

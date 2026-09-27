@@ -55,9 +55,16 @@ class AuditMiddleware:
             user = getattr(request, "user", None) or AnonymousUser()
             from apps.audit.models import AuditEvent
 
+            # ``action`` is a CharField(max_length=100). Truncate the
+            # full method+path so very long routes (e.g. ``PATCH
+            # /api/events/.../submissions/<id>/comments/<comment_id>``)
+            # still fit. The full path is recoverable from the
+            # request logs upstream; here we only need a label.
+            action_label = f"{request.method} {request.path}"[:95]
+
             AuditEvent.objects.create(
                 actor_id=user.id if user.is_authenticated else None,
-                action=f"{request.method} {request.path}",
+                action=action_label,
                 target_type="endpoint",
                 target_id=None,
                 payload={},
