@@ -161,3 +161,13 @@ Pytest config in [pytest.ini](pytest.ini) (read-only).
 ## Acknowledgements
 
 Two builders. One brief. One spec. 72 hours. The portal that judges the build is the portal we built.
+
+## CI
+
+[![test](https://github.com/choksi2212/dogfood-hackathon/actions/workflows/test.yml/badge.svg)](https://github.com/choksi2212/dogfood-hackathon/actions/workflows/test.yml)
+
+The test workflow runs the full pytest suite against PostgreSQL 16 on
+every push to `main` and on every pull request. The acceptance workflow
+runs the seven-check acceptance suite after `test` succeeds and posts
+the summary back to the pull request.
+

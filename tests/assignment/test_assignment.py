@@ -272,6 +272,8 @@ def test_same_seed_same_assignments(
             "judge_id", "project_id",
         )
     )
+    r2 = run_assignment(event=event, seed=77, reviews_per_project=3,
+                        created_by=organizer)
     a2 = set(
         JudgeAssignment.objects.filter(batch_id=r2["batch_id"]).values_list(
             "judge_id", "project_id",

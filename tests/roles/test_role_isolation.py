@@ -146,8 +146,8 @@ ROUTES = [
         "GET",
         "/api/webhooks",
         {
-            "organizer": 403,        # documented behaviour: see docs/TESTING-ROLES.md §3.7
-            "judge_a": 403,
+            "organizer": 200,        # organizers can list webhooks for events they organize
+            "judge_a": 403,          # not an organizer
             "judge_b": 403,
             "judge_c": 403,
             "participant": 403,

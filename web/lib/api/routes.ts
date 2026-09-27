@@ -38,4 +38,13 @@ export const routes = {
     `/api/events/${slug}/me/batch/${projectId}/scores`,
   scoreSubmit: (projectId: string, slug: string = EVENT_SLUG) =>
     `/api/events/${slug}/me/batch/${projectId}/submit`,
+  // apps/certificates — public, no auth (a certificate is a public,
+  // signed record; anyone with the public_id can verify it).
+  certificate: (publicId: string) => `/api/certificates/${publicId}`,
+  // apps/widget — widget.js is mounted at the project root, not under
+  // /api/, and ships its own Access-Control-Allow-Origin: * (it's meant
+  // to be <script>-embedded on third-party sites), so callers use
+  // NEXT_PUBLIC_WIDGET_BASE directly rather than the /api/* proxy.
+  widgetGallery: (slug: string = EVENT_SLUG) =>
+    `/api/widget/gallery?event=${slug}`,
 } as const;

@@ -89,6 +89,7 @@ class VoteBudget(models.Model):
     ``VoteView.post`` for the check.
     """
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     event = models.ForeignKey(
         "events.Event", on_delete=models.CASCADE, related_name="vote_budgets"
     )

@@ -14,9 +14,6 @@
     "/widget.js"
   ],
   "responses": {
-    "GET /api/certificates/{public_id}": {
-      "200": "Certificate"
-    },
     "GET /api/csv_export": {
       "200": "CSV body"
     },
@@ -37,6 +34,9 @@
     },
     "GET /api/widget/gallery": {
       "200": "Items list"
+    },
+    "GET /api/certificates/{public_id}": {
+      "200": "Certificate"
     },
     "GET /widget.js": {
       "200": "JavaScript shim"

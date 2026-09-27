@@ -1,0 +1,38 @@
+# ruff configuration — minimal, Django-friendly.
+#
+# The Django codebase uses some patterns ruff's default rules flag
+# (e.g. long lines in migrations, wildcard imports in apps/__init__.py,
+# re-exports marked as unused). We narrow the scope here rather than
+# rewriting history.
+
+target-version = "py312"
+line-length = 120
+extend-exclude = [
+    "**/migrations/**",
+    "**/staticfiles/**",
+    ".git/**",
+    ".pytest_cache/**",
+    "scrub/**",
+]
+
+[lint]
+# E501 (line too long) is left on but ignored below for migrations.
+# F401 (unused imports) and F403 (star imports) show up in Django
+# `apps.py` files and migration generators; we mute those at the
+# per-file level so business code is still held to the standard.
+select = ["E", "F", "I", "B", "UP"]
+ignore = [
+    "E501",  # line too long
+    "B008",  # function-call-in-default-argument (Django field defaults)
+    "UP031", # use f-string instead of % formatting (legacy code)
+]
+
+[lint.per-file-ignores]
+"**/migrations/*.py" = ["*"]
+"**/apps.py" = ["F401", "F403"]
+"scripts/**/*.py" = ["E", "F", "I", "B", "UP"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"

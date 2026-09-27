@@ -24,7 +24,7 @@ class Submission(models.Model):
     )
     track = models.ForeignKey(
         "events.Track",
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         related_name="submissions",
     )
     name = models.CharField(max_length=80)

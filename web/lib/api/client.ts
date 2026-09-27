@@ -2,6 +2,7 @@ import { routes } from "./routes";
 import {
   mockAssignmentRun,
   mockBulkInvite,
+  mockCertificate,
   mockEventDetail,
   mockGallery,
   mockJudgeScores,
@@ -16,12 +17,14 @@ import {
   mockScoreSubmit,
   mockSubmit,
   mockVote,
+  mockWidgetGallery,
 } from "./mocks";
 import {
   ApiError,
   type ApiErrorBody,
   type AssignmentRunResponse,
   type BulkInviteResponse,
+  type CertificateResponse,
   type EventDetail,
   type GalleryResponse,
   type JudgeScoresResponse,
@@ -40,6 +43,7 @@ import {
   type SubmitResponse,
   type User,
   type VoteResponse,
+  type WidgetGalleryResponse,
 } from "./types";
 
 // Flip NEXT_PUBLIC_USE_MOCKS=1 to develop screens before the backend
@@ -58,6 +62,14 @@ const API_BASE =
   typeof window === "undefined"
     ? (process.env.API_INTERNAL_URL ?? "http://localhost:8001")
     : "";
+
+// widget.js is meant to be <script>-embedded on third-party sites, so
+// unlike everything else here it needs a URL the *browser* can reach
+// directly — not the server-only API_INTERNAL_URL, and not proxied
+// through next.config.ts either, since the whole point is other sites
+// loading it cross-origin (it ships its own CORS: * for that reason).
+const WIDGET_BASE =
+  process.env.NEXT_PUBLIC_WIDGET_BASE ?? "http://localhost:8001";
 
 function cookieInit(cookieHeader?: string): RequestInit | undefined {
   return cookieHeader ? { headers: { Cookie: cookieHeader } } : undefined;
@@ -238,6 +250,29 @@ export const api = {
     return USE_MOCKS
       ? mockScoreSubmit()
       : request(routes.scoreSubmit(projectId, slug), { method: "POST" });
+  },
+
+  // Public, no auth — a certificate is a signed record anyone holding
+  // the public_id can verify.
+  certificate(publicId: string): Promise<CertificateResponse> {
+    return USE_MOCKS
+      ? mockCertificate(publicId)
+      : request(routes.certificate(publicId));
+  },
+
+  // Widget preview data, fetched the same way a third-party embedder's
+  // browser would (direct cross-origin GET, no cookies) — not proxied,
+  // to demonstrate the real embed actually works standalone.
+  widgetGallery(slug?: string): Promise<WidgetGalleryResponse> {
+    if (USE_MOCKS) return mockWidgetGallery();
+    return fetch(`${WIDGET_BASE}${routes.widgetGallery(slug)}`, {
+      credentials: "omit",
+      cache: "no-store",
+    }).then((res) => res.json() as Promise<WidgetGalleryResponse>);
+  },
+
+  widgetScriptUrl(): string {
+    return `${WIDGET_BASE}/widget.js`;
   },
 
   // CSV export is a file download the browser navigates to directly

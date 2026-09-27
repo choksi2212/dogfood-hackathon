@@ -140,7 +140,7 @@ def participant(db):
 
 
 @pytest.fixture
-def sample_event(db, organizer):
+def sample_event(db, organizer, judge_a, judge_b, judge_c, participant):
     now = _now()
     event, _ = Event.objects.update_or_create(
         slug=EVENT_SLUG,
@@ -179,14 +179,13 @@ def sample_event(db, organizer):
             order=order,
         )
 
-    for email, role, label in [
-        ("organizer@test.local", "organizer", "organizer"),
-        ("judge_a@test.local", "judge", "judge_a"),
-        ("judge_b@test.local", "judge", "judge_b"),
-        ("judge_c@test.local", "judge", "judge_c"),
-        ("participant@test.local", "participant", "participant"),
+    for user, role in [
+        (organizer, "organizer"),
+        (judge_a, "judge"),
+        (judge_b, "judge"),
+        (judge_c, "judge"),
+        (participant, "participant"),
     ]:
-        user = User.objects.get(email=email)
         Membership.objects.update_or_create(
             user=user, event=event,
             defaults={"role": role, "created_by": organizer},
