@@ -87,6 +87,21 @@ Mihir is the sole integrator: `manas → mihir → main`. We integrate to `main`
 every gate G2–G7, not once at the end, because judges clone `main` and the
 acceptance mechanism (40%) and `docker compose up` (20%) are graded there.
 
+## Single-container deployment
+
+For demos, judging machines, or a clean laptop, the whole stack can run in
+**one** container. Postgres + Django + Next.js + nginx all live inside one
+image, supervised by `supervisord`. Build and run:
+
+```bash
+docker compose -f docker-compose.single.yml up --build
+# open http://localhost:8000
+```
+
+`SKIP_SEED=1` skips the auto-seed. The default `docker-compose.yml`
+remains the multi-service setup for development (separate restartable
+services + the observability stack).
+
 ## Working agreement
 
 - Zero errors, zero warnings. Root cause only.
