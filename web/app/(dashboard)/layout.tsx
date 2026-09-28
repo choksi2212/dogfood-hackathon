@@ -33,18 +33,27 @@ export default async function DashboardLayout({
 
   const membership = user.memberships.find((m) => m.event === EVENT_SLUG);
   const role = membership?.role ?? "participant";
+  const isParticipant = role === "participant" || role === "admin";
   const isJudge = role === "judge";
   const isOrganizer = role === "organizer" || role === "admin";
 
-  const groups: NavGroup[] = [
-    {
+  // Vote is deliberately public to any signed-in account (the API is
+  // AllowAny) — an audience vote alongside judged scoring is by design,
+  // so judges and organizers keep it. Submit is not: POST .../submit
+  // requires IsParticipant, so showing it to a judge/organizer would
+  // dangle a control that just 403s — same mistake #9 fixed for
+  // /pairwise, applied here too.
+  const groups: NavGroup[] = [];
+  if (isParticipant) {
+    groups.push({
       label: "Participant",
-      items: [
-        { href: "/submit", label: "Submit", icon: "rocket" },
-        { href: "/vote", label: "Vote", icon: "thumbsUp" },
-      ],
-    },
-  ];
+      items: [{ href: "/submit", label: "Submit", icon: "rocket" }],
+    });
+  }
+  groups.push({
+    label: "Vote",
+    items: [{ href: "/vote", label: "Vote", icon: "thumbsUp" }],
+  });
   if (isJudge) {
     groups.push({
       label: "Judge",

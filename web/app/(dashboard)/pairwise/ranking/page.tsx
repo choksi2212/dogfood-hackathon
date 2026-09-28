@@ -1,8 +1,9 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { AlertCircle } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { EVENT_SLUG } from "@/lib/api/routes";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ExportCsvButton } from "./ExportCsvButton";
@@ -10,6 +11,26 @@ import { cn } from "@/lib/utils";
 
 export default async function PairwiseRankingPage() {
   const cookieHeader = (await cookies()).toString();
+
+  // GET .../pairwise/ranking is IsJudge-gated same as the ballot
+  // endpoint — check the role up front instead of letting a non-judge
+  // hit the generic error boundary (same fix as /pairwise itself, #9).
+  const user = await api.me(cookieHeader);
+  const membership = user.memberships.find((m) => m.event === EVENT_SLUG);
+  const canView = membership?.role === "judge" || membership?.role === "admin";
+
+  if (!canView) {
+    return (
+      <Alert>
+        <AlertCircle className="size-4" />
+        <AlertTitle>Judges only</AlertTitle>
+        <AlertDescription>
+          Only judges can view the pairwise ranking. Switch accounts to participate.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   const [data, gallery] = await Promise.all([
     api.pairwiseRanking(undefined, cookieHeader),
     // Ranking only has project_id (the fit doesn't carry names) — join
