@@ -6,10 +6,12 @@ Endpoints (under /api/):
   DELETE /api/events/<slug>/submissions/<id>/vote   retract a ballot
   GET    /api/events/<slug>/votes/results           organizer-only tally
 
-Both are deadline-gated: voting opens at ``submissions_close_at`` (i.e.
-once the registration window has closed). The vote window is not
-explicitly bounded here — the spec ties voting to the same window as
-peer scoring. Anti-abuse is layered at the proxy / abuse-flag app.
+Both are deadline-gated by ``submissions_close_at``: voting shares the
+submission window and closes with it (``@deadline_gated`` rejects once
+``now > submissions_close_at`` — see tests/voting/test_voting.py, which
+builds its own event with that deadline in the future specifically to
+exercise the "voting allowed" paths). Anti-abuse is layered at the
+proxy / abuse-flag app.
 
 Mode semantics (see ``Event.voting_mode``):
 

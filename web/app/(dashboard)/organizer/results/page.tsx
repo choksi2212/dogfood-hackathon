@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { api } from "@/lib/api/client";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import { api, ApiError } from "@/lib/api/client";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -22,10 +23,39 @@ const RESULT_COLOR: Record<string, string> = {
 
 export default async function VotingResultsPage() {
   const cookieHeader = (await cookies()).toString();
-  const [votes, audit] = await Promise.all([
-    api.voteResults(undefined, cookieHeader),
-    api.auditLog(undefined, 100, cookieHeader),
-  ]);
+
+  let votes;
+  let audit;
+  try {
+    [votes, audit] = await Promise.all([
+      api.voteResults(undefined, cookieHeader),
+      api.auditLog(undefined, 100, cookieHeader),
+    ]);
+  } catch (err) {
+    // The layout already guarantees a signed-in session — a 403 here
+    // means this account just isn't an organizer, same as /organizer.
+    if (err instanceof ApiError && err.status === 403) {
+      return (
+        <Alert>
+          <AlertCircle className="size-4" />
+          <AlertTitle>Organizer role required</AlertTitle>
+          <AlertDescription>
+            You&apos;re signed in, but this account isn&apos;t listed as an organizer
+            for this event. Ask the event owner to add you.
+          </AlertDescription>
+        </Alert>
+      );
+    }
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="size-4" />
+        <AlertDescription>
+          Couldn&apos;t load results or the audit log:{" "}
+          {err instanceof Error ? err.message : "Unknown error."}
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   const topVotes = votes.results.length
     ? Math.max(...votes.results.map((r) => r.total_votes))
