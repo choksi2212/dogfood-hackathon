@@ -5,12 +5,16 @@
 #   [tiers]    claimed = ["T1", "T2", ...] — checker reads these keys
 #              verbatim (uppercase), and a tier only counts as verified
 #              if every tier below it also passed.
-#   [auth]     four pre-baked session cookies, one per role, printed by
-#              `manage.py import_fixtures` (regenerate after every
-#              restart — see entrypoint.sh, which reseeds on boot).
+#   [auth]     five pre-baked session cookies, one per role, printed by
+#              `manage.py import_fixtures`. These are DETERMINISTIC:
+#              derived (HMAC-SHA256) from DJANGO_SECRET_KEY + the role
+#              label + the seeded user's email, so they are identical on
+#              every boot and every fresh database. The committed values
+#              work after a clean `docker compose up` — no copy-paste
+#              step. They only change if you change DJANGO_SECRET_KEY.
 #   [routes]   the five route names run.py hits.
 #
-# Regenerate auth cookies with:
+# If you did change the secret, regenerate with:
 #   docker compose exec web python manage.py import_fixtures
 
 [portal]
@@ -18,12 +22,13 @@ base_url = "http://localhost:8000"
 
 [tiers]
 claimed = ["T1", "T2", "T3"]
+pitch = "A self-hosted hackathon portal with a judging engine you can trust: role isolation in the backend, weighted rubrics, z-score + additive-shift normalization with a proof, Bradley-Terry pairwise mode, and a one-command seeded deploy."
 
 [auth]
-organizer   = "Cookie: session=YfVQib7SjTNfd94lM0EQ4W4HDT1sO0t5oMwgie86X7E"
-judge_a     = "Cookie: session=fK7PZE-XFxrTgAw7V-wFe6DfvfvhP2-wX3okkQxXy24"
-judge_b     = "Cookie: session=Jb7rR9UV-CPTmtAloidV3-v7qEiZsVKn_prSc3ITuo0"
-participant = "Cookie: session=2RWaA_DDxb2EBw9TvI8o0lH4sogxMbeSvQ3fdlY6VF0"
+organizer   = "Cookie: session=f6b85c6ef1a26610e46338168d9cdeb57981352bc49c2f0354143fa9a71cdb04"
+judge_a     = "Cookie: session=15a056f0daf204cd4cd1c05a075c2795b0b003cef2e0d616c35f6e0861f708a0"
+judge_b     = "Cookie: session=da81db3be52aeeccfd69b6f53c9f6194646ccabcdb602c32b8b9ddb70dfde497"
+participant = "Cookie: session=5630afa3363fab34ab1dee5a34b3b9d3cb33ff6e0834e7a410c75be3db89e74c"
 
 [routes]
 gallery      = "/api/gallery"

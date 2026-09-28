@@ -116,18 +116,27 @@ class Command(BaseCommand):
             headers = {}
             for label, fixture_judge_id in DEMO_JUDGE_LABELS.items():
                 user = judges_by_id[fixture_judge_id]
-                session, token = Session.create(user, label=label, ip="127.0.0.1", user_agent="import_fixtures/1.0", ttl_days=365)
+                session, token = Session.create(
+                    user, label=label, ip="127.0.0.1", user_agent="import_fixtures/1.0", ttl_days=365,
+                    deterministic=True,
+                )
                 headers[label] = token
-            org_session, org_token = Session.create(organizer, label="organizer", ip="127.0.0.1", user_agent="import_fixtures/1.0", ttl_days=365)
+            org_session, org_token = Session.create(
+                organizer, label="organizer", ip="127.0.0.1", user_agent="import_fixtures/1.0", ttl_days=365,
+                deterministic=True,
+            )
             headers["organizer"] = org_token
-            part_session, part_token = Session.create(participant, label="participant", ip="127.0.0.1", user_agent="import_fixtures/1.0", ttl_days=365)
+            part_session, part_token = Session.create(
+                participant, label="participant", ip="127.0.0.1", user_agent="import_fixtures/1.0", ttl_days=365,
+                deterministic=True,
+            )
             headers["participant"] = part_token
 
         self.stdout.write(f"# Imported {len(fixture['projects'])} projects, {len(fixture['judges'])} judges, "
                            f"{len(fixture['teams'])} teams, {len(fixture.get('scores', []))} scores")
         self.stdout.write(f"# event_slug = {event.slug}")
         self.stdout.write(f"# known_fixture_title = {fixture['projects'][0]['title']}")
-        self.stdout.write("# Paste the lines below into the [auth] block of .dogfood.toml:")
+        self.stdout.write("# Stable demo session cookies (deterministic — they match the committed .dogfood.toml):")
         self.stdout.write("")
         for label in ("organizer", "judge_a", "judge_b", "judge_c", "participant"):
             self.stdout.write(f'{label} = "Cookie: session={headers[label]}"')
