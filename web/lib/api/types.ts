@@ -217,6 +217,7 @@ export type BatchProject = {
   tagline: string;
   submitted: boolean;
   reviewed: boolean;
+  submitted_at: string | null;
 };
 
 export type MyBatchResponse = {

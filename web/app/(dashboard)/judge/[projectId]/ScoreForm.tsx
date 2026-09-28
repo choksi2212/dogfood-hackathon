@@ -19,19 +19,23 @@ type Status = "idle" | "saving" | "submitting" | "error";
 export function ScoreForm({
   projectId,
   criteria,
+  initialValues = {},
+  initialSubmittedAt = null,
 }: {
   projectId: string;
   criteria: Criterion[];
+  initialValues?: Record<string, number>;
+  initialSubmittedAt?: string | null;
 }) {
   const router = useRouter();
   const [values, setValues] = useState<Record<string, number>>(() =>
-    Object.fromEntries(criteria.map((c) => [c.id, c.min])),
+    Object.fromEntries(criteria.map((c) => [c.id, initialValues[c.id] ?? c.min])),
   );
   const [comment, setComment] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [submittedAt, setSubmittedAt] = useState<string | null>(null);
+  const [submittedAt, setSubmittedAt] = useState<string | null>(initialSubmittedAt);
 
   function setValue(criterionId: string, value: number) {
     setValues((v) => ({ ...v, [criterionId]: value }));
@@ -76,8 +80,11 @@ export function ScoreForm({
     return (
       <Alert>
         <CheckCircle2 className="size-4" />
-        <AlertDescription>
-          Submitted at {new Date(submittedAt).toLocaleString()}.
+        <AlertDescription className="flex items-center justify-between gap-3">
+          <span>Submitted at {new Date(submittedAt).toLocaleString()}.</span>
+          <Button variant="outline" size="sm" onClick={() => setSubmittedAt(null)}>
+            Edit review
+          </Button>
         </AlertDescription>
       </Alert>
     );

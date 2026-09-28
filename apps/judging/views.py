@@ -25,6 +25,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import User
+from apps.audit.helpers import log as audit_log
 from apps.events.decorators import deadline_gated
 from apps.events.models import Event, Membership, RubricCriterion
 from apps.events.permissions import IsOrganizer
@@ -65,6 +66,14 @@ class BatchInviteView(APIView):
                 defaults={"role": "judge", "created_by": request.user},
             )
             invited += 1
+
+        audit_log(
+            request.user,
+            "judges.bulk_invite",
+            event,
+            payload={"emails": emails, "invited": invited},
+            request=request,
+        )
         return Response({"invited": invited})
 
 
@@ -90,6 +99,13 @@ class AssignmentRunView(APIView):
             projects_per_judge=projects_per_judge,
             created_by=request.user,
         )
+        audit_log(
+            request.user,
+            "assignment.run",
+            event,
+            payload=result,
+            request=request,
+        )
         return Response(result)
 
 
@@ -111,22 +127,32 @@ class MyBatchView(APIView):
         # select_related, each iteration triggers a fresh query. With 30+
         # assignments per judge this is a 30x slowdown on the dashboard
         # render.
+        #
+        # A judge can hold assignments across more than one batch — the
+        # organizer re-running assignment doesn't delete old batches
+        # (JudgeBatch keeps them "around for audit"), and with a fixed
+        # seed the same judge/project pairing often repeats. Order oldest
+        # -> newest so that, when the same project_id repeats, the dict
+        # below ends up keyed on the assignment from the newest batch —
+        # the same "latest batch wins" resolution ScoreSaveView and
+        # ScoreSubmitView use, so what a judge sees as "reviewed" here
+        # always matches the assignment their save/submit calls hit.
         assignments = JudgeAssignment.objects.filter(judge=request.user, batch__event=event).select_related(
             "project__team", "project__track", "review"
-        )
+        ).order_by("batch__created_at")
 
-        projects = []
+        projects_by_id = {}
         for a in assignments:
             review = a.review if hasattr(a, "review") else None
-            projects.append(
-                {
-                    "id": str(a.project.id),
-                    "name": a.project.name,
-                    "tagline": a.project.tagline,
-                    "submitted": a.project.status == "submitted",
-                    "reviewed": review is not None and review.submitted_at is not None,
-                }
-            )
+            projects_by_id[str(a.project.id)] = {
+                "id": str(a.project.id),
+                "name": a.project.name,
+                "tagline": a.project.tagline,
+                "submitted": a.project.status == "submitted",
+                "reviewed": review is not None and review.submitted_at is not None,
+                "submitted_at": review.submitted_at.isoformat() if review and review.submitted_at else None,
+            }
+        projects = list(projects_by_id.values())
 
         scored = sum(1 for p in projects if p["reviewed"])
         return Response(
@@ -213,7 +239,21 @@ class ScoreSaveView(APIView):
 
     @deadline_gated("judging_close_at")
     def put(self, request, slug, project_id):
-        assignment = JudgeAssignment.objects.get(judge=request.user, project_id=project_id)
+        # Same "latest batch wins" resolution as MyBatchView — a judge
+        # can hold more than one assignment for this project across
+        # batches (old ones aren't deleted when the organizer re-runs
+        # assignment), so `.get()` here would raise MultipleObjectsReturned
+        # instead of ever saving anything.
+        assignment = (
+            JudgeAssignment.objects.filter(judge=request.user, project_id=project_id)
+            .order_by("-batch__created_at")
+            .first()
+        )
+        if assignment is None:
+            return Response(
+                {"error": {"code": "not_found", "message": "No assignment for this project."}},
+                status=404,
+            )
 
         scores_data = request.data.get("scores", [])
         rubric_criteria = {str(c.id): c for c in RubricCriterion.objects.filter(rubric__event__slug=slug)}
@@ -267,7 +307,17 @@ class ScoreSubmitView(APIView):
     @deadline_gated("judging_close_at")
     @transaction.atomic
     def post(self, request, slug, project_id):
-        assignment = JudgeAssignment.objects.get(judge=request.user, project_id=project_id)
+        # Same "latest batch wins" resolution as MyBatchView/ScoreSaveView.
+        assignment = (
+            JudgeAssignment.objects.filter(judge=request.user, project_id=project_id)
+            .order_by("-batch__created_at")
+            .first()
+        )
+        if assignment is None:
+            return Response(
+                {"error": {"code": "not_found", "message": "No assignment for this project."}},
+                status=404,
+            )
 
         # All required criteria must be scored.
         required_criteria = RubricCriterion.objects.filter(rubric__event__slug=slug)
