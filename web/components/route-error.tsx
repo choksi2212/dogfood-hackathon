@@ -1,7 +1,6 @@
 "use client";
-
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, RotateCcw } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
 export function RouteError({
@@ -13,10 +12,12 @@ export function RouteError({
 }) {
   return (
     <Alert variant="destructive">
-      <AlertCircle className="size-4" />
-      <AlertDescription className="flex items-center justify-between gap-4">
-        <span>{message}</span>
-        <Button variant="outline" size="sm" onClick={reset}>
+      <AlertCircle className="size-5" />
+      <AlertTitle>{message.split(":")[0]}</AlertTitle>
+      <AlertDescription className="flex flex-wrap items-center justify-between gap-4">
+        <span>The service is temporarily unavailable. Please try again.</span>
+        <Button variant="outline" onClick={reset}>
+          <RotateCcw className="size-4" />
           Try again
         </Button>
       </AlertDescription>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 
 type ExportRow = {
   rank: number;
@@ -13,7 +14,15 @@ type ExportRow = {
 };
 
 function toCsv(rows: ExportRow[]): string {
-  const header = ["rank", "project_name", "project_id", "theta", "wins", "losses", "ties"];
+  const header = [
+    "rank",
+    "project_name",
+    "project_id",
+    "theta",
+    "wins",
+    "losses",
+    "ties",
+  ];
   const escape = (v: string | number) => {
     const s = String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -51,6 +60,7 @@ export function ExportCsvButton({
 
   return (
     <Button variant="outline" onClick={handleClick}>
+      <Download className="size-4" />
       Export CSV
     </Button>
   );

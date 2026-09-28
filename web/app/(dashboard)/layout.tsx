@@ -13,6 +13,9 @@ import {
 import { DashboardNav, type NavGroup } from "@/components/dashboard-nav";
 import { SidebarUser } from "@/components/sidebar-user";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Brand } from "@/components/brand";
+import { DashboardTitle } from "@/components/dashboard-title";
+import { PageTransition } from "@/components/page-transition";
 
 export default async function DashboardLayout({
   children,
@@ -43,7 +46,12 @@ export default async function DashboardLayout({
   // requires IsParticipant, so showing it to a judge/organizer would
   // dangle a control that just 403s — same mistake #9 fixed for
   // /pairwise, applied here too.
-  const groups: NavGroup[] = [];
+  const groups: NavGroup[] = [
+    {
+      label: "Explore",
+      items: [{ href: "/gallery", label: "Project gallery", icon: "gallery" }],
+    },
+  ];
   if (isParticipant) {
     groups.push({
       label: "Participant",
@@ -60,7 +68,11 @@ export default async function DashboardLayout({
       items: [
         { href: "/judge", label: "My batch", icon: "listChecks" },
         { href: "/pairwise", label: "Pairwise compare", icon: "scale" },
-        { href: "/pairwise/ranking", label: "Pairwise ranking", icon: "barChart" },
+        {
+          href: "/pairwise/ranking",
+          label: "Pairwise ranking",
+          icon: "barChart",
+        },
       ],
     });
   }
@@ -69,16 +81,23 @@ export default async function DashboardLayout({
       label: "Organizer",
       items: [
         { href: "/organizer", label: "Dashboard", icon: "layoutDashboard" },
-        { href: "/organizer/results", label: "Results & audit", icon: "clipboardList" },
+        {
+          href: "/organizer/results",
+          label: "Results & audit",
+          icon: "clipboardList",
+        },
       ],
     });
   }
 
   return (
     <SidebarProvider>
-      <Sidebar collapsible="icon">
-        <SidebarHeader>
-          <span className="px-2 py-1 text-sm font-bold tracking-tight">Dogfood Portal</span>
+      <Sidebar
+        collapsible="icon"
+        className="border-r border-border/80 backdrop-blur-xl"
+      >
+        <SidebarHeader className="mb-3 flex h-20 justify-center border-b px-4 group-data-[collapsible=icon]:px-1.5">
+          <Brand />
         </SidebarHeader>
         <SidebarContent>
           <DashboardNav groups={groups} />
@@ -86,11 +105,22 @@ export default async function DashboardLayout({
         <SidebarUser name={user.name} email={user.email} role={role} />
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-14 items-center justify-between border-b px-4">
-          <SidebarTrigger />
-          <ThemeToggle />
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-bg/80 px-6 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <SidebarTrigger />
+            <span className="h-4 w-px bg-border" />
+            <DashboardTitle />
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="hidden font-mono text-xs tracking-caps text-text-muted sm:inline">
+              DOGFOOD / 2026
+            </span>
+            <ThemeToggle />
+          </div>
         </header>
-        <main className="flex-1 p-6">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 p-6 lg:p-10">
+          <PageTransition>{children}</PageTransition>
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

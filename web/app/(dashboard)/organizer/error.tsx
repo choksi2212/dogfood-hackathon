@@ -3,11 +3,17 @@
 import { RouteError } from "@/components/route-error";
 
 export default function OrganizerError({
-  error,
+  retry,
   reset,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry?: () => void;
+  reset?: () => void;
 }) {
-  return <RouteError message={`Could not load the dashboard: ${error.message}`} reset={reset} />;
+  return (
+    <RouteError
+      message="Could not load the event dashboard"
+      reset={retry ?? reset ?? (() => window.location.reload())}
+    />
+  );
 }

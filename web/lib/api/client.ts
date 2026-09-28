@@ -82,6 +82,33 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  async allGallery(): Promise<GalleryResponse["items"]> {
+    const items = new Map<string, GalleryResponse["items"][number]>();
+    const cursors = new Set<string>();
+    let after: string | undefined;
+    do {
+      const params = new URLSearchParams({ sort: "alpha" });
+      if (after) params.set("after", after);
+      const page = await request<GalleryResponse>(`${routes.gallery()}?${params}`);
+      page.items.forEach(item => items.set(item.id, item));
+      after = page.next || undefined;
+      if (after && cursors.has(after)) throw new Error("Gallery pagination could not continue.");
+      if (after) cursors.add(after);
+    } while (after);
+    return [...items.values()];
+  },
+
+  galleryPage({ track, sort = "alpha", after }: { track?: string; sort?: "alpha" | "newest"; after?: string } = {}): Promise<GalleryResponse> {
+    const params = new URLSearchParams({ sort });
+    if (track) params.set("track", track);
+    if (after) params.set("after", after);
+    return request(`${routes.gallery()}?${params.toString()}`);
+  },
+
+  register(payload: { name: string; email: string; password: string }): Promise<User> {
+    return request("/api/register", { method: "POST", body: JSON.stringify(payload) });
+  },
+
   gallery(): Promise<GalleryResponse> {
     return request(routes.gallery());
   },

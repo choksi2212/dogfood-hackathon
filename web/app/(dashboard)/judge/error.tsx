@@ -2,12 +2,18 @@
 
 import { RouteError } from "@/components/route-error";
 
-export default function JudgeError({
-  error,
+export default function ErrorBoundary({
+  retry,
   reset,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry?: () => void;
+  reset?: () => void;
 }) {
-  return <RouteError message={`Could not load your batch: ${error.message}`} reset={reset} />;
+  return (
+    <RouteError
+      message="We couldn’t load your batch"
+      reset={retry ?? reset ?? (() => window.location.reload())}
+    />
+  );
 }

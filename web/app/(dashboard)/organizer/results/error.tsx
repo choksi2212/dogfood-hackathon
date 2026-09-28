@@ -3,16 +3,17 @@
 import { RouteError } from "@/components/route-error";
 
 export default function ResultsError({
-  error,
+  retry,
   reset,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry?: () => void;
+  reset?: () => void;
 }) {
   return (
     <RouteError
-      message={`Could not load results or the audit log: ${error.message}`}
-      reset={reset}
+      message="Could not load results or the audit log"
+      reset={retry ?? reset ?? (() => window.location.reload())}
     />
   );
 }
