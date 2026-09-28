@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from django.db import transaction
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -31,7 +32,7 @@ class NormalizeView(APIView):
     """POST /api/events/<slug>/normalize — run the two-way additive fit
     on every score in the event, persist the result, return the proof."""
 
-    permission_classes = [IsOrganizer]
+    permission_classes = [IsAuthenticated, IsOrganizer]
 
     @transaction.atomic
     def post(self, request, slug):

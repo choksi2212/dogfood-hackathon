@@ -320,7 +320,13 @@ paths:
           description: Unauthenticated
   /api/events/{slug}/:
     get:
-      summary: Retrieve event details
+      summary: Retrieve full event details (organizer only)
+      description: |
+        Organizer-only read. Returns the full event payload including
+        rubric weights, prize structure, judging window, voting mode,
+        and the pairwise toggle. Judges and participants cannot read
+        this — they should use `GET /api/events/{slug}/rubric` for the
+        rubric they need to score against.
       security:
       - cookie: []
       parameters:
@@ -336,6 +342,8 @@ paths:
           description: Rate limited
         '401':
           description: Unauthenticated
+        '403':
+          description: Not an organizer of this event
     put:
       summary: Update an event (organizer only)
       security:
@@ -395,8 +403,36 @@ paths:
         '401':
           description: Unauthenticated
   /api/events/{slug}/rubric:
+    get:
+      summary: Read the rubric for an event (any event member)
+      description: |
+        Returns the rubric for this event \u2014 criteria names, weights,
+        min/max, and order. Visible to any signed-in member of the
+        event (judges need it to label sliders, organizers to manage
+        it, participants to know what they're being judged on).
+
+        Does NOT include prize structure, judging window, voting mode,
+        or the pairwise toggle \u2014 those live on the organizer-only
+        `GET /api/events/{slug}/`.
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Rubric (empty criteria array if the event has none)
+        '404':
+          description: Event not found
+        '429':
+          description: Rate limited
+        '401':
+          description: Unauthenticated
     post:
-      summary: Define the rubric for an event (organizer only)
+      summary: Replace the rubric for an event (organizer only)
       security:
       - cookie: []
       parameters:
@@ -407,13 +443,17 @@ paths:
           type: string
       responses:
         '201':
-          description: Rubric created
+          description: Rubric replaced
+        '422':
+          description: Validation failed (e.g. weights don't sum to 1.0)
         '429':
           description: Rate limited
         '415':
           description: "Unsupported media type \u2014 request body must be JSON"
         '401':
           description: Unauthenticated
+        '403':
+          description: Not an organizer of this event
   /api/events/{slug}/memberships:
     get:
       summary: List memberships for an event (organizer only)
@@ -587,7 +627,7 @@ paths:
           description: Unauthenticated
   /api/events/{slug}/normalize:
     post:
-      summary: Run the additive alternating-means fit on the event's scores
+      summary: Run the additive alternating-means fit on the event's scores (organizer only)
       security:
       - cookie: []
       parameters:
@@ -607,6 +647,8 @@ paths:
           description: "Unsupported media type \u2014 request body must be JSON"
         '401':
           description: Unauthenticated
+        '403':
+          description: Not an organizer of this event
   /api/events/{slug}/pairwise/ballots:
     post:
       summary: Submit a Bradley-Terry ballot
