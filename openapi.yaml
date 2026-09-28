@@ -1363,3 +1363,159 @@ paths:
           description: Rate limited
         '401':
           description: Unauthenticated
+
+  /api/events/{slug}/csv/scores:
+    get:
+      summary: Raw per-judge scores CSV (T2 every-stage export)
+      description: |
+        One row per (assignment, criterion) cell. Companion to the
+        normalized-score CSV at /api/csv_export. Use this for raw
+        audit, that one for the published final scores.
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+      responses:
+        '200':
+          description: Streaming CSV
+        '403':
+          description: Not an organizer of this event
+        '404':
+          description: Event not found
+        '401':
+          description: Unauthenticated
+        '429':
+          description: Rate limited
+  /api/events/{slug}/csv/roster:
+    get:
+      summary: Judge roster CSV (T2 every-stage export)
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+      responses:
+        '200':
+          description: Streaming CSV
+        '403':
+          description: Not an organizer of this event
+        '404':
+          description: Event not found
+        '401':
+          description: Unauthenticated
+        '429':
+          description: Rate limited
+  /api/events/{slug}/csv/assignments:
+    get:
+      summary: Judge-project assignments CSV (T2 every-stage export)
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+      responses:
+        '200':
+          description: Streaming CSV
+        '403':
+          description: Not an organizer of this event
+        '404':
+          description: Event not found
+        '401':
+          description: Unauthenticated
+        '429':
+          description: Rate limited
+  /api/events/{slug}/csv/submissions:
+    get:
+      summary: Submissions CSV (T2 every-stage export)
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+      responses:
+        '200':
+          description: Streaming CSV
+        '403':
+          description: Not an organizer of this event
+        '404':
+          description: Event not found
+        '401':
+          description: Unauthenticated
+        '429':
+          description: Rate limited
+  /api/events/{slug}/csv/audit:
+    get:
+      summary: Audit log CSV (T2 every-stage export)
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+      responses:
+        '200':
+          description: Streaming CSV
+        '403':
+          description: Not an organizer of this event
+        '404':
+          description: Event not found
+        '401':
+          description: Unauthenticated
+        '429':
+          description: Rate limited
+  /api/events/{slug}/csv/rankings:
+    get:
+      summary: Per-track rankings CSV (T2 every-stage export)
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+      responses:
+        '200':
+          description: Streaming CSV
+        '403':
+          description: Not an organizer of this event
+        '404':
+          description: Event not found
+        '401':
+          description: Unauthenticated
+        '429':
+          description: Rate limited
+  /api/events/{slug}/progress:
+    get:
+      summary: Organizer-wide live judging progress (T2)
+      description: |
+        One row per judge with their scored/total counts, plus event
+        totals. Used by the organizer dashboard to show
+        "X of Y projects scored by Z of W judges" in real time.
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+      responses:
+        '200':
+          description: Per-judge progress + event totals
+        '403':
+          description: Not an organizer of this event
+        '404':
+          description: Event not found
+        '401':
+          description: Unauthenticated
+        '429':
+          description: Rate limited
