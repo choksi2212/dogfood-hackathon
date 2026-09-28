@@ -1,190 +1,268 @@
 #!/usr/bin/env python3
-"""DOGFOOD acceptance runner.
+"""DOGFOOD 2026 acceptance checker.
 
-Mirrors the spec's run.py: makes the seven HTTP checks against the
-portal at the base_url from .dogfood.toml and prints PASS/FAIL with
-enough detail under each FAIL to fix without guessing.
+Usage:  python3 run.py .dogfood.toml > acceptance-report.txt
 
-Usage:
-  python3 acceptance.py .dogfood.toml
-  python3 acceptance.py .dogfood.toml > acceptance-report.txt
+Any Python 3. Standard library only, nothing to install.
 """
-from __future__ import annotations
 
+import argparse
 import json
+import os
+import re
 import sys
-import tomllib
 import urllib.error
 import urllib.request
-from pathlib import Path
+
+try:
+    import tomllib  # Python 3.11 and newer
+except ModuleNotFoundError:
+    tomllib = None
 
 
-def load_config(path: Path) -> dict:
-    with open(path, "rb") as f:
-        return tomllib.load(f)
+def parse_toml(text):
+    """Enough TOML for .dogfood.toml, so older Pythons work too.
+
+    Handles [section] headers, key = "string", and key = ["a", "b"].
+    """
+    data, section = {}, None
+    for raw in text.splitlines():
+        line = raw.split("#")[0].strip()
+        if not line:
+            continue
+        head = re.fullmatch(r"\[([A-Za-z0-9_.]+)\]", line)
+        if head:
+            section = data.setdefault(head.group(1), {})
+            continue
+        key, sep, value = line.partition("=")
+        if not sep or section is None:
+            continue
+        key, value = key.strip(), value.strip()
+        if value.startswith("["):
+            items = re.findall(r'"([^"]*)"', value)
+            section[key] = items
+        else:
+            section[key] = value.strip().strip('"').strip("'")
+    return data
 
 
-def request(url: str, headers: dict | None = None, method: str = "GET", body=None):
+def load_config(path):
+    if tomllib:
+        with open(path, "rb") as f:
+            return tomllib.load(f)
+    with open(path, encoding="utf-8") as f:
+        return parse_toml(f.read())
+
+TIERS = ["T1", "T2", "T3", "T4"]
+TIMEOUT = 10
+
+
+def request(url, header=None, method="GET", body=None):
+    """Return (status, text). Never raises on an HTTP error status."""
     req = urllib.request.Request(url, method=method)
-    for k, v in (headers or {}).items():
-        req.add_header(k, v)
-    data = None
+    if header:
+        name, _, value = header.partition(":")
+        req.add_header(name.strip(), value.strip())
     if body is not None:
+        req.data = json.dumps(body).encode()
         req.add_header("Content-Type", "application/json")
-        data = json.dumps(body).encode()
     try:
-        with urllib.request.urlopen(req, data=data, timeout=10) as resp:
-            payload = resp.read().decode(errors="replace")
-            return resp.status, payload
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            return resp.status, resp.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
-        return e.code, e.read().decode(errors="replace")
-    except urllib.error.URLError as e:
-        return 0, f"connection refused: {e.reason}"
+        return e.code, e.read().decode("utf-8", "replace")
+    except Exception as e:
+        return 0, f"{type(e).__name__}: {e}"
 
 
-def main(argv: list[str]) -> int:
-    cfg_path = Path(argv[1] if len(argv) > 1 else ".dogfood.toml")
-    cfg = load_config(cfg_path)
+class Check:
+    """One assertion. Collects its own failure detail as it runs."""
 
-    base = cfg["server"]["base_url"].rstrip("/")
-    routes = cfg["routes"]
-    auth = cfg["auth"]
+    def __init__(self, tier, label):
+        self.tier = tier
+        self.label = label
+        self.ok = False
+        self.detail = []
 
-    def cookie(header_value: str) -> dict:
-        # Strip the "Cookie: " prefix the spec prints, build a Cookie header.
-        kv = header_value.split(": ", 1)[1] if ": " in header_value else header_value
-        return {"Cookie": kv}
+    def note(self, line):
+        self.detail.append(line)
 
-    headers = {
-        "organizer": cookie(auth["organizer_HEADER"]),
-        "judge_a": cookie(auth["judge_a_HEADER"]),
-        "judge_b": cookie(auth["judge_b_HEADER"]),
-        "participant": cookie(auth["participant_HEADER"]),
-    }
 
-    known_title = cfg.get("meta", {}).get("known_fixture_title", "")
+def build_checks(cfg, fixture):
+    base = cfg["portal"]["base_url"].rstrip("/")
+    auth = cfg.get("auth", {})
+    routes = cfg.get("routes", {})
 
-    # --- T1: gallery / submit -------------------------------------------------
+    def url(key, suffix=""):
+        return base + routes.get(key, "") + suffix
+
     checks = []
 
-    # T1.01 — GET gallery no auth → 200
-    status, body = request(base + routes["gallery"])
-    checks.append({
-        "id": "T1.01",
-        "name": "GET /api/gallery (no auth) → 200",
-        "expected": 200, "actual": status, "ok": status == 200,
-        "detail": "" if status == 200 else body[:200],
-    })
+    # --- T1 -------------------------------------------------------------
+    c = Check("T1", "gallery is public")
+    status, body = request(url("gallery"))
+    c.ok = status == 200
+    if not c.ok:
+        c.note(f"GET {url('gallery')}")
+        c.note("no auth header")
+        c.note(f"got {status or 'no response'}, wanted 200")
+    gallery_body = body
+    checks.append(c)
 
-    # T1.02 — gallery contains known fixture title
-    ok = False
-    detail = ""
-    try:
-        data = json.loads(body)
-        items = data.get("items", [])
-        ok = any(known_title in (it.get("name") or "") for it in items)
-        detail = f"total={data.get('total')}, items_checked={len(items)}"
-    except Exception as exc:
-        detail = f"could not parse gallery response: {exc}"
-    checks.append({
-        "id": "T1.02",
-        "name": "GET /api/gallery contains known fixture title",
-        "expected": "title present", "actual": "yes" if ok else "no",
-        "ok": ok, "detail": detail,
-    })
+    c = Check("T1", "project from fixtures shown")
+    titles = fixture_titles(fixture)
+    haystack = gallery_body.lower()
+    c.ok = any(t.lower() in haystack for t in titles)
+    if not c.ok:
+        c.note(f"GET {url('gallery')}")
+        if titles:
+            c.note("looked for any of these fixture project titles: "
+                   + ", ".join(repr(t) for t in titles))
+            c.note("none of them appeared in the response body")
+            c.note("if your gallery paginates, make sure page one is what "
+                   "this route returns")
+        else:
+            c.note("no fixture file was loaded, so there was nothing to look for")
+    checks.append(c)
 
-    # T1.03 — POST submit as participant, after deadline → 4xx
-    status, body = request(
-        base + routes["submit"], headers=headers["participant"],
-        method="POST", body={},
+    c = Check("T1", "closed event refuses submissions")
+    status, _ = request(
+        url("submit"),
+        header=auth.get("participant"),
+        method="POST",
+        body={"title": "dogfood-late-submission-probe", "summary": "probe"},
     )
-    is_4xx = 400 <= status < 500
-    detail = ""
-    try:
-        detail = json.dumps(json.loads(body))[:300]
-    except Exception:
-        detail = body[:300]
-    checks.append({
-        "id": "T1.03",
-        "name": "POST /api/submit (participant, past deadline) → 4xx",
-        "expected": "4xx", "actual": status, "ok": is_4xx, "detail": detail,
-    })
+    c.ok = 400 <= status < 500
+    if not c.ok:
+        c.note(f"POST {url('submit')}")
+        c.note("sent as participant; the fixture event closed "
+               f"{(fixture or {}).get('event', {}).get('submissions_close', 'in the past')}")
+        c.note(f"got {status or 'no response'}, wanted 4xx")
+    checks.append(c)
 
-    # --- T2: only when claimed ------------------------------------------------
-    claimed = set(cfg.get("tiers", {}).get("claimed", []))
-    if "t2" in claimed:
-        # T2.04 — GET judge_scores as judge_a → 200
-        status, body = request(base + routes["judge_scores"], headers=headers["judge_a"])
-        checks.append({
-            "id": "T2.04",
-            "name": "GET /api/judge/scores (judge_a) → 200",
-            "expected": 200, "actual": status, "ok": status == 200,
-            "detail": "" if status == 200 else body[:200],
-        })
-        # T2.05 — GET peer_scores as judge_b → 401/403
-        status, body = request(base + routes["peer_scores"], headers=headers["judge_b"])
-        is_4xx = 400 <= status < 500
-        try:
-            detail = json.dumps(json.loads(body))[:200]
-        except Exception:
-            detail = body[:200]
-        checks.append({
-            "id": "T2.05",
-            "name": "GET /api/judge/peer-scores (judge_b) → 401/403",
-            "expected": "401/403", "actual": status, "ok": is_4xx,
-            "detail": detail,
-        })
-        # T2.06 — GET judge_scores as participant → 401/403
-        status, body = request(base + routes["judge_scores"], headers=headers["participant"])
-        is_4xx = 400 <= status < 500
-        try:
-            detail = json.dumps(json.loads(body))[:200]
-        except Exception:
-            detail = body[:200]
-        checks.append({
-            "id": "T2.06",
-            "name": "GET /api/judge/scores (participant) → 401/403",
-            "expected": "401/403", "actual": status, "ok": is_4xx,
-            "detail": detail,
-        })
-        # T2.07 — GET csv_export as organizer → 200 CSV
-        status, body = request(base + routes["csv_export"], headers=headers["organizer"])
-        is_csv = status == 200 and ("," in body[:200] or "text/csv" in body[:200].lower())
-        checks.append({
-            "id": "T2.07",
-            "name": "GET /api/csv_export (organizer) → 200 + CSV body",
-            "expected": "200 + CSV", "actual": status, "ok": is_csv,
-            "detail": "" if is_csv else body[:200],
-        })
+    # --- T2 -------------------------------------------------------------
+    c = Check("T2", "judge sees own scores")
+    status, _ = request(url("judge_scores"), header=auth.get("judge_a"))
+    c.ok = status == 200
+    if not c.ok:
+        c.note(f"GET {url('judge_scores')}")
+        c.note("sent as judge_a")
+        c.note(f"got {status or 'no response'}, wanted 200")
+    checks.append(c)
 
-    # --- Report ---------------------------------------------------------------
-    passed = sum(1 for c in checks if c["ok"])
-    failed = len(checks) - passed
-    lines = [
-        "=" * 64,
-        "DOGFOOD acceptance report",
-        "=" * 64,
-        f"Config:       {cfg_path}",
-        f"Base URL:     {base}",
-        f"Event:        {cfg.get('meta', {}).get('event_slug', '?')}",
-        f"Tiers claimed: {sorted(claimed)}",
-        f"Known title:  {known_title}",
-        "",
+    c = Check("T2", "judge cannot see peer scores")
+    probe = base + routes.get("peer_scores", routes.get("judge_scores", ""))
+    status, _ = request(probe, header=auth.get("judge_b"))
+    c.ok = status in (401, 403)
+    if not c.ok:
+        c.note(f"GET {probe}")
+        c.note("sent as judge_b; this is the url that returns judge_a's scores")
+        c.note(f"got {status or 'no response'}, wanted 401 or 403")
+        if status == 200:
+            c.note("the backend returned another judge's scores")
+    checks.append(c)
+
+    c = Check("T2", "participant blocked")
+    status, _ = request(url("judge_scores"), header=auth.get("participant"))
+    c.ok = status in (401, 403)
+    if not c.ok:
+        c.note(f"GET {url('judge_scores')}")
+        c.note("sent as participant")
+        c.note(f"got {status or 'no response'}, wanted 401 or 403")
+    checks.append(c)
+
+    c = Check("T2", "csv export works")
+    status, body = request(url("csv_export"), header=auth.get("organizer"))
+    first_line = body.splitlines()[0] if body.splitlines() else ""
+    c.ok = status == 200 and "," in first_line
+    if not c.ok:
+        c.note(f"GET {url('csv_export')}")
+        c.note("sent as organizer")
+        if status != 200:
+            c.note(f"got {status or 'no response'}, wanted 200")
+        else:
+            c.note("got 200 but the first line has no comma in it")
+    checks.append(c)
+
+    return checks
+
+
+def fixture_titles(fixture, n=3):
+    projects = (fixture or {}).get("projects") or []
+    return [p.get("title", "") for p in projects[:n] if p.get("title")]
+
+
+def load_fixture(explicit, config_path):
+    """Look where a student would plausibly have put it."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    beside_config = os.path.dirname(os.path.abspath(config_path))
+    candidates = [explicit] if explicit else [
+        "fixtures.json",
+        os.path.join(here, "fixtures.json"),
+        os.path.join(beside_config, "fixtures.json"),
+        os.path.join(beside_config, "data", "fixtures.json"),
     ]
+    for c in candidates:
+        try:
+            with open(c, "rb") as f:
+                return json.load(f), c
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+    return None, None
+
+
+def main():
+    ap = argparse.ArgumentParser(description="DOGFOOD 2026 acceptance checker")
+    ap.add_argument("config", help="path to .dogfood.toml")
+    ap.add_argument("--fixtures", default=None,
+                    help="path to fixtures.json (searched for if omitted)")
+    args = ap.parse_args()
+
+    cfg = load_config(args.config)
+
+    fixture, fixture_path = load_fixture(args.fixtures, args.config)
+    claimed = [t for t in cfg.get("tiers", {}).get("claimed", []) if t in TIERS]
+
+    print("DOGFOOD 2026 acceptance report")
+    print(f"portal: {cfg['portal']['base_url']}")
+    print(f"claimed: {' '.join(claimed) or 'nothing'}")
+    if fixture is None:
+        print("note: fixtures.json was not found, so the fixture content "
+              "check will fail. Put it next to run.py or pass its path.")
+    else:
+        print(f"fixtures: {fixture_path}")
+    print()
+
+    checks = build_checks(cfg, fixture)
+
+    width = max(len(c.label) for c in checks) + 2
     for c in checks:
-        status_str = "PASS" if c["ok"] else "FAIL"
-        lines.append(f"[{status_str}] {c['id']}  {c['name']}")
-        lines.append(f"        expected: {c['expected']}")
-        lines.append(f"        actual:   {c['actual']}")
-        if not c["ok"] and c["detail"]:
-            lines.append(f"        detail:   {c['detail']}")
-        lines.append("")
-    lines.append("=" * 64)
-    lines.append(f"Summary: {passed} PASS / {failed} FAIL / {len(checks)} total")
-    lines.append("=" * 64)
-    print("\n".join(lines))
-    return 0 if failed == 0 else 1
+        dots = "." * (width - len(c.label))
+        print(f"{c.tier}  {c.label} {dots} {'PASS' if c.ok else 'FAIL'}")
+        for line in c.detail:
+            print(f"       {line}")
+
+    verified = [t for t in TIERS
+                if any(c.tier == t for c in checks)
+                and all(c.ok for c in checks if c.tier == t)]
+    # a tier only counts if every tier below it also passed
+    solid = []
+    for t in TIERS:
+        if t in verified:
+            solid.append(t)
+        else:
+            break
+
+    print()
+    print(f"claimed {' '.join(claimed) or 'nothing'}, "
+          f"verified {' '.join(solid) or 'nothing'}")
+
+    overclaim = [t for t in claimed if t not in solid]
+    if overclaim:
+        print(f"note: claimed but not verified: {' '.join(overclaim)}")
+
+    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    sys.exit(main())

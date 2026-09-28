@@ -58,6 +58,13 @@ Nine base items, plus all four bonuses (+16). Everything below lives on
 > it is a weak one. See [JUDGING.md](JUDGING.md) for the assignment strategy, the
 > scoring model, and the defended normalization method.
 
+## Local development notes
+
+- `nginx.conf` is baked into the `nginx` image at build time (`COPY`, not a
+  volume mount). After editing it, `docker compose up -d` alone won't pick
+  up the change — rebuild that service explicitly:
+  `docker compose up -d --build nginx`.
+
 ## The acceptance mechanism
 
 `run.py` (provided in the spec) makes seven HTTP checks against the portal at

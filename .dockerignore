@@ -1,24 +1,31 @@
+# A bare pattern here only matches at the repo root — unlike
+# .gitignore, .dockerignore does NOT recurse a plain "node_modules/"
+# into subdirectories. Every entry that also needs to match nested
+# copies (web/node_modules, apps/*/__pycache__, etc.) is written with
+# a "**/" prefix so it actually does. Getting this wrong is why the
+# backend image's build context was silently ~1GB (web/node_modules +
+# web/.next) even though both looked "excluded" here.
 .git
-.gitignore
+**/.gitignore
 .env
 .env.local
-.venv/
-venv/
-__pycache__/
-*.pyc
-*.pyo
-node_modules/
-.next/
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-dist/
-build/
-*.log
-.DS_Store
-Thumbs.db
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/node_modules/
+**/.next/
+**/.mypy_cache/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.coverage
+**/htmlcov/
+**/dist/
+**/build/
+**/*.log
+**/.DS_Store
+**/Thumbs.db
 docs/
 README.md
 LICENSE

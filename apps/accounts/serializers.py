@@ -17,7 +17,11 @@ class UserSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop("password", None)
-        user = User(**validated_data)
+        # AbstractUser requires a non-empty unique username; use the
+        # email as the username so login-by-email continues to work.
+        # Same fix as seed_fixtures._ensure_user and
+        # apps.judging.views.BatchInviteView.post.
+        user = User(username=validated_data.get("email"), **validated_data)
         if password:
             validate_password(password)
             user.set_password(password)

@@ -196,6 +196,30 @@ paths:
           description: Malformed cursor or sort/cursor mismatch
         '429':
           description: Rate limited
+  /api/submissions/{id}:
+    get:
+      summary: Single submission detail (public read)
+      description: |
+        Returns one submission by UUID. Public — anyone with the link can
+        read it (matches the gallery's public-read posture). Drafts 404.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Submission detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Submission'
+        '404':
+          description: Submission not found, withdrawn, or still a draft
+        '429':
+          description: Rate limited
   /api/register:
     post:
       summary: Create a new user account and start a session
@@ -749,6 +773,53 @@ paths:
           description: Rate limited
         '401':
           description: Unauthenticated
+  /api/events/{slug}/votes/results:
+    get:
+      summary: Organizer-only tally of live votes per project
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Per-project vote tally
+        '404':
+          description: Event not found
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Not an organizer of this event
+  /api/events/{slug}/audit-log:
+    get:
+      summary: Organizer-only human-readable audit trail
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 100
+          maximum: 500
+      responses:
+        '200':
+          description: Recent audit entries, newest first
+        '404':
+          description: Event not found
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Not an organizer of this event
   /api/events/{slug}/submissions/{id}/comments:
     get:
       summary: Public list of visible comments on a submission
@@ -932,7 +1003,7 @@ paths:
           description: Rate limited
         '401':
           description: Unauthenticated
-  /api/{public_id}:
+  /api/certificates/{public_id}:
     get:
       summary: Public, HMAC-signed certificate for a submission
       parameters:

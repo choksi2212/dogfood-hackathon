@@ -1,6 +1,6 @@
 {
   "paths": [
-    "/api/{public_id}",
+    "/api/certificates/{public_id}",
     "/api/csv_export",
     "/api/events/{slug}/normalize",
     "/api/events/{slug}/pairwise/ballots",
@@ -35,7 +35,7 @@
     "GET /api/widget/gallery": {
       "200": "Items list"
     },
-    "GET /api/{public_id}": {
+    "GET /api/certificates/{public_id}": {
       "200": "Certificate"
     },
     "GET /widget.js": {

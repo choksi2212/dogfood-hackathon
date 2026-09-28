@@ -15,6 +15,8 @@ G4 (normalization):
 
 G5 (voting):
   /api/events/<slug>/submissions/<id>/vote  cast/retract
+  /api/events/<slug>/votes/results          organizer, per-project tally
+  /api/events/<slug>/audit-log              organizer, human-readable trail
 
 G6 (pairwise):
   /api/events/<slug>/pairwise/ballots       POST ballot
@@ -52,10 +54,11 @@ urlpatterns = [
     path("api/", include("apps.judging.urls")),
     path("api/", include("apps.normalization.urls")),
     path("api/", include("apps.voting.urls")),
+    path("api/", include("apps.audit.urls")),
     path("api/", include("apps.abuse.urls")),
     path("api/", include("apps.pairwise.urls")),
     path("api/", include("apps.api.urls")),
-    path("api/", include("apps.certificates.urls")),
+    path("api/certificates/", include("apps.certificates.urls")),
     path("api/", include("apps.widget.urls")),
     path("widget.js", include("apps.widget.urls_root")),
     path("api/billing/", include("apps.billing.urls")),

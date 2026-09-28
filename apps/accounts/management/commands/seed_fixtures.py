@@ -41,11 +41,11 @@ from apps.teams.models import Team, TeamMember
 
 DEMO_USERS = [
     # (email, name, role, label)
-    ("organizer@dogfood.local", "Olivia Organizer", "organizer", "organizer"),
-    ("judge_a@dogfood.local", "Avery Alpha-Judge", "judge", "judge_a"),
-    ("judge_b@dogfood.local", "Bailey Beta-Judge", "judge", "judge_b"),
-    ("judge_c@dogfood.local", "Casey Gamma-Judge", "judge", "judge_c"),
-    ("participant@dogfood.local", "Pranav Participant", "participant", "participant"),
+    ("organizer@test.local", "Olivia Organizer", "organizer", "organizer"),
+    ("judge_a@test.local", "Avery Alpha-Judge", "judge", "judge_a"),
+    ("judge_b@test.local", "Bailey Beta-Judge", "judge", "judge_b"),
+    ("judge_c@test.local", "Casey Gamma-Judge", "judge", "judge_c"),
+    ("participant@test.local", "Pranav Participant", "participant", "participant"),
 ]
 
 DEMO_PASSWORD = "dogfood-dev-password"
@@ -142,7 +142,7 @@ class Command(BaseCommand):
             )
 
         # Users + memberships + sessions
-        organizer = self._ensure_user("organizer@dogfood.local", "Olivia Organizer")
+        organizer = self._ensure_user("organizer@test.local", "Olivia Organizer")
         created_users = {}
         headers = {}
         for email, name, role, label in DEMO_USERS:
@@ -169,7 +169,7 @@ class Command(BaseCommand):
 
         for idx, (team_name, tagline) in enumerate(TEAM_SEED):
             captain = self._ensure_user(
-                f"captain_{idx}@dogfood.local",
+                f"captain_{idx}@test.local",
                 f"Captain {team_name}",
             )
             Membership.objects.update_or_create(
@@ -272,7 +272,7 @@ class Command(BaseCommand):
     @staticmethod
     def _bootstrap_creator():
         user, _ = User.objects.get_or_create(
-            email="bootstrap@dogfood.local",
+            email="bootstrap@test.local",
             defaults={"name": "Bootstrap", "is_active": True, "is_staff": True},
         )
         user.set_password(DEMO_PASSWORD)

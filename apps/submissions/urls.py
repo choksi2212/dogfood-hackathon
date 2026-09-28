@@ -4,6 +4,7 @@ from . import views
 
 urlpatterns = [
     path("gallery", views.GalleryView.as_view(), name="gallery"),
+    path("submissions/<uuid:id>", views.SubmissionDetailView.as_view(), name="submission_detail"),
     path(
         "events/<slug:slug>/submit",
         views.SubmitView.as_view(),

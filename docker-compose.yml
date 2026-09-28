@@ -126,16 +126,26 @@ services:
       timeout: 10s
       retries: 3
 
-  # --- Frontend (placeholder Next.js, Mihir replaces) ---------------------
+  # --- Frontend (Next.js, web/) -------------------------------------------
   frontend:
     build:
-      context: ./frontend
+      context: ./web
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-development}
+      # Server Components fetch Django directly over the compose
+      # network (no browser involved). Client Components never see
+      # this — they call relative /api/* paths, which nginx routes to
+      # `web` before the request ever reaches this container.
+      API_INTERNAL_URL: http://web:8000
+      # widget.js is <script>-embedded on third-party sites, so it
+      # needs a URL the browser can reach directly — nginx's public
+      # port (see the nginx service below), not the internal service
+      # name.
+      NEXT_PUBLIC_WIDGET_BASE: http://localhost:8000
     volumes:
-      - ./frontend:/app
+      - ./web:/app
       - /app/node_modules
       - /app/.next
     depends_on:

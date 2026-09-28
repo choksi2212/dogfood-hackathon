@@ -31,7 +31,7 @@ migrate:
 	$(COMPOSE) exec web python manage.py migrate
 
 seed:
-	$(COMPOSE) exec -T web python manage.py seed_fixtures
+	$(COMPOSE) exec -T web python manage.py import_fixtures
 
 reset:
 	$(COMPOSE) down -v

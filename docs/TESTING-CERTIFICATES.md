@@ -34,13 +34,12 @@ verify   = constant-time hmac.compare_digest(sig, sign_payload(payload))
 
 ## Known drift
 
-- `apps/certificates/urls.py` mounts `/api/certificates/<public_id>` via
-  `path("<str:public_id>", ...)` inside `include()`. The intent
-  per the spec is `/api/certificates/<public_id>`. The view tests
-  run against the actual URL the server responds to.
-- For `test_view_does_not_accept_post`: `@require_GET` is used. POST
-  should be 405. The current view returns 405 only if the URL routes
-  correctly; verify in browser before changing.
+- Fixed: `config/urls.py` mounted `apps.certificates.urls` under
+  `path("api/", ...)` instead of `path("api/certificates/", ...)`,
+  so the route was actually `/api/<public_id>` — missing the
+  `certificates/` prefix every other doc reference assumed. The
+  frontend's certificate lookup screen (web/app/certificates/) hit
+  this live while wiring against the real backend.
 
 ## Run
 
