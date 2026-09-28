@@ -1,0 +1,75 @@
+# Ledger 2026 — single-container all-in-one image.
+#
+# Runs Postgres + Django + Next.js + nginx in one container via
+# supervisord. The `docker compose up` story is now: build, then
+# point a browser at port 8000. No external postgres required.
+#
+# Build:  docker build -f Dockerfile.all-in-one -t ledger-portal .
+# Run:    docker run --rm -p 8000:8000 ledger-portal
+#
+# Use the regular multi-service docker-compose.yml when you want
+# isolated, restartable services or the observability stack.
+
+FROM python:3.12-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# One apt-get layer: postgres server + node + supervisor + nginx + the
+# build deps for psycopg / next / sharp.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    postgresql \
+    postgresql-contrib \
+    nginx \
+    supervisor \
+    curl \
+    ca-certificates \
+    gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" \
+       > /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Python deps first (cache-friendly).
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+# All-in-one entrypoint script.
+COPY entrypoint-all-in-one.sh /entrypoint-all-in-one.sh
+RUN chmod +x /entrypoint-all-in-one.sh
+
+# supervisord config — runs postgres, django, next, nginx as separate
+# processes under one supervisor.
+COPY supervisord.conf /etc/supervisor/supervisord.conf
+
+# nginx site config — public port 80 inside the container, exposed on
+# 8000 by the docker-compose port mapping.
+COPY nginx-all-in-one.conf /etc/nginx/sites-enabled/ledger
+RUN rm -f /etc/nginx/sites-enabled/default
+
+# Project files (everything except web/, which we layer separately).
+COPY . /app
+
+# Frontend deps + production build.
+WORKDIR /app/web
+COPY web/package.json web/package-lock.json* ./
+RUN npm install --no-audit --no-fund
+COPY web/ ./
+RUN npm run build
+
+WORKDIR /app
+
+EXPOSE 8000
+
+ENTRYPOINT ["/entrypoint-all-in-one.sh"]
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

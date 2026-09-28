@@ -1,0 +1,39 @@
+# Single-container deployment for the Ledger 2026 portal.
+#
+# This is the simple story: build the all-in-one image, run one
+# container, point a browser at http://localhost:8000. Postgres,
+# Django, Next.js, and nginx all live inside that one container
+# under supervisord.
+#
+# Use this for demos, hackathon judging machines, and laptops.
+# Use the regular docker-compose.yml when you want isolated services
+# (e.g. swapping in a managed postgres, or running the observability
+# stack).
+
+name: ledger-portal
+
+services:
+  portal:
+    build:
+      context: .
+      dockerfile: Dockerfile.all-in-one
+    image: ledger-portal:latest
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dogfood}
+      POSTGRES_USER: ${POSTGRES_USER:-dogfood}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dogfood}
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
+      DJANGO_DEBUG: "true"
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-secret-key-change-in-production}
+      DJANGO_ALLOWED_HOSTS: "*"
+      SKIP_SEED: ${SKIP_SEED:-0}
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://127.0.0.1:8000/healthz',timeout=3).status == 200 else sys.exit(1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
