@@ -98,11 +98,16 @@ class SubmissionSerializer(serializers.ModelSerializer):
 
 
 class SubmissionSummarySerializer(serializers.ModelSerializer):
-    """Lean shape for the public gallery — keeps payload small."""
+    """Lean shape for the public gallery — keeps payload small.
+
+    Image gallery and tech tags are part of the full submission
+    record (SubmissionSerializer) but intentionally NOT in the
+    public gallery summary — the gallery list view shouldn't carry
+    nested image lists or unbounded tag arrays. The detail page
+    reads SubmissionSerializer directly when it wants the full set.
+    """
 
     track_slug = serializers.SlugField(source="track.slug", read_only=True)
-    images = SubmissionImageSerializer(many=True, read_only=True)
-    tech_tags = serializers.ListField(child=serializers.CharField(), read_only=True)
 
     class Meta:
         model = Submission
@@ -113,8 +118,6 @@ class SubmissionSummarySerializer(serializers.ModelSerializer):
             "description",
             "track_slug",
             "thumbnail_path",
-            "tech_tags",
-            "images",
             "submitted_at",
         ]
 

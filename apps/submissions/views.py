@@ -448,6 +448,48 @@ class SubmitView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
+    def _resolve_team(self, request, event):
+        team_id = request.data.get("team_id")
+        if team_id:
+            from apps.teams.models import Team
+
+            try:
+                team = Team.objects.get(id=team_id, event=event)
+            except Team.DoesNotExist:
+                return Response(
+                    {
+                        "error": {
+                            "code": "not_found",
+                            "message": f"Team {team_id!r} not found in this event.",
+                        }
+                    },
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if not TeamMember.objects.filter(team=team, user=request.user).exists():
+                return Response(
+                    {
+                        "error": {
+                            "code": "forbidden_role",
+                            "message": "You are not a member of that team.",
+                        }
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            return team
+
+        member = TeamMember.objects.filter(user=request.user, team__event=event).select_related("team").first()
+        if member is None:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_failed",
+                        "message": "You are not in a team for this event.",
+                    }
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+        return member.team
+
 
 class SubmissionImageView(APIView):
     """T1 spec: image gallery per submission.
@@ -562,49 +604,6 @@ class SubmissionImageView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-    def _resolve_team(self, request, event):
-        team_id = request.data.get("team_id")
-        if team_id:
-            from apps.teams.models import Team
-
-            try:
-                team = Team.objects.get(id=team_id, event=event)
-            except Team.DoesNotExist:
-                return Response(
-                    {
-                        "error": {
-                            "code": "not_found",
-                            "message": f"Team {team_id!r} not found in this event.",
-                        }
-                    },
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-            if not TeamMember.objects.filter(team=team, user=request.user).exists():
-                return Response(
-                    {
-                        "error": {
-                            "code": "forbidden_role",
-                            "message": "You are not a member of that team.",
-                        }
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-            return team
-
-        member = TeamMember.objects.filter(user=request.user, team__event=event).select_related("team").first()
-        if member is None:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_failed",
-                        "message": "You are not in a team for this event.",
-                    }
-                },
-                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            )
-        return member.team
 
 
 class CommentListCreateView(APIView):

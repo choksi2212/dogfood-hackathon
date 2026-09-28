@@ -1268,3 +1268,98 @@ paths:
           description: Rate limited
         '415':
           description: "Unsupported media type \u2014 request body must be JSON"
+
+  /api/events/{slug}/submissions/{id}/images:
+    get:
+      summary: List image gallery entries for a submission (public)
+      security: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+      - name: id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Image gallery (may be empty)
+        '404':
+          description: Submission not found / still a draft
+        '429':
+          description: Rate limited
+    post:
+      summary: Add an image to a submission's gallery (participant-only)
+      description: |
+        Body: `{url, caption?, order?}`. Only members of the
+        submission's team may add; the submission must be in
+        draft or submitted state (not locked/withdrawn).
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+      - name: id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: {type: string, format: uri, maxLength: 1000}
+                caption: {type: string, maxLength: 200}
+                order: {type: integer, minimum: 0}
+      responses:
+        '201':
+          description: Image row created
+        '403':
+          description: Not a team member
+        '404':
+          description: Submission not found
+        '410':
+          description: Submission is locked or withdrawn
+        '422':
+          description: Validation failed
+        '429':
+          description: Rate limited
+        '401':
+          description: Unauthenticated
+        '415':
+          description: "Unsupported media type — request body must be JSON"
+  /api/events/{slug}/submissions/{id}/images/{image_id}:
+    delete:
+      summary: Remove an image from a submission's gallery (participant-only)
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: {type: string}
+      - name: id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      - name: image_id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      responses:
+        '204':
+          description: Image removed
+        '403':
+          description: Not a team member
+        '404':
+          description: Image not found
+        '429':
+          description: Rate limited
+        '401':
+          description: Unauthenticated
