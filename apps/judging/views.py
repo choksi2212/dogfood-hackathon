@@ -338,7 +338,68 @@ class ScoreSubmitView(APIView):
         review, _ = Review.objects.get_or_create(assignment=assignment)
         review.submitted_at = timezone.now()
         review.save()
+
+        # T4: issue / refresh the judge's signed participation record
+        # on each successful submission. The signature covers the
+        # judge's assignments, their submitted reviews, and per-criterion
+        # aggregates — enough to prove participation without needing to
+        # hit the API to interpret it.
+        self._issue_judge_certificate(assignment)
+
         return Response({"submitted_at": review.submitted_at.isoformat()})
+
+    def _issue_judge_certificate(self, assignment):
+        """Build a self-contained signed payload for one judge and
+        upsert the JudgeCertificate row. Idempotent: re-issues keep the
+        same public_id, so the public URL stays stable."""
+        from apps.certificates.models import JudgeCertificate
+        from apps.events.models import Event
+
+        scores = (
+            Score.objects.filter(assignment=assignment)
+            .select_related("criterion", "assignment__project", "assignment__judge")
+        )
+        # Per-criterion aggregate.
+        per_criterion = {}
+        for s in scores:
+            per_criterion.setdefault(
+                s.criterion.name,
+                {"count": 0, "mean": 0.0},
+            )
+            agg = per_criterion[s.criterion.name]
+            agg["count"] += 1
+            agg["mean"] += float(s.value)
+        for name, agg in per_criterion.items():
+            if agg["count"]:
+                agg["mean"] = round(agg["mean"] / agg["count"], 4)
+
+        # Project list (so the certificate is human-readable without
+        # follow-up API calls).
+        projects = []
+        for s in scores:
+            projects.append(
+                {
+                    "project_id": str(s.assignment.project_id),
+                    "project_name": s.assignment.project.name,
+                    "criterion": s.criterion.name,
+                    "value": s.value,
+                }
+            )
+
+        payload = {
+            "judge_email": assignment.judge.email,
+            "event_slug": assignment.batch.event.slug,
+            "batch_id": str(assignment.batch_id),
+            "submitted_at": timezone.now().isoformat(),
+            "n_projects_scored": len({s.assignment.project_id for s in scores}),
+            "per_criterion": per_criterion,
+            "scores": projects,
+        }
+        JudgeCertificate.issue_or_update(
+            judge=assignment.judge,
+            event=assignment.batch.event,
+            payload=payload,
+        )
 
 
 # --- CSV export -------------------------------------------------------------

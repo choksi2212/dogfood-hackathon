@@ -9,8 +9,9 @@ from .models import AuditEvent
 
 
 def log(actor, action, target=None, payload=None, request=None, result="success"):
+    event = _event_from_request(request) or (_event_from_target(target) if target else None)
     AuditEvent.objects.create(
-        event=_event_from_request(request) or (_event_from_target(target) if target else None),
+        event=event,
         actor=actor if actor and getattr(actor, "is_authenticated", False) else None,
         action=action,
         target_type=type(target).__name__ if target else "",
@@ -20,6 +21,29 @@ def log(actor, action, target=None, payload=None, request=None, result="success"
         user_agent=_ua_from_request(request),
         result=result,
     )
+    # T4: forward interesting actions to any subscribed webhooks.
+    # Forwarding is best-effort and fire-and-forget — see
+    # apps/api/delivery.py. We only forward successful actions
+    # (denials aren't usually what an organizer wants to react to)
+    # and only when we can resolve an event slug (so the webhook
+    # lookup has something to key off).
+    if event is not None and result == "success":
+        from apps.api.delivery import dispatch_event
+
+        dispatch_event(
+            event.slug,
+            action,
+            {
+                "actor": (
+                    getattr(actor, "email", None)
+                    if actor and getattr(actor, "is_authenticated", False)
+                    else None
+                ),
+                "target_type": type(target).__name__ if target else "",
+                "target_id": str(getattr(target, "id", "")) if target else "",
+                "payload": payload or {},
+            },
+        )
 
 
 def _event_from_request(request):

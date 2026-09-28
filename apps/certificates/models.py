@@ -63,3 +63,63 @@ class Certificate(models.Model):
             signature=signature,
             issued_by=issued_by,
         )
+
+
+class JudgeCertificate(models.Model):
+    """T4 spec: signed, verifiable record of a judge's participation.
+
+    Issued automatically when a judge first submits a review (the
+    review's ``submitted_at`` flips from NULL to a timestamp). Re-issues
+    keep the original ``public_id`` so the same URL always resolves
+    to the latest signed payload — the previous payload remains
+    verifiable via its stored signature.
+
+    The signed payload includes the judge's assignments, the
+    submitted reviews, and a per-criterion aggregate (count +
+    mean) so the certificate is self-contained and meaningful
+    without needing to hit the API to interpret it.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    public_id = models.CharField(max_length=64, unique=True, default=generate_public_id, editable=False)
+    judge = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="judge_certificates",
+    )
+    event = models.ForeignKey(
+        "events.Event",
+        on_delete=models.CASCADE,
+        related_name="judge_certificates",
+    )
+    signed_payload = models.JSONField()
+    signature = models.CharField(max_length=64)
+    issued_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "certificates_judgecertificate"
+        indexes = [
+            models.Index(fields=["public_id"]),
+            models.Index(fields=["event", "judge"]),
+        ]
+        # One certificate per (judge, event). Re-issues update the row
+        # rather than creating new rows, so the public_id stays stable.
+        constraints = [
+            models.UniqueConstraint(
+                fields=["judge", "event"],
+                name="unique_judge_event_certificate",
+            ),
+        ]
+
+    def verify(self) -> bool:
+        return verify_payload(self.signed_payload, self.signature)
+
+    @classmethod
+    def issue_or_update(cls, judge, event, *, payload: dict):
+        signature = sign_payload(payload)
+        return cls.objects.update_or_create(
+            judge=judge,
+            event=event,
+            defaults={"signed_payload": payload, "signature": signature},
+        )
