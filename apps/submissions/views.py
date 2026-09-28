@@ -232,7 +232,7 @@ class SubmitView(APIView):
     this event.
     """
 
-    permission_classes = [IsParticipant]
+    permission_classes = [IsAuthenticated, IsParticipant]
 
     @deadline_gated("submissions_close_at")
     def post(self, request, slug):
@@ -381,9 +381,18 @@ class CommentListCreateView(APIView):
     Comments are NOT auto-moderated — the anti-abuse app surfaces
     top suspicious IPs and organizers can soft-delete (is_hidden=true)
     a comment via PATCH below.
+
+    GET stays public (anyone can read comments), POST requires
+    authentication. The permission split is declared explicitly via
+    ``get_permissions()`` rather than a blanket ``[AllowAny]`` with an
+    inline auth check, so the auth boundary is visible at the class
+    header and accidental "make it public" edits can't silently drop it.
     """
 
-    permission_classes = [AllowAny]
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
     def get(self, request, slug, id):
         try:
@@ -402,16 +411,6 @@ class CommentListCreateView(APIView):
         return Response(CommentSerializer(comments, many=True).data)
 
     def post(self, request, slug, id):
-        if not request.user or not getattr(request.user, "is_authenticated", False):
-            return Response(
-                {
-                    "error": {
-                        "code": "not_authenticated",
-                        "message": "Authentication required to comment.",
-                    }
-                },
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
         try:
             submission = Submission.objects.get(id=id, event__slug=slug)
         except Submission.DoesNotExist:
