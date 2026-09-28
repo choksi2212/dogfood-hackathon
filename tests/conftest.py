@@ -60,6 +60,20 @@ def _enable_db(db):
 
 
 @pytest.fixture(autouse=True)
+def _fast_password_hashers(settings):
+    """Use MD5 password hashing for the whole test tree.
+
+    The bulk-import and fixture tests create/refresh hundreds of users
+    per run; PBKDF2's default ~720k iterations cost ~0.5s CPU per hash
+    and turned every full-fixture import into a minute of hashing.
+    MD5 is never used in production (config/settings.py keeps Django's
+    default PBKDF2 hasher) — this override is test-speed only, and no
+    test asserts on the hash format.
+    """
+    settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+
+@pytest.fixture(autouse=True)
 def _clear_cache():
     """Clear Django's cache before and after every test.
 

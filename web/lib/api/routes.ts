@@ -9,6 +9,13 @@ export const routes = {
   gallery: () => "/api/gallery",
   submission: (id: string) => `/api/submissions/${id}`,
   submit: (slug: string = EVENT_SLUG) => `/api/events/${slug}/submit`,
+  // T3 comments on gallery projects (apps/submissions,
+  // CommentListCreateView + CommentModerateView): public read, authed
+  // post, organizer-only soft-delete via PATCH {"action": "hide"}.
+  comments: (id: string, slug: string = EVENT_SLUG) =>
+    `/api/events/${slug}/submissions/${id}/comments`,
+  moderateComment: (id: string, commentId: string, slug: string = EVENT_SLUG) =>
+    `/api/events/${slug}/submissions/${id}/comments/${commentId}`,
   judgeScores: () => "/api/judge/scores",
   peerScores: (judge: string) => `/api/judge/peer-scores?judge=${judge}`,
   csvExport: () => "/api/csv_export",
@@ -47,6 +54,11 @@ export const routes = {
   // apps/certificates — public, no auth (a certificate is a public,
   // signed record; anyone with the public_id can verify it).
   certificate: (publicId: string) => `/api/certificates/${publicId}`,
+  // apps/certificates — judge participation records are public, signed
+  // records too, but they live in a different store than submission
+  // certificates, so /api/certificates/<id> 404s on them. The verify
+  // page falls back to this when the certificate lookup misses.
+  judgeRecord: (publicId: string) => `/api/records/judge/${publicId}`,
   // apps/widget — widget.js is mounted at the project root, not under
   // /api/, and ships its own Access-Control-Allow-Origin: * (it's meant
   // to be <script>-embedded on third-party sites), so callers use

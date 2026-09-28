@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "apps.abuse.apps.AbuseConfig",
     "apps.certificates.apps.CertificatesConfig",
     "apps.widget.apps.WidgetConfig",
+    "apps.webhooks.apps.WebhooksConfig",
     "apps.api.apps.ApiConfig",
     "apps.health.apps.HealthConfig",
     "apps.observability.apps.ObservabilityConfig",
@@ -150,6 +151,12 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# --- Upload limits -----------------------------------------------------------
+# Above the 5 MiB import limit in apps/api/views.py (MAX_IMPORT_BYTES), so
+# the import endpoint's own 413 guard fires first and this Django guard
+# never turns an oversized import into a generic 400.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
 
 # --- DRF ---------------------------------------------------------------------
 

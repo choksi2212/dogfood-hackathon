@@ -1,168 +1,174 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, Download } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarClock,
+  ShieldCheck,
+  SlidersHorizontal,
+} from "lucide-react";
 import { api, ApiError } from "@/lib/api/client";
-import { AssignmentPanel, BulkInvitePanel, NormalizationPanel } from "./actions";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeading, EmptyState, LoadError } from "@/components/portal-ui";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { ClientDate } from "@/components/client-date";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { cn } from "@/lib/cn";
+import { OrganizerActions } from "./actions";
+import { MembershipTable } from "./MembershipTable";
+import { StatCard } from "./StatCard";
 
 export default async function OrganizerPage() {
   const cookieHeader = (await cookies()).toString();
-
   let event;
   let memberships;
+  let submissions;
   try {
-    [event, memberships] = await Promise.all([
+    [event, memberships, submissions] = await Promise.all([
       api.eventDetail(undefined, cookieHeader),
       api.memberships(undefined, cookieHeader),
+      api
+        .allGallery()
+        .then((projects) => projects.length)
+        .catch(() => null),
     ]);
   } catch (err) {
-    // The layout already guarantees a signed-in session — a 403 here
-    // means this account just isn't an organizer for this event.
     if (err instanceof ApiError && err.status === 403) {
       return (
-        <Alert>
-          <AlertCircle className="size-4" />
-          <AlertTitle>Organizer role required</AlertTitle>
-          <AlertDescription>
-            You&apos;re signed in, but this account isn&apos;t listed as an organizer
-            for this event. Ask the event owner to add you.
-          </AlertDescription>
-        </Alert>
+        <EmptyState
+          icon={ShieldCheck}
+          title="Organizer access required"
+          description="Your account needs an organizer role for this event. Ask the event owner to add you, or switch to your organizer account."
+          href="/login"
+          action="Switch accounts"
+        />
       );
     }
     return (
-      <Alert variant="destructive">
-        <AlertCircle className="size-4" />
-        <AlertDescription>
-          Couldn&apos;t load the dashboard:{" "}
-          {err instanceof Error ? err.message : "Unknown error."}
-        </AlertDescription>
-      </Alert>
+      <LoadError
+        title="We couldn’t load your event"
+        description="Event data is temporarily unavailable. Refresh to try again."
+        href="/organizer"
+      />
     );
   }
-
-  const roleCounts = memberships.reduce<Record<string, number>>((acc, m) => {
-    acc[m.role] = (acc[m.role] ?? 0) + 1;
-    return acc;
-  }, {});
+  const counts = memberships.reduce<Record<string, number>>(
+    (result, member) => {
+      result[member.role] = (result[member.role] ?? 0) + 1;
+      return result;
+    },
+    {},
+  );
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{event.name}</h1>
-          <p className="mt-1 max-w-xl text-muted-foreground">{event.description}</p>
-        </div>
-        <Link
-          href="/organizer/results"
-          className={cn(buttonVariants({ variant: "outline" }))}
-        >
-          Voting results &amp; audit log <ArrowRight className="size-4" />
-        </Link>
+    <div className="space-y-10">
+      <PageHeading
+        eyebrow="EVENT CONTROL / ORGANIZER"
+        title={event.name}
+        description={
+          event.description ||
+          "Everything you need to run a fair, thoughtful judging cycle."
+        }
+        action={
+          <Link
+            href="/organizer/results"
+            className={cn(buttonVariants({ variant: "outline" }), "shrink-0")}
+          >
+            Results &amp; audit
+            <ArrowRight className="size-4" />
+          </Link>
+        }
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Judges"
+          value={counts.judge ?? 0}
+          detail="Reviewers on your event"
+          index={0}
+        />
+        <StatCard
+          label="Organizers"
+          value={counts.organizer ?? 0}
+          detail="Keeping everything on track"
+          index={1}
+        />
+        <StatCard
+          label="Participants"
+          value={counts.participant ?? 0}
+          detail="Builders with event access"
+          index={2}
+        />
+        <StatCard
+          label="Submissions"
+          value={submissions}
+          detail={
+            submissions === null
+              ? "Gallery count temporarily unavailable"
+              : "Published in the gallery"
+          }
+          index={3}
+        />
       </div>
 
-      <Card>
-        <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="flex flex-col gap-1">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">State</span>
-            <span>{event.state}</span>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-              Submissions close
-            </span>
-            <span>
-              <ClientDate iso={event.submissions_close_at} />
-            </span>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-              Judging window
-            </span>
-            <span>
-              <ClientDate iso={event.judging_open_at} /> –{" "}
-              <ClientDate iso={event.judging_close_at} />
-            </span>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-              Voting mode
-            </span>
-            <span>{event.voting_mode}</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      <section>
-        <h2 className="text-lg font-semibold">Membership</h2>
-        <div className="mt-3 flex gap-2">
-          {Object.entries(roleCounts).map(([role, count]) => (
-            <Badge key={role} variant="secondary">
-              {count} {role}
-              {count === 1 ? "" : "s"}
-            </Badge>
-          ))}
+      <section
+        aria-label="Event schedule"
+        className="surface grid gap-6 rounded-2xl p-6 sm:grid-cols-2 xl:grid-cols-4"
+      >
+        <div>
+          <p className="mb-3 flex items-center gap-2 text-xs text-text-muted">
+            <CalendarClock className="size-4" />
+            Event status
+          </p>
+          <Badge
+            className="rounded-full border-accent/25 bg-accent-dim px-3 py-1 text-accent capitalize"
+            variant="outline"
+          >
+            {event.state.replaceAll("_", " ")}
+          </Badge>
         </div>
-        <Card className="mt-3">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {memberships.map((m) => (
-                <TableRow key={m.id}>
-                  <TableCell>{m.user_name}</TableCell>
-                  <TableCell>{m.user_email}</TableCell>
-                  <TableCell className="capitalize">{m.role}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+        <div>
+          <p className="mb-3 text-xs text-text-muted">Submissions close</p>
+          <p className="font-mono text-xs leading-6">
+            <ClientDate iso={event.submissions_close_at} />
+          </p>
+        </div>
+        <div>
+          <p className="mb-3 text-xs text-text-muted">Judging window</p>
+          <div className="font-mono text-xs leading-6">
+            <ClientDate iso={event.judging_open_at} />
+            <span className="mx-1 text-text-muted">→</span>
+            <ClientDate iso={event.judging_close_at} />
+          </div>
+        </div>
+        <div>
+          <p className="mb-3 flex items-center gap-2 text-xs text-text-muted">
+            <SlidersHorizontal className="size-4" />
+            Voting mode
+          </p>
+          <p className="text-sm capitalize">{event.voting_mode}</p>
+          <p className="mt-1 text-xs text-text-muted">
+            {event.tracks.length} tracks · {event.rubric?.criteria.length ?? 0}{" "}
+            scoring criteria
+          </p>
+        </div>
       </section>
 
-      <section>
-        <h2 className="text-lg font-semibold">Actions</h2>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2">
-          <BulkInvitePanel />
-          <AssignmentPanel />
-          <NormalizationPanel />
-          <Card>
-            <CardHeader>
-              <CardTitle>Export</CardTitle>
-              <CardDescription>
-                Download the current scores as CSV for offline review.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <a
-                href={api.csvExportUrl()}
-                download
-                className={cn(buttonVariants())}
-              >
-                <Download className="size-4" />
-                Export scores (CSV)
-              </a>
-            </CardContent>
-          </Card>
+      <MembershipTable memberships={memberships} />
+
+      <section aria-labelledby="operations-title">
+        <div className="mb-5">
+          <p className="eyebrow mb-2">MAKE IT HAPPEN</p>
+          <h2
+            id="operations-title"
+            className="text-2xl font-medium tracking-tight"
+          >
+            Event operations
+          </h2>
+          <p className="mt-2 text-sm text-text-secondary">
+            Invite your panel, distribute projects, and prepare scores for
+            review.
+          </p>
         </div>
+        <OrganizerActions />
       </section>
     </div>
   );

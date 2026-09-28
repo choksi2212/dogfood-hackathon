@@ -324,9 +324,9 @@ class TestCertificateModel:
 
         cert_a = Certificate.issue(sub_a, payload=_payload_for(sub_a))
         cert_b = Certificate.issue(sub_b, payload=_payload_for(sub_b))
-        assert (
-            cert_a.public_id != cert_b.public_id
-        ), f"public_id collision across different submissions: {cert_a.public_id}"
+        assert cert_a.public_id != cert_b.public_id, (
+            f"public_id collision across different submissions: {cert_a.public_id}"
+        )
 
     def test_reissuing_creates_two_distinct_rows(self, sample_submission, sample_event):
         """Calling `Certificate.issue()` twice on the same submission
@@ -427,9 +427,9 @@ class TestCertificateView:
         Certificate.objects.filter(pk=cert.pk).update(signed_payload=tampered)
         client = Client()
         resp = client.get(self.CERT_URL.format(public_id=cert.public_id))
-        assert (
-            resp.status_code == 400
-        ), f"expected 400 signature_invalid, got {resp.status_code}: {resp.content[:200]!r}"
+        assert resp.status_code == 400, (
+            f"expected 400 signature_invalid, got {resp.status_code}: {resp.content[:200]!r}"
+        )
         body = resp.json()
         assert body["error"]["code"] == "signature_invalid"
 

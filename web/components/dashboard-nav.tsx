@@ -10,6 +10,7 @@ import {
   Rocket,
   Scale,
   ThumbsUp,
+  LayoutGrid,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -25,6 +26,7 @@ import {
 // Client Components (only plain serializable data crosses that boundary),
 // so the layout sends icon *keys* and this map resolves them locally.
 const ICONS = {
+  gallery: LayoutGrid,
   rocket: Rocket,
   thumbsUp: ThumbsUp,
   listChecks: ListChecks,

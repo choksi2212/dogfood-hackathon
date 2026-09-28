@@ -2,12 +2,18 @@
 
 import { RouteError } from "@/components/route-error";
 
-export default function RankingError({
-  error,
+export default function ErrorBoundary({
+  retry,
   reset,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry?: () => void;
+  reset?: () => void;
 }) {
-  return <RouteError message={`Could not load the ranking: ${error.message}`} reset={reset} />;
+  return (
+    <RouteError
+      message="We couldn’t load the ranking"
+      reset={retry ?? reset ?? (() => window.location.reload())}
+    />
+  );
 }

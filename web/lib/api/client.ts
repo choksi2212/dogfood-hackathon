@@ -6,8 +6,10 @@ import {
   type AuditLogResponse,
   type BulkInviteResponse,
   type CertificateResponse,
+  type Comment,
   type EventDetail,
   type GalleryResponse,
+  type JudgeRecordResponse,
   type JudgeScoresResponse,
   type LoginPayload,
   type Membership,
@@ -48,7 +50,7 @@ const API_BASE =
 // through next.config.ts either, since the whole point is other sites
 // loading it cross-origin (it ships its own CORS: * for that reason).
 const WIDGET_BASE =
-  process.env.NEXT_PUBLIC_WIDGET_BASE ?? "http://localhost:8001";
+  process.env.NEXT_PUBLIC_WIDGET_BASE ?? "http://localhost:8000";
 
 function cookieInit(cookieHeader?: string): RequestInit | undefined {
   return cookieHeader ? { headers: { Cookie: cookieHeader } } : undefined;
@@ -82,6 +84,33 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  async allGallery(): Promise<GalleryResponse["items"]> {
+    const items = new Map<string, GalleryResponse["items"][number]>();
+    const cursors = new Set<string>();
+    let after: string | undefined;
+    do {
+      const params = new URLSearchParams({ sort: "alpha" });
+      if (after) params.set("after", after);
+      const page = await request<GalleryResponse>(`${routes.gallery()}?${params}`);
+      page.items.forEach(item => items.set(item.id, item));
+      after = page.next || undefined;
+      if (after && cursors.has(after)) throw new Error("Gallery pagination could not continue.");
+      if (after) cursors.add(after);
+    } while (after);
+    return [...items.values()];
+  },
+
+  galleryPage({ track, sort = "alpha", after }: { track?: string; sort?: "alpha" | "newest"; after?: string } = {}): Promise<GalleryResponse> {
+    const params = new URLSearchParams({ sort });
+    if (track) params.set("track", track);
+    if (after) params.set("after", after);
+    return request(`${routes.gallery()}?${params.toString()}`);
+  },
+
+  register(payload: { name: string; email: string; password: string }): Promise<User> {
+    return request("/api/register", { method: "POST", body: JSON.stringify(payload) });
+  },
+
   gallery(): Promise<GalleryResponse> {
     return request(routes.gallery());
   },
@@ -98,6 +127,35 @@ export const api = {
     return request(routes.submit(slug), {
       method: "POST",
       body: JSON.stringify(payload),
+    });
+  },
+
+  // T3 §3 — comments on a gallery project. GET is public; POST
+  // requires a session (the browser call carries cookies same-origin
+  // via `request`'s credentials: "include"). The backend enforces the
+  // 2000-char limit and returns inline validation errors we surface.
+  comments(id: string, slug?: string): Promise<Comment[]> {
+    return request(routes.comments(id, slug));
+  },
+
+  postComment(id: string, body: string, slug?: string): Promise<Comment> {
+    return request(routes.comments(id, slug), {
+      method: "POST",
+      body: JSON.stringify({ body }),
+    });
+  },
+
+  // Organizer-only soft-delete — PATCH {"action": "hide"} flips
+  // is_hidden; hidden comments vanish from the public GET list.
+  moderateComment(
+    id: string,
+    commentId: string,
+    action: "hide" | "unhide",
+    slug?: string,
+  ): Promise<{ id: string; is_hidden: boolean }> {
+    return request(routes.moderateComment(id, commentId, slug), {
+      method: "PATCH",
+      body: JSON.stringify({ action }),
     });
   },
 
@@ -237,6 +295,14 @@ export const api = {
   // the public_id can verify.
   certificate(publicId: string): Promise<CertificateResponse> {
     return request(routes.certificate(publicId));
+  },
+
+  // Public, no auth — judge participation records are signed records
+  // too. The certificates/<publicId> verify page calls this as a
+  // fallback when the certificate lookup 404s, since judge records are
+  // served from a different endpoint than submission certificates.
+  judgeRecord(publicId: string): Promise<JudgeRecordResponse> {
+    return request(routes.judgeRecord(publicId));
   },
 
   // Widget preview data, fetched the same way a third-party embedder's

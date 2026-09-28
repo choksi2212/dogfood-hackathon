@@ -1,13 +1,17 @@
 "use client";
-
 import { RouteError } from "@/components/route-error";
-
 export default function GalleryError({
-  error,
+  retry,
   reset,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry?: () => void;
+  reset?: () => void;
 }) {
-  return <RouteError message={`Could not load the gallery: ${error.message}`} reset={reset} />;
+  return (
+    <RouteError
+      message="Could not load the gallery"
+      reset={retry ?? reset ?? (() => window.location.reload())}
+    />
+  );
 }

@@ -6,7 +6,7 @@
 **Repo:** `https://github.com/choksi2212/dogfood-hackathon`
 **Spec:** `https://dogfoodhack.com/spec`
 **Stack:** Django 5 + DRF + PostgreSQL 16 + Next.js 15, all in `docker compose up`
-**Companion docs:** [PRD](DOGFOOD-PRD.md), [TRD](DOGFOOD-TRD.md), [Architecture](DOGFOOD-ARCHITECTURE.md)
+**Companion docs:** [PRD](PRD.md), [TRD](TRD.md), [Architecture](../ARCHITECTURE.md)
 
 > The PRD says *what*. The TRD says *how*. The architecture says *how the how is
 > shaped*. This document says *exactly what to type*.
@@ -37,10 +37,13 @@ dogfood-hackathon/
 ├── backend/
 ├── web/
 ├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── DATA-MODEL.md
-│   ├── JUDGING.md
-│   └── THREAT-MODEL.md
+│   ├── PRD.md
+│   ├── TRD.md
+│   └── BACKEND-IMPL.md
+├── ARCHITECTURE.md
+├── DATA-MODEL.md
+├── JUDGING.md
+├── THREAT-MODEL.md
 ├── openapi.yaml
 ├── role-isolation-matrix.txt
 ├── normalization-proof.txt
@@ -134,37 +137,26 @@ djangorestframework-stubs==3.15.2
 ### 1.6 Makefile
 
 ```makefile
-.PHONY: up down logs accept test lint clean seed
-
-up:
-	docker compose up -d
-	@docker compose logs -f backend | grep -m1 "Application startup complete"
-
-down:
-	docker compose down
-
-logs:
-	docker compose logs -f
-
-accept:
-	docker compose exec -T backend bash -c "cd /app && python3 /app/scripts/run_accept.sh /app/.dogfood.toml > /app/acceptance-report.txt"
-	@cat acceptance-report.txt
-
-test:
-	docker compose exec -T backend pytest
-
-lint:
-	docker compose exec -T backend ruff check .
-	docker compose exec -T backend mypy backend/
-
-clean:
-	docker compose down -v
-	docker system prune -f
-
-seed:
-	docker compose exec -T backend python manage.py seed_fixtures
-	docker compose exec -T backend python manage.py seed_users
+# Condensed from the real Makefile (COMPOSE ?= docker compose).
+up:          $(COMPOSE) up --build
+seed:        $(COMPOSE) exec -T web python manage.py import_fixtures
+accept:      $(COMPOSE) exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
+test:        $(COMPOSE) exec -T web pytest tests/ -v
+lint:        ruff check .
+             ruff format --check .
+ci:          lint
+             pip install -r requirements.txt
+             python manage.py migrate --noinput
+             pytest tests/ -v --tb=short
+down-clean:  $(COMPOSE) down -v
 ```
+
+The `accept` target runs the vendored `acceptance.py` (byte-for-byte the
+spec's `run.py`, only the filename differs) directly — no wrapper script,
+no separate user-seeder command — and seeding is the single idempotent
+`manage.py import_fixtures`. The real Makefile also has `accept-fresh`
+(re-seed then accept), `test-<category>`, `test-cov`, `types`, and the
+`metrics-*` targets for the observability stack.
 
 ### 1.7 docker-compose.yml
 
@@ -226,7 +218,7 @@ volumes:
   postgres-data:
 ```
 
-### 1.8 Dockerfile.backend
+### 1.8 Dockerfile
 
 ```dockerfile
 FROM python:3.12-slim
@@ -236,12 +228,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY backend/ ./backend/
-COPY scripts/ ./scripts/
-ENV PYTHONUNBUFFERED=1
+COPY . .
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 EXPOSE 8000
-CMD ["sh", "-c", "python manage.py migrate && python manage.py seed_fixtures && python manage.py seed_users && gunicorn backend.wsgi:application -w 3 -b 0.0.0.0:8000"]
+ENTRYPOINT ["./entrypoint.sh"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000",
+     "--workers", "3", "--threads", "2", "--timeout", "60",
+     "--access-logfile", "-", "--error-logfile", "-"]
 ```
+
+The entrypoint waits for postgres (`pg_isready`), runs `migrate --noinput`,
+runs `import_fixtures` (skippable with `SKIP_SEED=1`; it falls back to the
+legacy `seed_fixtures` only when `fixtures.json` is missing), then `exec`s
+the CMD. There is no `Dockerfile.backend`, no separate user-seeder
+command, and no `backend.wsgi` — the Django project package is `config/`.
 
 ### 1.9 Dockerfile.web
 
@@ -834,60 +834,52 @@ urlpatterns = [
 ]
 ```
 
-### 3.9 Seed users command
+### 3.9 The seed command (`import_fixtures`)
 
 ```python
-# apps/accounts/management/commands/seed_users.py
+# apps/accounts/management/commands/import_fixtures.py (condensed;
+# helper bodies elided)
 
-import hashlib
-import secrets
-from datetime import timedelta
+import hashlib, hmac, json
+from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.utils import timezone
-from apps.accounts.models import User, Session
-from apps.events.models import Event, Membership
-
 
 class Command(BaseCommand):
-    help = 'Seed the four pre-baked session users.'
-    
+    help = ("Load the official fixtures.json into the real schema and "
+            "seed the five demo sessions (organizer, judge_a, judge_b, "
+            "judge_c, participant).")
+
     def handle(self, *args, **options):
-        event = Event.objects.get(slug='sample-hack-2026')
-        
-        users_spec = [
-            ('organizer@example.org', 'organizer', 'Organizer'),
-            ('judge_a@example.org', 'judge', 'Judge A'),
-            ('judge_b@example.org', 'judge', 'Judge B'),
-            ('participant@example.org', 'participant', 'Participant'),
-        ]
-        
-        for email, role, name in users_spec:
-            user, _ = User.objects.get_or_create(
-                email=email,
-                defaults={'name': name, 'is_active': True},
-            )
-            user.set_password('dogfood123')
-            user.save()
-            
-            Membership.objects.get_or_create(
-                user=user,
-                event=event,
-                defaults={'role': role},
-            )
-            
-            # Generate a session token
-            token = secrets.token_urlsafe(32)
-            Session.objects.create(
-                user=user,
-                token_hash=hashlib.sha256(token.encode()).hexdigest(),
-                expires_at=timezone.now() + timedelta(days=365),
-            )
-            
-            # Print the header
-            header_name = role if role != 'judge_a' and role != 'judge_b' else role
-            env_name = role.upper() if role != 'judge_a' and role != 'judge_b' else f'JUDGE_{role[-1].upper()}'
-            self.stdout.write(f'{env_name}_HEADER = "Cookie: session={token}"')
+        data = json.loads(Path("fixtures.json").read_text())
+        event = self._upsert_event(data["event"])          # slug sample-hack-2026
+        self._upsert_tracks(event, data["tracks"])
+        judges = self._upsert_judges(event, data["judges"])
+        teams, projects = self._upsert_teams_and_projects(
+            event, data["teams"], data["projects"])
+        self._upsert_scores(event, data["scores"])
+
+        # Five demo sessions with deterministic tokens:
+        for label, user in self._demo_users(event, judges):
+            token = hmac.new(
+                settings.SECRET_KEY.encode(),
+                f"dogfood-2026-demo-session:{label}:{user.email}".encode(),
+                hashlib.sha256,
+            ).hexdigest()
+            self._upsert_session(user, token)   # user-agent: import_fixtures/1.0
+            self.stdout.write(f'{label.upper()}_HEADER = "Cookie: session={token}"')
 ```
+
+The five demo sessions are bound to the first three **fixture** judges —
+`judge_a` → `tomas.varga@example.org`, `judge_b` → `wei.lindqvist@example.org`,
+`judge_c` → `priya.nair@example.org` — plus the organizer and participant
+accounts, all with the dev password `dogfood-dev-password`. Because each
+token is `HMAC-SHA256(DJANGO_SECRET_KEY, "dogfood-2026-demo-session:{label}:{email}")`,
+the five committed `.dogfood.toml` `[auth]` headers are valid on every fresh
+volume; they change only if `DJANGO_SECRET_KEY` changes (re-run `make seed` to
+print the new values). The command is idempotent, and `entrypoint.sh` runs it
+automatically after `migrate`. There is no separate user-seeder command; a
+legacy `seed_fixtures` (synthetic data) is only a fallback when
+`fixtures.json` is missing.
 
 ## Part 4 — Events App (apps/events)
 
@@ -2369,7 +2361,7 @@ def _voter_key(request, event):
 class VoteView(APIView):
     permission_classes = [AllowAny]
     
-    @deadline_gated('submissions_close_at')  # voting opens at submissions_close
+    @deadline_gated('judging_close_at')  # voting opens when judging closes
     def post(self, request, slug, id):
         event = Event.objects.get(slug=slug)
         project = Submission.objects.get(id=id, event=event)
@@ -3497,18 +3489,21 @@ def readyz(request):
     return JsonResponse({'status': 'ready', 'migrations_applied': True, 'seed_loaded': True})
 
 
-def verify_view(request):
-    """Public key + verification instructions."""
-    from .models import SigningKey
-    keys = SigningKey.objects.filter(retired_at__isnull=True)
-    public_keys = [
-        {'id': str(k.id), 'public_key': k.public_key.hex(), 'created_at': k.created_at.isoformat()}
-        for k in keys
-    ]
+def certificate_view(request, public_id):
+    """GET /api/certificates/<public_id> — public verify-on-read."""
+    try:
+        cert = Certificate.objects.select_related("submission").get(public_id=public_id)
+    except Certificate.DoesNotExist:
+        return JsonResponse({'error': {'code': 'not_found'}}, status=404)
+    if not cert.verify():   # recompute the HMAC; hmac.compare_digest
+        return JsonResponse({'error': {'code': 'signature_invalid'}}, status=400)
     return JsonResponse({
-        'public_keys': public_keys,
-        'verifier': 'python scripts/verify_cert.py cert.pdf <public_key_hex>',
-        'note': 'Use the offline verifier script with the public key to check signatures.',
+        'public_id': cert.public_id,
+        'submission_id': str(cert.submission_id),
+        'issued_at': cert.issued_at.isoformat(),
+        'signed_payload': cert.signed_payload,
+        'signature': cert.signature,
+        'signature_algorithm': 'HMAC-SHA256',
     })
 
 
@@ -3908,17 +3903,18 @@ from django.contrib.sessions.backends.db import SessionStore
 
 @pytest.fixture
 def seed_data(db):
-    """Create the four pre-baked users and return their session tokens."""
+    """Create the five pre-baked users and return their session tokens."""
     event = Event.objects.get(slug='sample-hack-2026')
     
     users = {}
     cookies = {}
     
     for role, email, name in [
-        ('organizer', 'organizer@example.org', 'Organizer'),
-        ('judge_a', 'judge_a@example.org', 'Judge A'),
-        ('judge_b', 'judge_b@example.org', 'Judge B'),
-        ('participant', 'participant@example.org', 'Participant'),
+        ('organizer', 'organizer@test.local', 'Organizer'),
+        ('judge_a', 'tomas.varga@example.org', 'Judge A'),
+        ('judge_b', 'wei.lindqvist@example.org', 'Judge B'),
+        ('judge_c', 'priya.nair@example.org', 'Judge C'),
+        ('participant', 'participant@test.local', 'Participant'),
     ]:
         user, _ = User.objects.get_or_create(
             email=email,
@@ -4003,45 +3999,54 @@ class Command(BaseCommand):
 
 ### 15.1 The file
 
+This is the committed file at the repo root (abridged — the `[auth]` values
+are real hex tokens, not placeholders):
+
 ```toml
 [portal]
-base_url = "http://localhost:8080"
+base_url = "http://localhost:8000"
 
 [tiers]
-claimed = ["T1", "T2"]
-# claimed = ["T1", "T2", "T3", "T4"] once T3 and T4 are ready
-pitch = "Self-hostable hackathon submission and judging portal."
+claimed = ["T1", "T2", "T3"]
+pitch = "A self-hosted hackathon portal with a judging engine you can trust: ..."
 
 [auth]
-# Generated by seed_users; do not edit manually
-organizer   = "Cookie: session=<TOKEN_FROM_SEED_SCRIPT>"
-judge_a     = "Cookie: session=<TOKEN_FROM_SEED_SCRIPT>"
-judge_b     = "Cookie: session=<TOKEN_FROM_SEED_SCRIPT>"
-participant = "Cookie: session=<TOKEN_FROM_SEED_SCRIPT>"
+# Seeded deterministically by import_fixtures (see §15.2) — valid after
+# any clean `docker compose up`, no copy-paste step.
+organizer   = "Cookie: session=<hex-token>"
+judge_a     = "Cookie: session=<hex-token>"
+judge_b     = "Cookie: session=<hex-token>"
+participant = "Cookie: session=<hex-token>"
 
 [routes]
-gallery      = "/api/events/sample-hack-2026/gallery"
-submit       = "/api/events/sample-hack-2026/submissions/<id>/submit"
+gallery      = "/api/gallery"
+submit       = "/api/events/sample-hack-2026/submit"
 judge_scores = "/api/judge/scores"
-peer_scores  = "/api/judge/scores?judge=judge_a"
-csv_export   = "/api/events/sample-hack-2026/export.csv"
+peer_scores  = "/api/judge/peer-scores?judge=judge_a"
+csv_export   = "/api/csv_export"
 ```
 
-### 15.2 How to populate the [auth] block
+### 15.2 How the [auth] block is populated
+
+It is not a manual step. `import_fixtures` seeds the demo sessions with
+DETERMINISTIC tokens — `HMAC-SHA256(DJANGO_SECRET_KEY,
+"dogfood-2026-demo-session:{label}:{email}")`, derived from the role label and
+the seeded user's email (never a database PK, which fresh volumes would
+change) — so the committed `.dogfood.toml` is valid after any
+`docker compose up` and on any fresh database volume:
 
 ```bash
-# 1. Bring up the portal
-docker compose up -d
+# 1. Bring up the portal (entrypoint runs migrate + import_fixtures)
+docker compose up
 
-# 2. Wait for it to be ready
-docker compose logs -f backend | grep -m1 "Application startup complete"
-
-# 3. The seed_users command prints the four headers to stdout.
-#    Copy them from the logs:
-docker compose logs backend | grep -E '^[A-Z_]+_HEADER'
-
-# 4. Paste into .dogfood.toml's [auth] block
+# 2. Run the checker — the committed [auth] values just work
+python3 acceptance.py .dogfood.toml        # or the official run.py
 ```
+
+`import_fixtures` still prints the headers ("Stable demo session cookies
+(deterministic — they match the committed .dogfood.toml)") for the one case
+that needs them: if you changed `DJANGO_SECRET_KEY`, copy the newly printed
+values into `.dogfood.toml`.
 
 ### 15.3 The run.py script (provided by spec)
 

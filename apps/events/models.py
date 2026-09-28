@@ -27,6 +27,26 @@ class Event(models.Model):
         default="simple",
     )
     pairwise_enabled = models.BooleanField(default=False)
+    # T1 spec: per-event custom questions the organizer can ask every
+    # participant. Schema is JSON-encoded list of question dicts. Each
+    # question has the shape::
+    #
+    #   {
+    #     "id": "github_url",                # organizer-picked string id
+    #     "label": "Repository URL",          # human label shown on the form
+    #     "type": "url"|"text"|"long"|"number"|"select"|"multiselect"|"checkbox",
+    #     "required": true,
+    #     "options": ["a", "b"]               # only for select / multiselect
+    #     "track_ids": ["main", "wildcard"],  # restrict to these tracks; absent = all
+    #     "visible_if": {                     # conditional show
+    #       "question_id": "track",
+    #       "equals": "main"
+    #     }
+    #   }
+    #
+    # Answers are persisted as ``SubmissionAnswer`` rows, keyed by
+    # ``question_id`` against the submission.
+    custom_questions = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
         "accounts.User",

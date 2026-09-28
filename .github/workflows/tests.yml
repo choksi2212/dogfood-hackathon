@@ -1,0 +1,55 @@
+name: tests
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: dogfood
+          POSTGRES_USER: dogfood
+          POSTGRES_PASSWORD: dogfood
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dogfood"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: dogfood
+      POSTGRES_PASSWORD: dogfood
+      POSTGRES_DB: dogfood
+      DJANGO_SECRET_KEY: ci-test-secret-key-not-used-anywhere-else
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
+      SKIP_SEED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Migrations apply on a clean database
+        run: python manage.py migrate --noinput
+
+      - name: Seed official fixtures
+        run: python manage.py import_fixtures
+
+      - name: Test suite
+        run: python -m pytest -q

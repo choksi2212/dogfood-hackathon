@@ -1,11 +1,34 @@
 from rest_framework import serializers
 
-from .models import Comment, Submission
+from .models import Comment, Submission, SubmissionAnswer, SubmissionImage
+
+
+class SubmissionImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubmissionImage
+        fields = ["id", "url", "caption", "order", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+
+class SubmissionAnswerSerializer(serializers.ModelSerializer):
+    """Per-submission answer to an event-defined custom question."""
+
+    class Meta:
+        model = SubmissionAnswer
+        fields = ["id", "question_id", "value"]
+        read_only_fields = ["id"]
 
 
 class SubmissionSerializer(serializers.ModelSerializer):
     team_name = serializers.CharField(source="team.name", read_only=True)
     track_slug = serializers.SlugField(source="track.slug", read_only=True)
+    # Nested write — accept `images: [{url, caption, order}]` and
+    # `answers: [{question_id, value}]` in PUT/POST bodies. Images are
+    # replaced wholesale (simple model — gallery rows are owned by the
+    # submission). Answers upsert on (submission, question_id) so the
+    # frontend can re-send the full list each save.
+    images = SubmissionImageSerializer(many=True, required=False)
+    answers = SubmissionAnswerSerializer(many=True, required=False)
 
     class Meta:
         model = Submission
@@ -23,10 +46,13 @@ class SubmissionSerializer(serializers.ModelSerializer):
             "demo_video_url",
             "repo_url",
             "live_url",
+            "tech_tags",
             "status",
             "submitted_at",
             "created_at",
             "updated_at",
+            "images",
+            "answers",
         ]
         read_only_fields = [
             "id",
@@ -36,9 +62,50 @@ class SubmissionSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    def create(self, validated_data):
+        images = validated_data.pop("images", [])
+        answers = validated_data.pop("answers", [])
+        instance = super().create(validated_data)
+        for img in images:
+            SubmissionImage.objects.create(submission=instance, **img)
+        for ans in answers:
+            SubmissionAnswer.objects.update_or_create(
+                submission=instance,
+                question_id=ans["question_id"],
+                defaults={"value": ans["value"]},
+            )
+        return instance
+
+    def update(self, instance, validated_data):
+        images = validated_data.pop("images", None)
+        answers = validated_data.pop("answers", None)
+        instance = super().update(instance, validated_data)
+        if images is not None:
+            # Wholesale replace — the frontend always sends the full
+            # ordered list, and "delete one + recreate" is the simplest
+            # way to honor reorder operations.
+            instance.images.all().delete()
+            for img in images:
+                SubmissionImage.objects.create(submission=instance, **img)
+        if answers is not None:
+            for ans in answers:
+                SubmissionAnswer.objects.update_or_create(
+                    submission=instance,
+                    question_id=ans["question_id"],
+                    defaults={"value": ans["value"]},
+                )
+        return instance
+
 
 class SubmissionSummarySerializer(serializers.ModelSerializer):
-    """Lean shape for the public gallery — keeps payload small."""
+    """Lean shape for the public gallery — keeps payload small.
+
+    Image gallery and tech tags are part of the full submission
+    record (SubmissionSerializer) but intentionally NOT in the
+    public gallery summary — the gallery list view shouldn't carry
+    nested image lists or unbounded tag arrays. The detail page
+    reads SubmissionSerializer directly when it wants the full set.
+    """
 
     track_slug = serializers.SlugField(source="track.slug", read_only=True)
 

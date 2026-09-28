@@ -23,7 +23,7 @@ abuse flag model.
 | Audit row on retract | VoteAudit row with action='retract' |
 | AbuseFlag model | create with target_type='submission' succeeds |
 | AbuseFlag default status | status='pending' |
-| Vote before submissions_close | 422 |
+| Vote after `judging_close_at` | 422 `deadline_passed` — voting closes when judging closes |
 | Quadratic refunds on retract | cost refunded |
 
 ## Known drift

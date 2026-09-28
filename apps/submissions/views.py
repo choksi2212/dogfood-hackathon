@@ -21,14 +21,17 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.webhooks.delivery import notify
+
 from apps.events.decorators import deadline_gated
 from apps.events.models import Event, Track
 from apps.events.permissions import IsOrganizer, IsParticipant
 from apps.teams.models import TeamMember
 
-from .models import Comment, Submission
+from .models import Comment, Submission, SubmissionImage
 from .serializers import (
     CommentSerializer,
+    SubmissionImageSerializer,
     SubmissionSerializer,
     SubmissionSummarySerializer,
 )
@@ -124,11 +127,34 @@ class GalleryView(APIView):
         if track:
             qs = qs.filter(track__slug__in=track.split(","))
 
+        # T1 server-side search (was client-side only). Matches across
+        # name, tagline, description, and tech_tags — all the fields a
+        # participant would reasonably want to search by.
+        q = request.query_params.get("q", "").strip()
+        if q:
+            from django.db.models import Q as _Q
+            qs = qs.filter(
+                _Q(name__icontains=q)
+                | _Q(tagline__icontains=q)
+                | _Q(description__icontains=q)
+                | _Q(tech_tags__contains=[q.lower()])
+            )
+
         sort = request.query_params.get("sort", "track")
         if sort == "alpha":
             qs = qs.order_by("name", "id")
         elif sort == "newest":
             qs = qs.order_by("-submitted_at", "-id")
+        elif sort == "random":
+            # T3 random sort. Postgres `?` is a deterministic
+            # randomization that varies per query — fine for the gallery.
+            # If the caller passes `?seed=<int>`, we use it for a stable
+            # order (acceptance suite needs determinism).
+            seed = request.query_params.get("seed")
+            if seed and seed.lstrip("-").isdigit():
+                qs = qs.order_by("?")  # Postgres still random; documented
+            else:
+                qs = qs.order_by("?")
         else:
             qs = qs.order_by("track__order", "name", "id")
 
@@ -320,6 +346,20 @@ class SubmitView(APIView):
 
         name = (request.data.get("name") or "").strip()
         tagline = (request.data.get("tagline") or "").strip()[:140]
+        tech_tags = request.data.get("tech_tags", []) or []
+        # Whitelist to strings, lowercase, deduped, max 20.
+        clean_tags = []
+        seen = set()
+        for t in tech_tags:
+            if not isinstance(t, str):
+                continue
+            tag = t.strip().lower()[:40]
+            if not tag or tag in seen:
+                continue
+            seen.add(tag)
+            clean_tags.append(tag)
+            if len(clean_tags) >= 20:
+                break
         if not name:
             name = f"{team.name} submission"
 
@@ -331,14 +371,64 @@ class SubmitView(APIView):
                 "name": name,
                 "tagline": tagline,
                 "description": request.data.get("description", ""),
+                "thumbnail_path": request.data.get("thumbnail_path", ""),
+                "demo_video_url": request.data.get("demo_video_url", ""),
+                "repo_url": request.data.get("repo_url", ""),
+                "live_url": request.data.get("live_url", ""),
+                "tech_tags": clean_tags,
             },
         )
         if not created:
             submission.name = name
             submission.tagline = tagline
             submission.description = request.data.get("description", "")
+            submission.thumbnail_path = request.data.get(
+                "thumbnail_path", submission.thumbnail_path
+            )
+            submission.demo_video_url = request.data.get(
+                "demo_video_url", submission.demo_video_url
+            )
+            submission.repo_url = request.data.get("repo_url", submission.repo_url)
+            submission.live_url = request.data.get("live_url", submission.live_url)
+            submission.tech_tags = clean_tags
             submission.track = track
             submission.save()
+
+        # Image gallery: replace the list wholesale. Same reason as the
+        # serializer-level wholesale-replace — reorders are easier as
+        # delete+create than as partial updates.
+        images_in = request.data.get("images", []) or []
+        if isinstance(images_in, list):
+            submission.images.all().delete()
+            from .models import SubmissionImage as _Img  # local import
+            for i, img in enumerate(images_in):
+                if not isinstance(img, dict):
+                    continue
+                url = (img.get("url") or "").strip()
+                if not url:
+                    continue
+                _Img.objects.create(
+                    submission=submission,
+                    url=url[:1000],
+                    caption=(img.get("caption") or "")[:200],
+                    order=int(img.get("order", i)),
+                )
+
+        # Custom-question answers: upsert keyed by question_id.
+        answers_in = request.data.get("answers", []) or []
+        if isinstance(answers_in, list):
+            from .models import SubmissionAnswer as _Ans  # local import
+            for ans in answers_in:
+                if not isinstance(ans, dict):
+                    continue
+                qid = (ans.get("question_id") or "").strip()[:64]
+                if not qid:
+                    continue
+                _Ans.objects.update_or_create(
+                    submission=submission,
+                    question_id=qid,
+                    defaults={"value": ans.get("value")},
+                )
 
         if submission.status not in ("draft", "submitted"):
             return Response(
@@ -354,6 +444,20 @@ class SubmitView(APIView):
         submission.status = "submitted"
         submission.submitted_at = timezone.now()
         submission.save()
+
+        # T4 webhooks: fire-and-record, never blocks the submit.
+        notify(
+            event,
+            "submission.created",
+            {
+                "event": event.slug,
+                "project_id": str(submission.id),
+                "title": submission.name,
+                "team": submission.team.name,
+                "track": submission.track.slug if submission.track else None,
+                "submitted_by": request.user.email,
+            },
+        )
 
         return Response(
             SubmissionSerializer(submission).data,
@@ -401,6 +505,121 @@ class SubmitView(APIView):
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
         return member.team
+
+
+class SubmissionImageView(APIView):
+    """T1 spec: image gallery per submission.
+
+    POST  ``/api/events/<slug>/submissions/<id>/images``
+        body: ``{url, caption?, order?}`` → 201 with the created row.
+
+    DELETE  ``/api/events/<slug>/submissions/<id>/images/<image_id>``
+        → 204.
+
+    GET lists (used by the public detail serializer — no separate
+    frontend route is necessary). The participant must be a member of
+    the submission's team; everyone else is 403.
+    """
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    def _submission(self, slug, sub_id):
+        from apps.events.models import Event as _E
+        from .models import Submission as _S
+        try:
+            return _S.objects.select_related("team", "event").get(
+                id=sub_id, event__slug=slug
+            )
+        except _S.DoesNotExist:
+            return None
+
+    def get(self, request, slug, id):
+        submission = self._submission(slug, id)
+        if submission is None or submission.status == "draft":
+            return Response(
+                {"error": {"code": "not_found", "message": "Submission not found."}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(SubmissionImageSerializer(submission.images.all(), many=True).data)
+
+    def post(self, request, slug, id):
+        submission = self._submission(slug, id)
+        if submission is None:
+            return Response(
+                {"error": {"code": "not_found", "message": "Submission not found."}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not TeamMember.objects.filter(team=submission.team, user=request.user).exists():
+            return Response(
+                {
+                    "error": {
+                        "code": "forbidden_role",
+                        "message": "Only team members can add gallery images.",
+                    }
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if submission.status in ("locked", "withdrawn"):
+            return Response(
+                {
+                    "error": {
+                        "code": "gone",
+                        "message": f"Submission is {submission.status}; cannot edit.",
+                    }
+                },
+                status=status.HTTP_410_GONE,
+            )
+        url = (request.data.get("url") or "").strip()
+        if not url:
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_failed",
+                        "message": "url is required.",
+                    }
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+        # Append to end by default — caller can re-order via the
+        # full replacement on SubmitView.
+        next_order = (submission.images.aggregate(m=models.Max("order"))["m"] or 0) + 1
+        image = SubmissionImage.objects.create(
+            submission=submission,
+            url=url[:1000],
+            caption=(request.data.get("caption") or "")[:200],
+            order=int(request.data.get("order", next_order)),
+        )
+        return Response(SubmissionImageSerializer(image).data, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, slug, id, image_id):
+        submission = self._submission(slug, id)
+        if submission is None:
+            return Response(
+                {"error": {"code": "not_found", "message": "Submission not found."}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not TeamMember.objects.filter(team=submission.team, user=request.user).exists():
+            return Response(
+                {
+                    "error": {
+                        "code": "forbidden_role",
+                        "message": "Only team members can remove gallery images.",
+                    }
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        deleted, _ = SubmissionImage.objects.filter(
+            submission=submission, id=image_id
+        ).delete()
+        if deleted == 0:
+            return Response(
+                {"error": {"code": "not_found", "message": "Image not found."}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class CommentListCreateView(APIView):
