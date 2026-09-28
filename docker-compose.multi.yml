@@ -1,0 +1,189 @@
+name: dogfood-portal
+
+# NOTE: per PLAN.md §10 — never publish the DB port. A judge's laptop is
+# very likely already running native Postgres on 5432. Backend debug port
+# is bound to 127.0.0.1 only.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dogfood}
+      POSTGRES_USER: ${POSTGRES_USER:-dogfood}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dogfood}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dogfood} -d ${POSTGRES_DB:-dogfood}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dogfood}
+      POSTGRES_USER: ${POSTGRES_USER:-dogfood}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dogfood}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-secret-key-change-in-production}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,web,frontend,nginx}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8001:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://127.0.0.1:8000/healthz',timeout=3).status == 200 else sys.exit(1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # --- Observability stack --------------------------------------------------
+  # Local-only metrics pipeline. Scrapes the Django ``/metrics`` endpoint,
+  # routes alerts through Alertmanager, and serves pre-built Grafana
+  # dashboards. All three admin UIs are bound to 127.0.0.1 only — they're
+  # operator-only and never exposed to the public internet.
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./observability/prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      web:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:9090:9090"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    volumes:
+      - ./observability/alertmanager:/etc/alertmanager:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_INSTALL_PLUGINS: ""
+      # Bind to 3001 inside the container — port 3000 collides with
+      # the Next.js dev server. Nginx proxies /grafana → grafana:3001.
+      GF_SERVER_HTTP_PORT: "3001"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    ports:
+      # Operator-only UI. Nginx also exposes /grafana/ at the public
+      # port (8000).
+      - "127.0.0.1:3001:3001"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # --- Frontend (Next.js, web/) -------------------------------------------
+  frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      # Server Components fetch Django directly over the compose
+      # network (no browser involved). Client Components never see
+      # this — they call relative /api/* paths, which nginx routes to
+      # `web` before the request ever reaches this container.
+      API_INTERNAL_URL: http://web:8000
+      # widget.js is <script>-embedded on third-party sites, so it
+      # needs a URL the browser can reach directly — nginx's public
+      # port (see the nginx service below), not the internal service
+      # name.
+      NEXT_PUBLIC_WIDGET_BASE: http://localhost:8000
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      web:
+        condition: service_healthy
+    # No host port — accessed only via nginx.
+
+  # --- nginx (public entry point on port 8000) ---------------------------
+  # Routes /api → Django, / → frontend, /grafana /prometheus /alertmanager
+  # → operator UIs. Single exposed port for the entire stack.
+  nginx:
+    build:
+      context: ./observability/nginx
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+      grafana:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      alertmanager:
+        condition: service_started
+    volumes:
+      # Microcache backing store — 50MB shared-memory dict for the
+      # nginx-level cache of public reads (gallery, widget JSON).
+      - nginx-microcache:/var/cache/nginx/microcache
+    ports:
+      # 127.0.0.1 only — operator / demo machine. The company sets up
+      # a real TLS-terminating proxy in front of this in production.
+      - "127.0.0.1:8000:80"
+
+volumes:
+  pgdata:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:
+  nginx-microcache:

@@ -89,18 +89,26 @@ acceptance mechanism (40%) and `docker compose up` (20%) are graded there.
 
 ## Single-container deployment
 
-For demos, judging machines, or a clean laptop, the whole stack can run in
-**one** container. Postgres + Django + Next.js + nginx all live inside one
-image, supervised by `supervisord`. Build and run:
+The default `docker compose up` runs **one** container — Postgres,
+Django, Next.js, and nginx all live inside it, supervised by
+`supervisord`. One command, one container, one port (8000):
 
 ```bash
-docker compose -f docker-compose.single.yml up --build
+docker compose up --build -d
 # open http://localhost:8000
 ```
 
-`SKIP_SEED=1` skips the auto-seed. The default `docker-compose.yml`
-remains the multi-service setup for development (separate restartable
-services + the observability stack).
+The first boot seeds fixtures automatically. `SKIP_SEED=1` skips that.
+Session cookies rotate each restart — regenerate them with
+`docker compose exec portal python manage.py import_fixtures`.
+
+For isolated development (separate restartable services + the
+observability stack — Prometheus / Alertmanager / Grafana), use
+`docker-compose.multi.yml` instead:
+
+```bash
+docker compose -f docker-compose.multi.yml up --build -d
+```
 
 ## Working agreement
 
