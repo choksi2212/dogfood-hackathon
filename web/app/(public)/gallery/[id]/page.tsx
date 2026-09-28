@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { api, ApiError } from "@/lib/api/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { ClientDate } from "@/components/client-date";
 
 export default async function SubmissionDetailPage({
   params,
@@ -31,13 +32,6 @@ export default async function SubmissionDetailPage({
     );
   }
 
-  const submitted = submission.submitted_at
-    ? new Date(submission.submitted_at).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "—";
   const hasDistinctTagline = submission.tagline && submission.tagline !== submission.name;
   const hasLinks = submission.repo_url || submission.live_url || submission.demo_video_url;
 
@@ -61,7 +55,9 @@ export default async function SubmissionDetailPage({
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span>{submission.team_name}</span>
           <span aria-hidden="true">·</span>
-          <span>Submitted {submitted}</span>
+          <span>
+            Submitted <ClientDate iso={submission.submitted_at} variant="short" />
+          </span>
           <span aria-hidden="true">·</span>
           <Badge className="capitalize">{submission.status}</Badge>
         </div>

@@ -2,6 +2,7 @@ import { CheckCircle2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { ClientDate } from "@/components/client-date";
 import type { CertificateResponse } from "@/lib/api/types";
 
 type Result =
@@ -71,7 +72,9 @@ export default async function CertificatePage({
         <dt className="text-sm text-muted-foreground">Submission</dt>
         <dd className="tabular-nums">{cert.submission_id}</dd>
         <dt className="text-sm text-muted-foreground">Issued</dt>
-        <dd className="tabular-nums">{new Date(cert.issued_at).toLocaleString()}</dd>
+        <dd className="tabular-nums">
+          <ClientDate iso={cert.issued_at} />
+        </dd>
       </dl>
       <h2 className="mt-6 mb-3 text-lg font-semibold">Signed payload</h2>
       <pre className="max-w-md overflow-x-auto rounded-lg border bg-muted p-3 text-sm">

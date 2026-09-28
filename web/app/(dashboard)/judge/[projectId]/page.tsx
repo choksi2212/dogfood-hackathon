@@ -14,12 +14,16 @@ export default async function JudgeScorePage({
   const cookieHeader = (await cookies()).toString();
 
   let batch;
-  let event;
+  let rubric;
   let judgeScores;
   try {
-    [batch, event, judgeScores] = await Promise.all([
+    [batch, rubric, judgeScores] = await Promise.all([
       api.meBatch(undefined, cookieHeader),
-      api.eventDetail(undefined, cookieHeader),
+      // Just the rubric — judges don't need (and shouldn't see) the
+      // prizes, judging window, voting mode, or pairwise toggle that
+      // EventDetailView exposes. EventDetailView is organizer-only
+      // post-fix; the rubric endpoint serves any event member.
+      api.rubric(undefined, cookieHeader),
       // Pre-fill the form with whatever this judge already saved —
       // without this, revisiting an already-scored project silently
       // resets every slider to 0, and re-submitting overwrites the
@@ -56,7 +60,7 @@ export default async function JudgeScorePage({
     notFound();
   }
 
-  const criteria = event.rubric?.criteria ?? [];
+  const criteria = rubric.criteria;
   const initialValues = Object.fromEntries(
     judgeScores.scores
       .filter((s) => s.project_id === project.id)

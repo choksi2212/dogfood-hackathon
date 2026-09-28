@@ -37,6 +37,28 @@ export type SubmissionDetail = Submission & {
   updated_at: string;
 };
 
+// Matches apps/events/views.py RubricView — split out from EventDetail
+// so the judge scoring console can fetch the criterion names without
+// pulling the rest of the event config (rubric weights, prizes,
+// judging window — all organizer-only on EventDetailView).
+//
+// When the event has no rubric yet the backend returns
+// `{id: null, name: null, criteria: []}` — the shape is honest about
+// the empty case rather than 404-ing.
+export type RubricResponse = {
+  id: string | null;
+  name: string | null;
+  criteria: {
+    id: string;
+    name: string;
+    description: string;
+    weight: string;
+    min: number;
+    max: number;
+    order: number;
+  }[];
+};
+
 export type SubmitPayload = {
   name?: string;
   tagline?: string;

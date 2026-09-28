@@ -17,6 +17,7 @@ import {
   type PairwiseBallotResponse,
   type PairwiseRankingResponse,
   type RetractVoteResponse,
+  type RubricResponse,
   type ScoreSavePayload,
   type ScoreSaveResponse,
   type ScoreSubmitResponse,
@@ -175,6 +176,15 @@ export const api = {
   // "include" on `request` covers it).
   eventDetail(slug?: string, cookieHeader?: string): Promise<EventDetail> {
     return request(routes.eventDetail(slug), cookieInit(cookieHeader));
+  },
+
+  // Rubric-only read, split out from eventDetail. Judges hit this from
+  // the scoring console to label their sliders; organizers and
+  // participants can read it too. Returns the same `rubric` shape
+  // EventDetail.rubric had — just without prizes / judging window /
+  // voting mode, which are organizer-only on EventDetailView.
+  rubric(slug?: string, cookieHeader?: string): Promise<RubricResponse> {
+    return request(routes.rubric(slug), cookieInit(cookieHeader));
   },
 
   memberships(slug?: string, cookieHeader?: string): Promise<Membership[]> {

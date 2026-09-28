@@ -29,6 +29,7 @@ export const routes = {
     `/api/events/${slug}/pairwise/ranking`,
   // Organizer dashboard (apps/events, apps/judging, apps/normalization).
   eventDetail: (slug: string = EVENT_SLUG) => `/api/events/${slug}/`,
+  rubric: (slug: string = EVENT_SLUG) => `/api/events/${slug}/rubric`,
   memberships: (slug: string = EVENT_SLUG) =>
     `/api/events/${slug}/memberships`,
   bulkInviteJudges: (slug: string = EVENT_SLUG) =>

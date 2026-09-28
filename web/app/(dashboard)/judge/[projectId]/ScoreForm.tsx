@@ -10,9 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { EventDetail } from "@/lib/api/types";
+import { ClientDate } from "@/components/client-date";
+import type { RubricResponse } from "@/lib/api/types";
 
-type Criterion = NonNullable<EventDetail["rubric"]>["criteria"][number];
+type Criterion = RubricResponse["criteria"][number];
 
 type Status = "idle" | "saving" | "submitting" | "error";
 
@@ -81,7 +82,9 @@ export function ScoreForm({
       <Alert>
         <CheckCircle2 className="size-4" />
         <AlertDescription className="flex items-center justify-between gap-3">
-          <span>Submitted at {new Date(submittedAt).toLocaleString()}.</span>
+          <span>
+            Submitted at <ClientDate iso={submittedAt} />.
+          </span>
           <Button variant="outline" size="sm" onClick={() => setSubmittedAt(null)}>
             Edit review
           </Button>

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ClientDate } from "@/components/client-date";
 import {
   Table,
   TableBody,
@@ -83,15 +84,17 @@ export default async function OrganizerPage() {
             <span className="text-xs uppercase tracking-wide text-muted-foreground">
               Submissions close
             </span>
-            <span>{new Date(event.submissions_close_at).toLocaleString()}</span>
+            <span>
+              <ClientDate iso={event.submissions_close_at} />
+            </span>
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-xs uppercase tracking-wide text-muted-foreground">
               Judging window
             </span>
             <span>
-              {new Date(event.judging_open_at).toLocaleString()} –{" "}
-              {new Date(event.judging_close_at).toLocaleString()}
+              <ClientDate iso={event.judging_open_at} /> –{" "}
+              <ClientDate iso={event.judging_close_at} />
             </span>
           </div>
           <div className="flex flex-col gap-1">

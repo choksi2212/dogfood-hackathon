@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { ClientDate } from "@/components/client-date";
 
 const RESULT_COLOR: Record<string, string> = {
   success: "text-success font-medium",
@@ -132,7 +133,9 @@ export default async function VotingResultsPage() {
               <TableBody>
                 {audit.entries.map((entry) => (
                   <TableRow key={entry.id}>
-                    <TableCell>{new Date(entry.created_at).toLocaleString()}</TableCell>
+                    <TableCell>
+                      <ClientDate iso={entry.created_at} />
+                    </TableCell>
                     <TableCell>{entry.actor_email ?? "anonymous"}</TableCell>
                     <TableCell>{entry.action}</TableCell>
                     <TableCell>
