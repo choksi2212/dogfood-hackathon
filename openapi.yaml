@@ -70,6 +70,57 @@ components:
         issued_at:
           type: string
           format: date-time
+    JudgeCertificate:
+      type: object
+      properties:
+        public_id:
+          type: string
+        judge_email:
+          type: string
+          format: email
+        event_slug:
+          type: string
+        signed_payload:
+          type: object
+          description: |
+            Self-contained payload — assignments, submitted reviews,
+            per-criterion aggregates.
+        signature:
+          type: string
+        signature_algorithm:
+          type: string
+          example: HMAC-SHA256
+        issued_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    BulkImportRequest:
+      type: object
+      required:
+      - kind
+      - rows
+      properties:
+        kind:
+          type: string
+          enum:
+          - judges
+          - teams
+          - submissions
+        rows:
+          type: array
+          items:
+            type: object
+    BulkImportResponse:
+      type: object
+      properties:
+        kind:
+          type: string
+        submitted:
+          type: integer
+        created:
+          type: integer
 paths:
   /healthz:
     get:
@@ -1021,6 +1072,68 @@ paths:
                 $ref: '#/components/schemas/Certificate'
         '404':
           description: Not found
+        '429':
+          description: Rate limited
+  /api/certificates/judges/{public_id}:
+    get:
+      summary: Public, HMAC-signed participation record for a judge
+      description: |
+        Same URL shape and signature scheme as the submission certificate
+        endpoint. Issued/refreshed on each successful score submission.
+        The signed payload includes the judge's assignments, submitted
+        reviews, and per-criterion aggregates.
+      parameters:
+      - name: public_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Participation record payload + signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JudgeCertificate'
+        '400':
+          description: Signature does not verify (tamper detected)
+        '404':
+          description: Not found
+        '429':
+          description: Rate limited
+  /api/events/{slug}/bulk/import:
+    post:
+      summary: Organizer bulk import for judges / teams / submissions
+      description: |
+        Organizer-only. Accepts a JSON body keyed by kind and a rows
+        array. Idempotent — re-imports skip existing rows.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkImportRequest'
+      responses:
+        '201':
+          description: Import summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkImportResponse'
+        '401':
+          description: Not authenticated
+        '403':
+          description: Not an organizer for this event
+        '404':
+          description: Event not found
+        '422':
+          description: Validation failed
         '429':
           description: Rate limited
   /widget.js:
