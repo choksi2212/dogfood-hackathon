@@ -99,8 +99,11 @@ class Command(BaseCommand):
             fixture = json.load(f)
 
         with transaction.atomic():
-            organizer = self._ensure_user("organizer@dogfood.local", "Olivia Organizer")
+            organizer = self._ensure_user("organizer@test.local", "Olivia Organizer")
             event = self._import_event(fixture["event"], options["event_slug"], organizer)
+            Membership.objects.update_or_create(
+                user=organizer, event=event, defaults={"role": "organizer", "created_by": organizer}
+            )
             self._clear_event_data(event)
             tracks_by_id = self._import_tracks(fixture["tracks"], event)
             criteria_by_key = self._import_rubric(event)
@@ -215,7 +218,7 @@ class Command(BaseCommand):
         teams_by_id = {}
         for t in fixture_teams:
             members = t.get("members") or []
-            captain_email = members[0] if members else f"{t['id']}@dogfood.local"
+            captain_email = members[0] if members else f"{t['id']}@test.local"
             captain = self._ensure_user(captain_email, captain_email.split("@")[0])
             Membership.objects.update_or_create(user=captain, event=event, defaults={"role": "participant", "created_by": organizer})
 
@@ -298,7 +301,7 @@ class Command(BaseCommand):
             )
 
     def _ensure_participant(self, event, teams_by_id, organizer):
-        participant = self._ensure_user("participant@dogfood.local", "Pranav Participant")
+        participant = self._ensure_user("participant@test.local", "Pranav Participant")
         Membership.objects.update_or_create(user=participant, event=event, defaults={"role": "participant", "created_by": organizer})
         first_team = next(iter(teams_by_id.values()))
         member, _ = TeamMember.objects.get_or_create(team=first_team, user=participant, defaults={"role_in_team": "member"})

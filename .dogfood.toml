@@ -20,10 +20,10 @@ base_url = "http://localhost:8000"
 claimed = ["T1", "T2", "T3"]
 
 [auth]
-organizer   = "Cookie: session=HpAjLFd3BeOJSG3R_L6nFpFpr32eLqf7DoeEhqJOdRI"
-judge_a     = "Cookie: session=Y9-QhQDjjTRoCNcvpaiIyZnGmtqqTJnzcYnjlS_7KPw"
-judge_b     = "Cookie: session=jZPZ0H4aFRnPAu_KMKSYYV4hJ_O4B2H15a-wGqvsvCg"
-participant = "Cookie: session=fLrJbtov4E6GlyItuF7nrFxU6XrbFT3c8vpNHH0EEyc"
+organizer   = "Cookie: session=YfVQib7SjTNfd94lM0EQ4W4HDT1sO0t5oMwgie86X7E"
+judge_a     = "Cookie: session=fK7PZE-XFxrTgAw7V-wFe6DfvfvhP2-wX3okkQxXy24"
+judge_b     = "Cookie: session=Jb7rR9UV-CPTmtAloidV3-v7qEiZsVKn_prSc3ITuo0"
+participant = "Cookie: session=2RWaA_DDxb2EBw9TvI8o0lH4sogxMbeSvQ3fdlY6VF0"
 
 [routes]
 gallery      = "/api/gallery"

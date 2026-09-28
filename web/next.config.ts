@@ -8,6 +8,11 @@ import type { NextConfig } from "next";
 const API_INTERNAL_URL = process.env.API_INTERNAL_URL ?? "http://localhost:8001";
 
 const nextConfig: NextConfig = {
+  // Browsers hit the app via nginx on 127.0.0.1:8000 / localhost:8000,
+  // not the Next dev server's own origin (frontend:3000) — without this,
+  // Next's dev-mode cross-origin guard blocks HMR and RSC requests that
+  // arrive proxied from a different apparent origin.
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   async rewrites() {
     return [
       {
