@@ -20,6 +20,6 @@ export default async function SubmitPage() {
     );
   }
   return (
-    <SubmitForm draftKey={`dogfood:${EVENT_SLUG}:${user.id}:project-draft`} />
+    <SubmitForm draftKey={`ledger:${EVENT_SLUG}:${user.id}:project-draft`} />
   );
 }

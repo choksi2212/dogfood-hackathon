@@ -11,7 +11,7 @@ export default function GalleryPage() {
         action={
           <Badge variant="secondary" className="gap-2 py-2">
             <span className="size-1.5 rounded-full bg-success" />
-            Dogfood 2026 gallery
+            Ledger 2026 gallery
           </Badge>
         }
       />

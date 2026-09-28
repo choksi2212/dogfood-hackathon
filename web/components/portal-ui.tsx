@@ -5,7 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
 export function PageHeading({
-  eyebrow = "DOGFOOD / 2026",
+  eyebrow = "LEDGER / 2026",
   title,
   description,
   action,

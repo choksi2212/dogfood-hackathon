@@ -102,7 +102,7 @@ export default function WidgetPage() {
   return (
     <div>
       <PageHeading
-        eyebrow="DOGFOOD / EVERYWHERE"
+        eyebrow="LEDGER / EVERYWHERE"
         title="Bring the builds to your site."
         description="A little window into everything that shipped. Embed the live gallery on your event page, community hub, or team website."
         action={
@@ -139,7 +139,7 @@ export default function WidgetPage() {
           <div className="p-5 sm:p-7">
             <div className="mb-6 flex items-start justify-between gap-3">
               <div>
-                <p className="eyebrow text-xs">DOGFOOD / 2026</p>
+                <p className="eyebrow text-xs">LEDGER / 2026</p>
                 <h2 className="mt-2 text-2xl font-medium tracking-tight">
                   Fresh from the hackathon.
                 </h2>
