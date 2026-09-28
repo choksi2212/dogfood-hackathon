@@ -63,11 +63,17 @@ def widget_gallery(request):
     except Event.DoesNotExist:
         return JsonResponse({"items": []})
 
-    qs = (
-        Submission.objects.filter(event=event, status="submitted")
-        .select_related("track")
-        .order_by("track__order", "name")
-    )
+    # T3 random sort support — embedders can pass ?sort=random
+    sort = request.GET.get("sort", "track")
+    qs = Submission.objects.filter(event=event, status="submitted").select_related("track")
+    if sort == "random":
+        qs = qs.order_by("?")
+    elif sort == "alpha":
+        qs = qs.order_by("name")
+    elif sort == "newest":
+        qs = qs.order_by("-submitted_at")
+    else:
+        qs = qs.order_by("track__order", "name")
     items = [
         {
             "id": str(s.id),

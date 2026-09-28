@@ -1,5 +1,6 @@
 import uuid
 
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
 
@@ -30,6 +31,15 @@ class Submission(models.Model):
     demo_video_url = models.URLField(blank=True)
     repo_url = models.URLField(blank=True)
     live_url = models.URLField(blank=True)
+    # T1 spec: freeform tech tags. ArrayField is Postgres-native; on SQLite
+    # (tests) Django falls back to a JSON-encoded text column automatically
+    # so the same field works across backends.
+    tech_tags = ArrayField(
+        models.CharField(max_length=40),
+        default=list,
+        blank=True,
+        size=20,
+    )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
     submitted_at = models.DateTimeField(null=True, blank=True)
     locked_at = models.DateTimeField(null=True, blank=True)
@@ -45,6 +55,65 @@ class Submission(models.Model):
 
     def __str__(self) -> str:
         return f"{self.event.slug}/{self.name}"
+
+
+class SubmissionImage(models.Model):
+    """T1 spec: image gallery per submission. Each row is one URL + caption
+    + display order. ``order`` lets the participant reorder without an
+    extra status field. Public-read (anyone with the URL sees the row),
+    write-only by the participant team."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    submission = models.ForeignKey(
+        "submissions.Submission",
+        on_delete=models.CASCADE,
+        related_name="images",
+    )
+    url = models.URLField(max_length=1000)
+    caption = models.CharField(max_length=200, blank=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "submissions_submissionimage"
+        ordering = ["order", "created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.submission.name} #{self.order}"
+
+
+class SubmissionAnswer(models.Model):
+    """T1 spec: per-submission answer to an event-defined custom question.
+    Questions themselves live on ``Event.custom_questions`` (a JSONField
+    on Event — see apps/events/models.py); this table stores the answers
+    and keeps the foreign key so deletion of a submission cascades
+    cleanly."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    submission = models.ForeignKey(
+        "submissions.Submission",
+        on_delete=models.CASCADE,
+        related_name="answers",
+    )
+    # The question id is the string the event organizer picked when
+    # defining the question (their own id, stable across the event).
+    question_id = models.CharField(max_length=64)
+    value = models.JSONField()
+
+    class Meta:
+        db_table = "submissions_submissionanswer"
+        # One answer row per (submission, question). The frontend re-orders
+        # answers via PUT, never via delete+create, so this constraint
+        # matches the typical edit cycle.
+        constraints = [
+            models.UniqueConstraint(
+                fields=["submission", "question_id"],
+                name="unique_answer_per_question",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.submission.name} / {self.question_id}"
 
 
 class Comment(models.Model):

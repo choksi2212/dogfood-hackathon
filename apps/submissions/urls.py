@@ -20,4 +20,17 @@ urlpatterns = [
         views.CommentModerateView.as_view(),
         name="moderate_comment",
     ),
+    # T1 spec: image gallery per submission. POST adds one image; DELETE
+    # removes by id; GET lists (used internally — public read happens
+    # through SubmissionDetailView which now nests `images`).
+    path(
+        "events/<slug:slug>/submissions/<uuid:id>/images",
+        views.SubmissionImageView.as_view(),
+        name="submission_images",
+    ),
+    path(
+        "events/<slug:slug>/submissions/<uuid:id>/images/<uuid:image_id>",
+        views.SubmissionImageView.as_view(),
+        name="submission_image",
+    ),
 ]
