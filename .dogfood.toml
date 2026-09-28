@@ -1,4 +1,4 @@
-# .dogfood.toml — DOGFOOD 2026 acceptance config
+# .dogfood.toml — Ledger 2026 acceptance config
 #
 # Schema matches the official run.py exactly:
 #   [portal]   base_url of the running portal
@@ -17,13 +17,13 @@
 base_url = "http://localhost:8000"
 
 [tiers]
-claimed = ["T1", "T2", "T3"]
+claimed = ["T1", "T2", "T3", "T4"]
 
 [auth]
-organizer   = "Cookie: session=YfVQib7SjTNfd94lM0EQ4W4HDT1sO0t5oMwgie86X7E"
-judge_a     = "Cookie: session=fK7PZE-XFxrTgAw7V-wFe6DfvfvhP2-wX3okkQxXy24"
-judge_b     = "Cookie: session=Jb7rR9UV-CPTmtAloidV3-v7qEiZsVKn_prSc3ITuo0"
-participant = "Cookie: session=2RWaA_DDxb2EBw9TvI8o0lH4sogxMbeSvQ3fdlY6VF0"
+organizer   = "Cookie: session=dAhWtHvy2o33eDdBUJOsuX504cJ8YRXxopLMgH5jKuU"
+judge_a     = "Cookie: session=6IgsYLPLgnAtOoendGZBqfJ9xqfzpKTMlknJJkcs87s"
+judge_b     = "Cookie: session=PyHvqE350sU05u5_n9Jg7OqXDCotl18FVNOmb9lDE9E"
+participant = "Cookie: session=-yZFhkWbFV_nEEkR8L2I_GRMG9ko8iyNOdVm4FI6s7c"
 
 [routes]
 gallery      = "/api/gallery"
