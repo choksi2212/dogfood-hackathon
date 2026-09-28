@@ -158,20 +158,18 @@ def test_score_save_exactly_at_close_returns_422(auth_client, sample_event, samp
 
 
 # ---------------------------------------------------------------------------
-# 4. submissions_close_at — vote endpoint
+# 4. judging_close_at — vote endpoint
 # ---------------------------------------------------------------------------
 
 
-def test_vote_after_submissions_close_returns_422(auth_client, sample_event, sample_submission):
-    """sample_event's ``submissions_close_at`` is already in the past;
-    the vote endpoint's ``@deadline_gated("submissions_close_at")``
-    decorator fires ``422 deadline_passed``.
-
-    This is the actual current behavior of the decorator (it gates
-    ``now > deadline``). The intended semantic — voting opens AT
-    submissions_close, i.e. once registration is over — is inverted
-    here; the test pins the live behavior so any flip to ``<`` later
-    is loud."""
+def test_vote_after_judging_close_returns_422(auth_client, sample_event, sample_submission):
+    """The community vote runs while judges deliberate and closes when
+    judging closes: the vote endpoint's ``@deadline_gated("judging_close_at")``
+    decorator fires ``422 deadline_passed`` once ``now > judging_close_at``.
+    The fixture keeps judging open (``judging_close_at = now + 2d``), so the
+    deadline is moved into the past first."""
+    now = timezone.now()
+    _patch_event(sample_event, judging_close_at=now - timedelta(seconds=1))
     resp = auth_client["participant"].post(
         f"/api/events/{sample_event.slug}/submissions/{sample_submission.id}/vote",
         data=json.dumps({"votes": 1}),
@@ -181,11 +179,11 @@ def test_vote_after_submissions_close_returns_422(auth_client, sample_event, sam
     assert resp.json()["error"]["code"] == "deadline_passed"
 
 
-def test_vote_exactly_at_submissions_close_returns_422(auth_client, sample_event, sample_submission):
-    """``submissions_close_at = now - 1 microsecond`` boundary.
+def test_vote_exactly_at_judging_close_returns_422(auth_client, sample_event, sample_submission):
+    """``judging_close_at = now - 1 microsecond`` boundary.
     The decorator's strict ``>`` triggers at the line."""
     now = timezone.now()
-    _patch_event(sample_event, submissions_close_at=now - timedelta(microseconds=1))
+    _patch_event(sample_event, judging_close_at=now - timedelta(microseconds=1))
     resp = auth_client["participant"].post(
         f"/api/events/{sample_event.slug}/submissions/{sample_submission.id}/vote",
         data=json.dumps({"votes": 1}),

@@ -6,7 +6,7 @@
 **Repo:** `https://github.com/choksi2212/dogfood-hackathon`
 **Spec:** live Sep 23, 2026 — `https://dogfoodhack.com/spec`
 **Stack:** Django 5 + Django REST Framework + PostgreSQL 16 + Next.js 15, all in `docker compose up`
-**Companion docs:** [PRD](DOGFOOD-PRD.md), [Architecture](DOGFOOD-ARCHITECTURE.md), [Backend Impl](DOGFOOD-BACKEND-IMPL.md)
+**Companion docs:** [PRD](PRD.md), [Architecture](../ARCHITECTURE.md), [Backend Impl](BACKEND-IMPL.md)
 
 > The PRD says *what*. This document says *how*. The architecture says *how the how is
 > shaped*. The backend impl doc says *exactly what to type*.
@@ -708,7 +708,7 @@ require a CSRF token. The frontend obtains the token from a cookie and includes 
 the `X-CSRFToken` header.
 
 API endpoints with cookie auth: CSRF required.
-API endpoints with the four pre-baked session headers (acceptance mechanism): CSRF
+API endpoints with the five pre-baked session headers (acceptance mechanism): CSRF
 **not** required (the spec implies this; the headers are pre-authenticated and
 trusted).
 
@@ -763,8 +763,11 @@ revoke UPDATE and DELETE on `audit_audit` for the application user.
 ### 6.12 Secret management
 
 - The Django `SECRET_KEY` is from `.env` (gitignored).
-- The Ed25519 signing key for certificates is generated on first boot and persisted
-  to the database; the private key is in `.env` in production.
+- Certificates and judge records are signed with HMAC-SHA256 keyed by the Django
+  `SECRET_KEY` (the same secret that protects sessions). There is no separate
+  signing key persisted to the database and no `.env` private key; an offline
+  public-key verifier (Ed25519 with a published key) is labeled future work
+  (THREAT-MODEL.md §5.5).
 - Webhook secrets are per-webhook, generated on creation, shown once.
 - Argon2 parameters are in `settings.py`, not in `.env`.
 
@@ -833,63 +836,61 @@ We do not implement these. The 72-hour scope does not require them.
 ```
 dogfood-hackathon/
 ├── README.md
-├── LICENSE                  (MIT or Apache-2.0, committed at H+0)
+├── LICENSE
 ├── .gitignore
 ├── .gitattributes           (* text=auto eol=lf)
-├── .dogfood.toml            (the spec config + tier claims)
-├── acceptance-report.txt    (the spec output, regenerated on every gate)
-├── docker-compose.yml
-├── Dockerfile.backend
-├── Dockerfile.web
-├── Makefile
+├── .env.example             (compose defaults; production overrides)
+├── .dogfood.toml            (the spec config: 5 routes + 5 auth headers + claims)
+├── .github/workflows/       (tests.yml, lint.yml)
+├── acceptance.py            (the vendored checker — run.py, only the name differs)
+├── acceptance-report.txt    (the committed report, regenerated on every gate)
+├── docker-compose.yml       (db + web + frontend + nginx + prometheus/grafana/alertmanager)
+├── Dockerfile               (the web image; gunicorn config.wsgi)
+├── entrypoint.sh            (wait-for-db → migrate → import_fixtures → exec CMD)
+├── Makefile                 (up/seed/accept/test/lint/ci/metrics-*)
 ├── requirements.txt
-├── package.json
-├── package-lock.json
+├── mypy.ini                 (mypy config)
+├── pytest.ini               (shared test config)
+├── fixtures.json            (the official spec fixtures)
 ├── nginx/
-│   └── nginx.conf
-├── backend/
-│   ├── manage.py
-│   ├── backend/
-│   │   ├── settings.py
-│   │   ├── urls.py
-│   │   ├── wsgi.py
-│   │   └── asgi.py
-│   ├── apps/
-│   │   ├── accounts/
-│   │   ├── events/
-│   │   ├── teams/
-│   │   ├── submissions/
-│   │   ├── judging/
-│   │   ├── voting/
-│   │   ├── audit/
-│   │   ├── normalization/
-│   │   ├── pairwise/
-│   │   └── api/
-│   ├── scripts/
-│   │   ├── seed.py
-│   │   ├── verify_cert.py
-│   │   └── generate_proof.py
-│   └── tests/
-├── web/
-│   ├── package.json
-│   ├── next.config.mjs
-│   ├── app/                 (App Router)
-│   ├── components/
-│   ├── lib/
-│   └── public/
+│   └── nginx.conf           (baked into the nginx image at build time)
+├── config/                  (Django project package)
+│   ├── settings.py
+│   ├── urls.py
+│   └── wsgi.py
+├── apps/                    (14 apps with models)
+│   ├── accounts/            (User, Session, import_fixtures + seed_fixtures commands)
+│   ├── events/
+│   ├── teams/
+│   ├── submissions/
+│   ├── judging/
+│   ├── voting/
+│   ├── audit/
+│   ├── normalization/       (proof.py — the normalization-proof.txt generator)
+│   ├── pairwise/
+│   ├── api/                 (Webhook model, bulk import/export views)
+│   ├── webhooks/            (WebhookDelivery + flush_webhooks command)
+│   ├── certificates/        (Certificate, JudgeRecord + HMAC helpers)
+│   ├── billing/
+│   └── abuse/
+├── web/                     (Next.js frontend)
 ├── scripts/
-│   ├── run_accept.sh        (make accept)
-│   ├── verify_cert.py       (the offline certificate verifier)
-│   └── generate_proof.py    (the proof file)
+│   ├── role_isolation_matrix.py
+│   └── matrix.toml
+├── tests/                   (15 category subdirectories, one docs block each)
+├── load-tests/
 ├── docs/
-│   ├── ARCHITECTURE.md      (the architecture doc)
-│   ├── DATA-MODEL.md        (the schema doc)
-│   ├── JUDGING.md           (the judging + normalization doc)
-│   └── THREAT-MODEL.md      (the +3 bonus)
+│   ├── PRD.md               (the requirements doc)
+│   ├── TRD.md               (the technical requirements doc)
+│   └── BACKEND-IMPL.md      (the backend implementation doc)
+├── ARCHITECTURE.md          (the architecture doc)
+├── DATA-MODEL.md            (the schema doc)
+├── JUDGING.md               (the judging + normalization doc)
+├── THREAT-MODEL.md          (the +3 bonus)
+├── WRITEUP.md               (the submission writeup)
 ├── openapi.yaml             (the API First bonus)
 ├── role-isolation-matrix.txt (the defense-in-depth artifact)
-├── normalization-proof.txt  (the +5 bonus)
-└── demo-video.mp4           (or link)
+└── normalization-proof.txt  (the +5 bonus)
 ```
 
 ### 8.2 Docker Compose
@@ -996,38 +997,26 @@ CMD ["npm", "start"]
 ### 8.4 Makefile
 
 ```makefile
-.PHONY: up down logs accept clean seed test lint
-
-up:
-	docker compose up -d
-	docker compose logs -f backend | grep -m1 "Application startup complete"
-
-down:
-	docker compose down
-
-logs:
-	docker compose logs -f
-
-accept:
-	@docker compose exec -T backend python -c "import urllib.request; print('OK')" || (echo "Backend not up. Run make up first." && exit 1)
-	docker compose exec -T backend bash -c "python3 /app/scripts/run_accept.sh /app/.dogfood.toml > /app/acceptance-report.txt"
-	@cat acceptance-report.txt
-
-clean:
-	docker compose down -v
-	docker system prune -f
-
-seed:
-	docker compose exec -T backend python manage.py seed_fixtures
-	docker compose exec -T backend python manage.py seed_users
-
-test:
-	docker compose exec -T backend pytest
-
-lint:
-	docker compose exec -T backend ruff check .
-	docker compose exec -T backend mypy backend/
+# Condensed from the real Makefile (COMPOSE ?= docker compose).
+up:          $(COMPOSE) up --build
+seed:        $(COMPOSE) exec -T web python manage.py import_fixtures
+accept:      $(COMPOSE) exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
+test:        $(COMPOSE) exec -T web pytest tests/ -v
+lint:        ruff check .
+             ruff format --check .
+ci:          lint
+             pip install -r requirements.txt
+             python manage.py migrate --noinput
+             pytest tests/ -v --tb=short
+down-clean:  $(COMPOSE) down -v
 ```
+
+The `accept` target runs the vendored `acceptance.py` (byte-for-byte the
+spec's `run.py`, only the filename differs) directly — no wrapper script
+and no separate user-seeder command. Seeding is the single idempotent
+`manage.py import_fixtures`; the real Makefile also has `accept-fresh`
+(re-seed then accept), `test-<category>`, `test-cov`, `types`, and the
+`metrics-*` targets for the observability stack.
 
 ### 8.5 Migrations
 
@@ -2397,13 +2386,13 @@ wipes the database.
 
 ```bash
 # Local dev: create migrations after model changes
-docker compose exec backend python manage.py makemigrations
+docker compose exec web python manage.py makemigrations
 
 # Apply migrations
-docker compose exec backend python manage.py migrate
+docker compose exec web python manage.py migrate
 
 # Verify migrations match across environments
-docker compose exec backend python manage.py showmigrations
+docker compose exec web python manage.py showmigrations
 ```
 
 Migrations are committed in the repo. They are the schema history.
@@ -2411,26 +2400,21 @@ Migrations are committed in the repo. They are the schema history.
 ### 17.3 Loading the seed data
 
 ```bash
-# Seed fixtures (idempotent)
-docker compose exec backend python manage.py seed_fixtures
-
-# Seed the four pre-baked session users (one per role)
-docker compose exec backend python manage.py seed_users
+# Seed the official fixtures + the five demo sessions (idempotent)
+docker compose exec web python manage.py import_fixtures
 ```
 
-The seed script prints the four auth headers to stdout. They go into
-`.dogfood.toml`'s `[auth]` block.
+`import_fixtures` also prints the five auth headers to stdout. They are already
+committed in `.dogfood.toml`'s `[auth]` block — the tokens are deterministic
+HMAC values, so they match every fresh boot.
 
 ### 17.4 Building the production images
 
 ```bash
-# Backend image
-docker build -t dogfood/backend:dev -f Dockerfile.backend .
+# The Django service image is the root Dockerfile (gunicorn config.wsgi)
+docker build -t dogfood/web:dev .
 
-# Web image
-docker build -t dogfood/web:dev -f Dockerfile.web .
-
-# Both at once
+# Everything the compose stack defines
 docker compose build
 ```
 
@@ -2881,7 +2865,7 @@ bonus). The mapping here is the technical controls.
 | Results leak during voting | Integrity of the event | Server-side gating; `results` endpoint returns 403 before `results_at` |
 | Vote order bias | Fairness of voting | Randomised ballot ordering, seeded per session |
 | Webhook URL takeover | Integrity of integrations | HMAC signature; per-webhook secret; HTTPS-only |
-| Signed certificate forgery | Trust in certificates | Ed25519; public key published; offline verifier |
+| Signed certificate forgery | Trust in certificates | HMAC-SHA256 (SECRET_KEY) over canonical JSON; verify-on-read at the public endpoints |
 | Cookie theft via XSS | Account takeover | CSP; `HttpOnly` cookies; safe markdown rendering |
 | CSRF | State-changing actions | Django CSRF middleware; cookie-auth requires token |
 | SQL injection | Database integrity | ORM only; no raw SQL; lint rule |
@@ -3350,99 +3334,77 @@ The receiver verifies by recomputing the HMAC and comparing.
 
 ### 23.15 Certificates (FR-320..326)
 
-**Key generation:**
+**Signing:** HMAC-SHA256 keyed by the Django `SECRET_KEY`, over the canonical
+JSON payload. There is no keypair to generate, no key row in the database, and
+no `.env` private key:
 
 ```python
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-import base64
+import hashlib, hmac, json
 
-def generate_signing_key():
-    private_key = Ed25519PrivateKey.generate()
-    private_bytes = private_key.private_bytes(
-        encoding=serialization.Encoding.Raw,
-        format=serialization.PrivateFormat.Raw,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-    public_bytes = private_key.public_key().public_bytes(
-        encoding=serialization.Encoding.Raw,
-        format=serialization.PublicFormat.Raw,
-    )
-    return {
-        'private': base64.b64encode(private_bytes).decode(),
-        'public': base64.b64encode(public_bytes).decode(),
-    }
+def _canonical(payload: dict) -> bytes:
+    return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+
+def sign_payload(payload: dict) -> str:
+    return hmac.new(
+        settings.SECRET_KEY.encode(), _canonical(payload), hashlib.sha256
+    ).hexdigest()
+
+def verify_payload(payload: dict, signature: str) -> bool:
+    return hmac.compare_digest(sign_payload(payload), signature)
 ```
 
-The private key is stored in `.env` (production) or the DB (dev). The public key is
-published.
+**Record generation:** the certificate is a JSON record (no PDF, no reportlab):
+the payload carries the recipient/event/role/date facts plus
+`"signature_algorithm": "HMAC-SHA256"`, issued by the organizer via
+`POST /api/events/<slug>/certificates/issue`.
 
-**PDF generation:** `reportlab`. The certificate has the event name, recipient name,
-role, date, and signature.
-
-**Verifier script:**
-
-```python
-# scripts/verify_cert.py
-# Usage: python scripts/verify_cert.py cert.pdf public_key.pub
-# Verifies the Ed25519 signature offline.
-```
-
-The script is committed in the repo. It is the offline verifier.
+**Verification:** verify-on-read at the public endpoint. The same view that
+serves `GET /api/certificates/<public_id>` recomputes the HMAC over the stored
+payload and compares with `hmac.compare_digest`; a tampered row returns 400
+`signature_invalid` instead of its content. There is no offline verifier
+script (an Ed25519 offline verifier with a published key is labeled future
+work — THREAT-MODEL.md §5.5).
 
 ---
 
 ## Part 24 — Fixtures-to-Real Migration (technical)
 
-### 24.1 The seed script
+### 24.1 The seed command
 
-The seed script (`backend/apps/events/management/commands/seed_fixtures.py`) reads
-`fixtures.json` (committed in the repo) and creates:
+`manage.py import_fixtures` (`apps/accounts/management/commands/import_fixtures.py`)
+reads the committed `fixtures.json` and creates: the event (`sample-hack-2026`),
+its 8 tracks, the rubric and criteria, the fixture judges, the teams and their
+projects, and the scores. It is idempotent: re-running it does not duplicate.
+`entrypoint.sh` runs it automatically after `migrate`; `make seed` re-runs it
+by hand. (A legacy `seed_fixtures` command invents synthetic data and serves
+only as a fallback when `fixtures.json` is missing.)
 
-- 1 event ("Sample Hack 2026")
-- 8 tracks
-- 1 rubric (2 criteria)
-- 30 judges (with placeholder emails)
-- 40 teams (1–4 members each, generated)
-- 40 projects (with all fields populated)
-- ~120 scores (with the three edge cases)
+### 24.2 The five demo sessions
 
-The seed is idempotent: re-running it does not duplicate.
-
-### 24.2 The user seed
-
-The user seed (`backend/apps/accounts/management/commands/seed_users.py`) creates
-four users:
-
-- `organizer@example.org` (organizer)
-- `judge_a@example.org` (judge)
-- `judge_b@example.org` (judge)
-- `participant@example.org` (participant)
-
-Each has a known password (`dogfood123` in dev only). The script prints the four
-session headers on completion.
+`import_fixtures` also seeds five demo sessions — organizer, judge_a, judge_b,
+judge_c, participant — bound to the real fixture users, each with the known dev
+password `dogfood-dev-password`. The session tokens are deterministic:
+`HMAC-SHA256(DJANGO_SECRET_KEY, "dogfood-2026-demo-session:{label}:{email}")`,
+so the five committed `.dogfood.toml` `[auth]` headers match every fresh boot.
 
 ### 24.3 The flow at H+0
 
 ```
 docker compose up
   ↓
-db: postgres starts
+db: postgres starts (pg_isready healthcheck)
   ↓
-backend: migrations apply
+web: entrypoint.sh waits for db, migrations apply
   ↓
-backend: seed_fixtures runs
+web: import_fixtures runs (fixtures + five demo sessions)
   ↓
-backend: seed_users runs
+web: gunicorn starts serving (config.wsgi)
   ↓
-backend: prints session headers to stdout
+frontend: next build
   ↓
-backend: gunicorn starts serving
+frontend: next start
   ↓
-web: next build
-  ↓
-web: next start
-  ↓
-nginx: starts
+nginx: starts (public entry point on 127.0.0.1:8000)
   ↓
 portal: ready
 ```
@@ -4027,14 +3989,14 @@ authoritative definition; this list is the same terms with technical detail.
 - Next.js 15: `https://nextjs.org/docs`
 - nginx: `https://nginx.org/en/docs/`
 - Argon2: `https://github.com/P-H-C/phc-winner-argon2`
-- Ed25519: `https://ed25519.cr.yp.to/`
+- HMAC-SHA256: `https://datatracker.ietf.org/doc/html/rfc2104`
 
 ### 30.5 Companion docs
 
-- [PRD](DOGFOOD-PRD.md)
-- [Architecture](DOGFOOD-ARCHITECTURE.md)
-- [Backend Impl](DOGFOOD-BACKEND-IMPL.md)
-- [Master Plan](DOGFOOD-PLAN.md)
-- [Manas Build Doc](DOGFOOD-MANAS.md)
-- [Mihir Build Doc](DOGFOOD-MIHIR.md)
+- [PRD](PRD.md)
+- [Architecture](../ARCHITECTURE.md)
+- [Backend Impl](BACKEND-IMPL.md)
+- [Master Plan](PLAN.md)
+- [Manas Build Doc](../MANAS.md)
+- [Mihir Build Doc](../MIHIR.md)
 

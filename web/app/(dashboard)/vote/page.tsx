@@ -17,6 +17,59 @@ import { EmptyState, PageHeading } from "@/components/portal-ui";
 import { RouteError } from "@/components/route-error";
 import { RouteLoading } from "@/components/route-loading";
 
+// PRD §3.3.4 FR-241/FR-242 — randomised ballot ordering: the projects a
+// voter sees must not give anyone a positional advantage, but the order
+// must stay stable within a session (refreshing must NOT re-shuffle).
+// The backend gallery API is shared with the public gallery (sorted,
+// cursor-paginated), so the ballot shuffles client-side: the seed is
+// drawn once per browser session and kept in sessionStorage, and a
+// deterministic PRNG turns that seed into the same shuffle on every
+// render of that session. A new session draws a new seed → new order.
+const BALLOT_SEED_KEY = "dogfood:ballot-seed";
+
+function ballotSeed(): number {
+  let stored: string | null = null;
+  try {
+    stored = sessionStorage.getItem(BALLOT_SEED_KEY);
+  } catch {
+    stored = null; // storage disabled — fall back to an ephemeral seed
+  }
+  if (!stored) {
+    stored = String(Math.floor(Math.random() * 0x7fffffff));
+    try {
+      sessionStorage.setItem(BALLOT_SEED_KEY, stored);
+    } catch {
+      // Private-mode browsers block writes; the order stays random,
+      // just not stable across refreshes. Better than a crash.
+    }
+  }
+  const seed = Number(stored);
+  return Number.isFinite(seed) && seed > 0 ? seed : 1;
+}
+
+// mulberry32 — a tiny deterministic PRNG (one 32-bit seed → same
+// sequence every time). Fisher–Yates below consumes it.
+function mulberry32(seed: number): () => number {
+  let a = seed;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffled<T>(items: T[]): T[] {
+  const rand = mulberry32(ballotSeed());
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 export default function VotePage() {
   const [items, setItems] = useState<Submission[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -31,7 +84,7 @@ export default function VotePage() {
     api
       .allGallery()
       .then((data) => {
-        if (active) setItems(data);
+        if (active) setItems(shuffled(data));
       })
       .catch(() => {
         if (active) setFailed(true);

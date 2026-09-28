@@ -207,11 +207,17 @@ class Command(BaseCommand):
     # -- people -------------------------------------------------------------
 
     def _ensure_user(self, email, name):
-        user, _ = User.objects.get_or_create(email=email, defaults={"username": email, "name": name, "is_active": True})
+        user, created = User.objects.get_or_create(email=email, defaults={"username": email, "name": name, "is_active": True})
         user.username = email
         user.name = name
         user.is_active = True
-        user.set_password(DEMO_PASSWORD)
+        # Hash the seeded demo password only on first create. Re-importing
+        # the same fixtures (the bulk round-trip, docker reboots on a
+        # mounted volume, organizer re-imports) must not re-run PBKDF2 for
+        # every unchanged user — that turned a full import into a minute
+        # of CPU. The demo password never changes for existing users.
+        if created:
+            user.set_password(DEMO_PASSWORD)
         user.save()
         return user
 

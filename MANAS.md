@@ -7,8 +7,8 @@
 
 > **SPEC IS LIVE (Sep 23, a day early).** This doc has been rewritten against the real
 > spec. The biggest change is that the acceptance mechanism is `run.py` (seven HTTP
-> checks), and `.dogfood.toml` is the seam — a 15-line config file declaring five route
-> names and four pre-baked session headers. Role isolation is graded on **one cell**:
+> checks), and `.dogfood.toml` is the seam — a small config file declaring five route
+> names and five pre-baked session headers. Role isolation is graded on **one cell**:
 > `peer_scores` as `judge_b` returns 401/403. T3 and T4 have **zero** checks in run.py.
 > Anything that conflicts with the spec is wrong by definition — the spec is what runs.
 
@@ -319,8 +319,11 @@ recovered ranking is evidence; an implemented algorithm is a claim.**
 
 REST API + webhooks covering every UI action · certificate generation · **signed, publicly
 verifiable** judge participation records · bulk import/export. The API is nearly free if you
-have been API-first since G2. Signed records: Ed25519, publish the public key, ship a verify
-endpoint *and* a standalone verify script so the proof does not require your server running.
+have been API-first since G2. Signed records: HMAC-SHA256 over canonical
+JSON, verified at the public unauthenticated endpoint
+(`/api/records/judge/<public_id>`; the signed payload carries the display
+name only, never the email). An offline public-key verifier (Ed25519 with a
+published key) stays labeled future work (THREAT-MODEL.md §5.5).
 
 ### G8 — H+62 → H+66 · Documents. Feature freeze.
 
@@ -340,7 +343,7 @@ final `.dogfood.toml` matching the report **exactly**, final commit.
 
 **This file does two jobs**, both load-bearing:
 
-1. **The seam.** run.py reads `[portal].base_url`, the five `[routes]`, and the four
+1. **The seam.** run.py reads `[portal].base_url`, the five `[routes]`, and the five
    `[auth]` headers. If the file is wrong, run.py fails. If a header doesn't authenticate
    the right role, the check fails. The file is the contract between our portal and the
    acceptance mechanism.
@@ -375,7 +378,7 @@ csv_export   = "/api/export.csv"
 **`auth` headers** — these are *whatever proves you are this role.* The spec leaves the
 shape entirely to us: cookies, Bearer tokens, basic auth, even a header we invent. The
 checker doesn't care about the mechanism; it just attaches the string verbatim. **The
-seed script prints these four headers to stdout when the portal boots.** They go straight
+seed script prints these five headers to stdout when the portal boots.** They go straight
 into `[auth]`. The checker never logs in.
 
 **`peer_scores`** — this is the URL that *in your portal* would return judge A's scores.

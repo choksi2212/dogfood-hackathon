@@ -163,7 +163,7 @@ The brief uses some words loosely. We pin them down here so the docs do not drif
 | **Pairwise comparison** | A judge's pick of which of two projects is better. Input to the Bradley-Terry model. |
 | **CSV export** | Organizer-facing dump of all data at any pipeline stage: assignments, raw scores, normalized scores, final ranking. |
 | **Acceptance mechanism** | `run.py` reading `.dogfood.toml` and making seven HTTP calls against our portal. The output is `acceptance-report.txt`. |
-| **`.dogfood.toml`** | Repo-root config: portal URL, tier claims, four pre-baked session headers, five route names. Both the contract and the honesty file. |
+| **`.dogfood.toml`** | Repo-root config: portal URL, tier claims, five pre-baked session headers, five route names. Both the contract and the honesty file. |
 | **Audit event** | An append-only record of every consequential action: who did what, when, from where, with what payload. The readable audit trail is a T3 requirement and a threat-model primitive. |
 | **Public API** | The HTTP surface documented in `openapi.yaml`. Every UI action provably reaches the database only through this surface. The API First bonus is demonstrated, not asserted. |
 | **DOGFOOD window** | Sep 26 18:00 UTC → Sep 29 18:00 UTC, 2026. The 72 hours during which code is written and committed to the competition repo. |
@@ -448,10 +448,11 @@ Session       id (uuid), user_id (fk), token_hash (unique, sha256),
 ```
 
 **Acceptance criteria.**
-- The acceptance mechanism verifies: the four pre-baked session headers in
-  `.dogfood.toml` (`organizer`, `judge_a`, `judge_b`, `participant`) produce distinct,
-  non-privileged sessions that authenticate as the right role against the right endpoints.
-- The seed script prints these four headers on portal boot (spec §03 `[auth]`).
+- The acceptance mechanism verifies: the five pre-baked session headers in
+  `.dogfood.toml` (`organizer`, `judge_a`, `judge_b`, `judge_c`,
+  `participant`) produce distinct, non-privileged sessions that
+  authenticate as the right role against the right endpoints.
+- The seed script prints these five headers on portal boot (spec §03 `[auth]`).
 
 **Edge cases.**
 - A user tries to register with an already-used email → 409, generic message.
@@ -1346,8 +1347,9 @@ get a budget of credits and the cost of `n` votes on one project is `n²`.
   project is `n²`. The total cost across projects must not exceed 100. The server
   validates the budget; the client shows remaining credits.
 - FR-205 — A voter cannot vote on their own team project. The API returns 403.
-- FR-206 — Voting opens at `submissions_close_at` and closes at `results_at`. Outside
-  this window, votes return 403.
+- FR-206 — Votes (cast and retract) are accepted only once judging has closed: the
+  server gates both POST and DELETE on `judging_close_at` via the deadline
+  decorator; results stay hidden until `results_at`.
 - FR-207 — A vote is a single API call. There is no per-project "vote count" UI; the
   voter sees only their own vote and (in quadratic mode) their remaining credits.
 - FR-208 — A vote can be retracted within the voting window. After retraction, the voter
@@ -1679,8 +1681,9 @@ WebhookDelivery  id (uuid), webhook_id (fk), event_type, payload, signature,
 
 #### 3.4.2 Certificate and record generation — FR-320 through FR-326
 
-**Description.** The portal generates PDF certificates for participants and organizers
-after results are published. Each certificate is signed (Ed25519) and verifiable.
+**Description.** The portal issues signed certificate records (JSON, not PDF) for
+submissions after results are published. Each record is signed (HMAC-SHA256) and
+verifiable at a public endpoint.
 
 **User stories.**
 - As a participant, I want a certificate I can put on my LinkedIn.
@@ -1690,40 +1693,44 @@ after results are published. Each certificate is signed (Ed25519) and verifiable
 - FR-320 — A certificate is generated for: each participant (after results_at),
   each judge (after judging_close_at), each organizer (event-end).
 - FR-321 — A certificate has: recipient name, event name, role, date, signature.
-- FR-322 — The certificate is a PDF, generated server-side via `reportlab` or
-  `weasyprint`. No client-side rendering.
-- FR-323 — The certificate is signed with an Ed25519 keypair generated per deployment.
-  The public key is published at `/verify`.
-- FR-324 — A verifier (anyone with the certificate PDF + the public key) can verify the
-  signature offline, with a standalone script in the repo (`scripts/verify.py`).
-- FR-325 — A certificate is downloadable as `/{event_slug}/certificates/{kind}/{user_id}.pdf`.
+- FR-322 — The certificate is a JSON record served by the API (no PDF, no
+  reportlab); the payload carries `"signature_algorithm": "HMAC-SHA256"`.
+- FR-323 — The certificate is signed with HMAC-SHA256 keyed by the deployment's
+  `SECRET_KEY`, over the canonical JSON payload. There is no separate keypair
+  and no key row.
+- FR-324 — Anyone can verify a certificate at the public endpoint
+  `GET /api/certificates/{public_id}`: 200 with the record, or 400
+  `signature_invalid` if the payload or signature was tampered with.
+- FR-325 — A certificate is retrievable by its `public_id`; there is no
+  `/{event_slug}/certificates/{kind}/{user_id}.pdf` path.
 - FR-326 — A certificate is generated on demand; it is not pre-rendered for all users.
 
 **API surface.** Adds:
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| GET | `/api/events/{slug}/me/certificate` | session | my certificate |
-| GET | `/api/events/{slug}/certificates/{user_id}.pdf` | varies | public after results_at |
-| GET | `/verify` | none | public key + verification instructions |
+| POST | `/api/events/{slug}/certificates/issue` | organizer | issue for one submission or `{"all": true}` |
+| GET | `/api/certificates/{public_id}` | none | public verify-on-read (400 `signature_invalid` if tampered) |
 
 **Data model.**
 
 ```
-Certificate   id (uuid), event_id (fk), user_id (fk), kind (enum),
-              serial (unique), signature, public_key_id,
-              generated_at
-SigningKey    id (uuid), public_key (hex), created_at,
-              retired_at (nullable)
+Certificate   id (uuid), public_id (char(64), unique), submission_id (fk),
+              signed_payload (json), signature (char(64)),
+              issued_at, issued_by_id (fk, nullable)
 ```
+
+No signing-key table exists — the HMAC is keyed by `SECRET_KEY`.
 
 **Acceptance criteria.**
 - No acceptance checks. T4 is scored on docs + video.
 
 **Edge cases.**
-- The signing key is rotated → old certificates still verify against the retired key.
-  The retired key is published alongside the current one.
-- A certificate is requested before the relevant deadline → 403.
+- A certificate row is tampered with (direct DB edit) → verification recomputes the
+  HMAC and fails closed with 400 `signature_invalid`.
+- Re-issuing a certificate mints a fresh `public_id`; the old record keeps verifying.
+- A certificate is requested for a draft/withdrawn submission → not certifiable
+  (only `submitted` and `locked` are).
 
 **Out of scope.**
 - Per-track certificates.
@@ -1742,22 +1749,29 @@ projects they scored, when, against what rubric. The record is publicly verifiab
 - FR-330 — A participation record is generated per judge per event, after judging closes.
 - FR-331 — The record has: judge name, event name, projects reviewed (id, title, track,
   submitted_at), scores per criterion, rubric, signature.
-- FR-332 — The record is JSON, signed with Ed25519 (same keypair as certificates).
-- FR-333 — The record is downloadable at
-  `/{event_slug}/participation/{user_id}.json`.
-- FR-334 — The record is verifiable with the same `scripts/verify.py` script.
+- FR-332 — The record is JSON, signed with HMAC-SHA256 (the same scheme as
+  certificates; keyed by `SECRET_KEY`, no key row).
+- FR-333 — The record is served at `GET /api/records/judge/{public_id}` (and listed
+  for the organizer at `GET /api/events/{slug}/records/judge`).
+- FR-334 — The record is verifiable at that same public endpoint — the view
+  recomputes the signature on read and returns 400 `signature_invalid` on mismatch.
 - FR-335 — The record includes a hash of the event rubric so a verifier can check what
   the judge scored against.
-- FR-336 — The record is portable: it does not require the portal to be running.
+- FR-336 — The record is verifiable without an account (the endpoint is
+  unauthenticated). Verification does require the portal to be running; an
+  offline public-key verifier is labeled future work (THREAT-MODEL.md §5.5).
 
 **API surface.** Adds:
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| GET | `/api/events/{slug}/me/participation` | session | my record |
-| GET | `/api/events/{slug}/participation/{user_id}.json` | varies | public after judging_close_at |
+| POST | `/api/events/{slug}/records/judge` | organizer | issue one (`{"judge": "<email>"}`) or all (`{"all": true}`) |
+| GET | `/api/events/{slug}/records/judge` | organizer | list issued records (emails visible here only) |
+| GET | `/api/records/judge/{public_id}` | none | public verify; payload carries the display name only |
 
-**Data model.** Reuses `Certificate` and `SigningKey`.
+**Data model.** `JudgeRecord` (`certificates_judgerecord`): public_id (unique),
+judge (fk), event (fk), signed_payload (json), signature (char(64)), issued_at,
+issued_by (nullable fk). Same HMAC scheme as certificates.
 
 **Acceptance criteria.**
 - No acceptance checks. T4 is scored on docs + video.
@@ -1809,32 +1823,35 @@ sites (e.g. an organizers main website). The bundle has no external dependencies
 migrating from another platform) and produces a bulk export of everything (for backup).
 
 **User stories.**
-- As an organizer, I want to import 100 projects from a CSV.
+- As an organizer, I want to import 100 projects from another platform's dump.
 - As an organizer, I want to export everything for backup.
 
 **Functional requirements.**
-- FR-350 — Bulk import accepts a CSV with columns: team_name, member_emails, project
-  name, tagline, description, repo_url, live_url, track_slug, custom_question_answers.
-- FR-351 — Import is transactional: either all rows succeed or none. Failures are
-  reported with row numbers.
-- FR-352 — Import validates each row: required fields, email format, track existence,
-  team size 1–4. Failed validations abort the import.
-- FR-353 — Import is restricted to organizers.
-- FR-354 — Export is a JSON dump of: events, tracks, prizes, rubrics, users,
-  memberships, teams, projects, scores, votes, comments, audit events (the whole
-  database).
-- FR-355 — Export is downloadable as `dump-{event_slug}-{timestamp}.json`.
-- FR-356 — Export is restricted to admins.
-- FR-357 — The dump can be re-imported (round-trip). The same portal, after a fresh
-  `docker compose up`, can load the dump and reproduce the event.
-- FR-358 — The dump is signed (Ed25519) so a backup is verifiable.
+- FR-350 — Bulk import accepts a fixtures-shaped JSON body (the same keys as
+  `fixtures.json`): event, tracks, rubric, judges, teams + projects, scores. It is
+  not a CSV import.
+- FR-351 — Import is transactional: either the whole body applies or nothing does.
+  A failed import leaves the event exactly as it was.
+- FR-352 — Import validates before writing: a body over 5 MiB is rejected with 413
+  before parsing; malformed JSON fails with 422.
+- FR-353 — Import is restricted to organizers/admins; `bootstrap` mode imports into
+  a fresh slug only.
+- FR-354 — Export is a fixtures-shaped JSON dump of the event's data: event, tracks,
+  rubric, judges, teams, projects, scores.
+- FR-355 — Export is served by `GET /api/events/{slug}/export`.
+- FR-356 — Export is restricted to organizers/admins.
+- FR-357 — The dump can be re-imported (round-trip): export → import → export is
+  byte-identical, with name-derived `trk_`/`jdg_`/`tm_`/`prj_` ids.
+- FR-358 — Import is idempotent: re-importing the same body is safe. (The dump is
+  not signed; the graded verifiable artifact is the acceptance report, and the
+  audit log covers organizer actions.)
 
 **API surface.** Adds:
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| POST | `/api/events/{slug}/import/projects` | organizer | multipart CSV |
-| GET | `/api/admin/dump` | admin | full export |
+| POST | `/api/events/{slug}/import` | organizer | fixtures-shaped JSON; 413 over 5 MiB, 422 malformed |
+| GET | `/api/events/{slug}/export` | organizer | fixtures-shaped JSON, deterministic ids |
 
 **Data model.** No new tables; the dump is generated from existing data.
 
@@ -1842,9 +1859,9 @@ migrating from another platform) and produces a bulk export of everything (for b
 - No acceptance checks. T4 is scored on docs + video.
 
 **Edge cases.**
-- The import CSV has a row with a malformed email → the import is aborted; the error
-  lists the row number.
-- The export is too large to fit in memory → streaming, with a Content-Length header.
+- The import body is malformed JSON or truncated → 422, nothing written.
+- The import body exceeds 5 MiB → 413 before parsing.
+- The import targets a slug that already exists (non-bootstrap) → rejected.
 
 **Out of scope.**
 - Selective export (table-by-table).
@@ -2216,7 +2233,7 @@ These are in `THREAT-MODEL.md` in full. The high-impact ones:
 | Organizer edits scores silently | Audit log append-only | An organizer with DB access can edit raw rows; documented |
 | Results leak during voting | Server-side gating | A cached response on the client |
 | Vote-order bias | Randomised ballots, seeded per session | A determined voter opens many sessions |
-| Signed certificates are forged | Ed25519 with published public key | The signing key is compromised (rotation handles this) |
+| Signed certificates are forged | HMAC-SHA256 over canonical JSON; verify-on-read at the public endpoints | An organizer with SECRET_KEY/DB access can mint records; documented |
 | API endpoints bypass auth | Every endpoint has a permission class; sweep test | A new endpoint added without one |
 
 ### 7.4 Mitigation matrix — what we will and will not do
@@ -2709,10 +2726,11 @@ The portal is delivered as a `docker compose` project. To deploy:
 git clone https://github.com/choksi2212/dogfood-hackathon
 cd dogfood-hackathon
 docker compose up
-# wait for "Application startup complete" in the logs
-# the seed script prints the four auth headers to stdout
-# copy them into .dogfood.toml's [auth] section
-python3 run.py .dogfood.toml > acceptance-report.txt
+# entrypoint waits for postgres, migrates, then runs import_fixtures,
+# which seeds five demo sessions with DETERMINISTIC cookies
+# (HMAC-SHA256 of DJANGO_SECRET_KEY + label + email). The committed
+# .dogfood.toml [auth] values are already correct — no copy-paste step.
+python3 acceptance.py .dogfood.toml > acceptance-report.txt
 # inspect the report; if PASS, the portal is verified
 ```
 
@@ -2782,10 +2800,10 @@ This PRD is one of four documents. The others:
 
 | Document | Purpose | Reader |
 |---|---|---|
-| [DOGFOOD-PRD.md](DOGFOOD-PRD.md) | What and why | Both, judges |
-| [DOGFOOD-TRD.md](DOGFOOD-TRD.md) | How (technical requirements) | Both |
-| [DOGFOOD-ARCHITECTURE.md](DOGFOOD-ARCHITECTURE.md) | System architecture | Both |
-| [DOGFOOD-BACKEND-IMPL.md](DOGFOOD-BACKEND-IMPL.md) | Backend implementation | Manas |
+| [PRD.md](PRD.md) | What and why | Both, judges |
+| [TRD.md](TRD.md) | How (technical requirements) | Both |
+| [ARCHITECTURE.md](../ARCHITECTURE.md) | System architecture | Both |
+| [BACKEND-IMPL.md](BACKEND-IMPL.md) | Backend implementation | Manas |
 
 The four documents use the same feature numbering (FR-NNN) so a feature can be located
 in any of them. The PRD says what; the TRD says how; the architecture says how the how
@@ -3140,8 +3158,10 @@ view of the ownership split in §7 (PRD), with timing.
 **Hours H+0 to H+3 (G1):**
 - Bring up Postgres + Django + nginx via `docker compose up`.
 - Verify migrations apply cleanly.
-- Seed fixtures + the four pre-baked users.
-- Print the four session headers; paste into `.dogfood.toml`.
+- Seed fixtures + the demo users via `import_fixtures`.
+- The demo session headers are deterministic (HMAC of `DJANGO_SECRET_KEY` +
+  label + email) and are committed into `.dogfood.toml` — the committed
+  values work on every boot and every fresh volume, no paste step.
 - `make accept` runs against an empty backend → expect 7 FAILs.
 
 **Hours H+3 to H+8:**
@@ -3356,7 +3376,7 @@ build goes faster when fluency is high.
 
 - [ ] Rehearse `docker compose up` cold (target: 3 minutes from `git clone`).
 - [ ] Rehearse writing `.dogfood.toml` from memory (target: 60 seconds).
-- [ ] Rehearse the four pre-baked session headers via the seed script.
+- [ ] Rehearse the five pre-baked session headers via the seed script.
 - [ ] Rehearse the assignment algorithm on paper (no IDE).
 - [ ] Rehearse the normalization fit on paper.
 - [ ] Rehearse the BT fit on paper.
@@ -3394,13 +3414,13 @@ This part lists failure modes that are likely to occur and how we handle them.
 
 ### 19.1 The CSRF trap
 
-We use cookie auth. Cookie auth requires CSRF. The four pre-baked session
+We use cookie auth. Cookie auth requires CSRF. The five pre-baked session
 headers from the acceptance mechanism **bypass CSRF** (the spec implies this).
 We must make sure our middleware does not require CSRF on those headers.
 
 Mitigation: `CsrfViewMiddleware` checks the `Referer` and `Origin` headers; for
-the four pre-baked session headers, we set the headers explicitly. If CSRF
-fires, we exempt the four headers in `CSRF_TRUSTED_ORIGINS`.
+the five pre-baked session headers, we set the headers explicitly. If CSRF
+fires, we exempt the five headers in `CSRF_TRUSTED_ORIGINS`.
 
 ### 19.2 The port collision trap
 
@@ -3586,7 +3606,8 @@ implementation by asking: does this scenario work?
 ### 22.4 Scenario: A participant votes in quadratic mode
 
 1. Event voting_mode = 'quadratic'.
-2. Voting window is open (`submissions_close_at` to `results_at`).
+2. Voting window is open (judging has closed: `judging_close_at` passed, `results_at`
+   not yet reached).
 3. Participant browses the gallery, finds a project they like.
 4. Participant clicks "Vote". A modal appears with a credit budget (100 credits).
 5. Participant allocates 5 votes to project A (cost: 25 credits, 75 remaining).
@@ -3651,23 +3672,19 @@ implementation by asking: does this scenario work?
 1. Event has results published.
 2. Participant navigates to `/dashboard`.
 3. The dashboard shows "Certificate available".
-4. Participant clicks "Download". Browser hits
-   `/api/events/{slug}/me/certificate`.
+4. The participant opens the verify URL: `/api/certificates/{public_id}`.
 5. The server:
-   - Verifies the participant has a `submitted` review (or a team with a
-     submitted project).
-   - Generates a PDF with reportlab, including the Ed25519 signature.
-   - Returns the PDF with `Content-Disposition: attachment`.
-6. The participant downloads `certificate.pdf`.
-7. To verify offline, the participant runs:
-   ```
-   python scripts/verify_cert.py certificate.pdf <public_key_hex>
-   ```
-8. The verifier extracts the signature from the PDF metadata, verifies against
-   the public key, and prints "Signature valid."
+   - Recomputes the HMAC-SHA256 over the stored canonical JSON payload and
+     compares with `hmac.compare_digest`.
+   - On match: 200 with the record (`signed_payload`, `signature`,
+     `"signature_algorithm": "HMAC-SHA256"`).
+   - On mismatch: 400 `signature_invalid` — the tampered row is not served.
+6. Anyone can repeat the check later, with no account, at the same URL.
+7. A row edited directly in the database fails verification the same way —
+   verify-on-read, no offline script needed.
 
 **What this scenario verifies:**
-- T4.2 certificate generation + offline verification.
+- T4.2 certificate generation + public verify-on-read verification.
 
 ### 22.8 Scenario: A clean-machine run at H+70
 
@@ -3678,13 +3695,10 @@ implementation by asking: does this scenario work?
 5. `docker compose down -v` (in case anything is running).
 6. `docker compose up -d`.
 7. Wait for "Application startup complete" in the logs.
-8. `curl http://localhost:8080/healthz` → 200.
-9. `curl http://localhost:8080/readyz` → 200.
-10. `make accept` → 7 PASS.
-11. Inspect `acceptance-report.txt`. Verify it matches the report from H+62.
-
-
-13. Final commit: `freeze: H+71, ready for judging`.
+8. `curl http://localhost:8000/healthz` → 200.
+9. `make accept` → 7 PASS.
+10. Inspect `acceptance-report.txt`. Verify it matches the report from H+62.
+11. Final commit: `freeze: H+71, ready for judging`.
 
 **What this scenario verifies:**
 - 20% Adoptability criterion (docker compose up works cold).
@@ -3979,14 +3993,14 @@ This PRD:
 
 | Doc | Lines | Purpose |
 |---|---|---|
-| DOGFOOD-PLAN.md | ~430 | Strategic overview, gates, kickoff hour discipline |
-| DOGFOOD-PRD.md | 3958 | This document — what and why |
-| DOGFOOD-TRD.md | 4041 | How — technical requirements |
-| DOGFOOD-ARCHITECTURE.md | 4059 | How the how is shaped |
-| DOGFOOD-BACKEND-IMPL.md | 4095 | Exactly what to type |
-| DOGFOOD-MANAS.md | ~1100 | Per-person build doc (Manas) |
-| DOGFOOD-MIHIR.md | ~1100 | Per-person build doc (Mihir) |
-| DOGFOOD-SETUP-MIHIR.md | ~250 | Machine setup for Mihir |
+| PLAN.md | ~430 | Strategic overview, gates, kickoff hour discipline |
+| PRD.md | 3958 | This document — what and why |
+| TRD.md | 4041 | How — technical requirements |
+| ARCHITECTURE.md | 4059 | How the how is shaped |
+| BACKEND-IMPL.md | 4095 | Exactly what to type |
+| MANAS.md | ~1100 | Per-person build doc (Manas) |
+| MIHIR.md | ~1100 | Per-person build doc (Mihir) |
+| SETUP-MIHIR.md | ~250 | Machine setup for Mihir |
 | README.md | ~30 | Repo README (links to the docs) |
 | dogfood/text.txt | ~1500 | Raw text scrape of dogfoodhack.com |
 

@@ -21,13 +21,14 @@
 base_url = "http://localhost:8000"
 
 [tiers]
-claimed = ["T1", "T2", "T3"]
-pitch = "A self-hosted hackathon portal with a judging engine you can trust: role isolation in the backend, weighted rubrics, z-score + additive-shift normalization with a proof, Bradley-Terry pairwise mode, and a one-command seeded deploy."
+claimed = ["T1", "T2", "T3", "T4"]
+pitch = "A self-hosted hackathon portal with a judging engine you can trust: backend role isolation, weighted rubrics, z-score + additive-shift normalization with a proof, Bradley-Terry pairwise mode, signed certificates and publicly verifiable judge records, and byte-identical bulk import/export in a one-command seeded deploy."
 
 [auth]
 organizer   = "Cookie: session=f6b85c6ef1a26610e46338168d9cdeb57981352bc49c2f0354143fa9a71cdb04"
 judge_a     = "Cookie: session=15a056f0daf204cd4cd1c05a075c2795b0b003cef2e0d616c35f6e0861f708a0"
 judge_b     = "Cookie: session=da81db3be52aeeccfd69b6f53c9f6194646ccabcdb602c32b8b9ddb70dfde497"
+judge_c     = "Cookie: session=8932dba43aa530e0035c15591d0121a2ff82f7843978f3f1834b12859aa815ec"
 participant = "Cookie: session=5630afa3363fab34ab1dee5a34b3b9d3cb33ff6e0834e7a410c75be3db89e74c"
 
 [routes]

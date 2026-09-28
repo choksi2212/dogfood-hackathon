@@ -21,6 +21,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.webhooks.delivery import notify
+
 from apps.events.decorators import deadline_gated
 from apps.events.models import Event, Track
 from apps.events.permissions import IsOrganizer, IsParticipant
@@ -442,6 +444,20 @@ class SubmitView(APIView):
         submission.status = "submitted"
         submission.submitted_at = timezone.now()
         submission.save()
+
+        # T4 webhooks: fire-and-record, never blocks the submit.
+        notify(
+            event,
+            "submission.created",
+            {
+                "event": event.slug,
+                "project_id": str(submission.id),
+                "title": submission.name,
+                "team": submission.team.name,
+                "track": submission.track.slug if submission.track else None,
+                "submitted_by": request.user.email,
+            },
+        )
 
         return Response(
             SubmissionSerializer(submission).data,

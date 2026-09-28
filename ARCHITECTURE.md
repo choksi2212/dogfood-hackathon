@@ -266,7 +266,7 @@ There are no async endpoints. Django runs in WSGI mode (gunicorn sync workers). 
 
 ### 4.1 The ERD (text)
 
-The database has 23 tables across 10 apps. The relationships:
+The database has 40 tables across 17 Django apps. The relationships:
 
 ```
 User ──┬──< Session
@@ -277,7 +277,8 @@ User ──┬──< Session
        │                            │           └──< TeamInvite
        │                            ├──< Submission ──< SubmissionImage
        │                            │            ├──< SubmissionTag >── TechTag
-       │                            │            └──< CustomAnswer >── CustomQuestion
+       │                            │            ├──< CustomAnswer >── CustomQuestion
+       │                            │            └──< Certificate
        │                            ├──< JudgeBatch ──< JudgeAssignment >── User
        │                            │                                    └── Submission
        │                            │                                    └── Review
@@ -288,13 +289,21 @@ User ──┬──< Session
        │                            ├──< AuditEvent
        │                            ├──< NormalizationRun ──< NormalizedScore
        │                            │                     └──< JudgeBias
-       │                            └──< PairwiseRun ──< PairwiseComparison
-       │                                              └──< PairwiseRating
-       └──< Webhook ──< WebhookDelivery
-       └──< Certificate >── SigningKey
+       │                            ├──< PairwiseRun ──< PairwiseComparison
+       │                            │                 └──< PairwiseRating
+       │                            ├──< Webhook ──< WebhookDelivery
+       │                            └──< JudgeRecord
 ```
 
-### 4.2 The 23 tables
+No `SigningKey` table exists — signing is HMAC-SHA256 over the server's
+`SECRET_KEY` (see Part 17), so there are no key rows to store.
+
+### 4.2 The core tables
+
+40 tables exist; this section sketches the core one per concern. Real table
+names for the signed-record and webhook machinery: `api_webhook`,
+`webhooks_webhookdelivery`, `certificates_certificate`,
+`certificates_judgerecord`.
 
 For each: purpose, key fields, indexes.
 
@@ -495,26 +504,34 @@ For each: purpose, key fields, indexes.
 - Purpose: per-project BT output.
 - Fields: `run_id`, `project_id`, `theta`, `stderr`. Unique together.
 
-#### api (miscellaneous)
+#### webhooks / certificates / api (signing and delivery)
 
 **`api_webhook`**
-- Purpose: registered webhook.
-- Fields: `id`, `event_id`, `url`, `secret_hash`, `events (jsonb)`, `active`,
-  `created_at`, `created_by_id`.
+- Purpose: organizer-registered webhook subscription (one event, one target URL).
+- Fields: `id (uuid)`, `event_id (fk)`, `url`, `secret` (per-subscription
+  HMAC key, stored as-is so the organizer UI can re-display it), `events (jsonb)`
+  allowlist, `is_active`, `created_at`. Index: `(event, is_active)`.
 
-**`api_webhookdelivery`**
-- Purpose: one delivery attempt.
-- Fields: `id`, `webhook_id`, `event_type`, `payload`, `signature`, `attempted_at`,
-  `status_code`, `response_body`, `next_retry_at`.
+**`webhooks_webhookdelivery`**
+- Purpose: one delivery row per attempt — the row is created `pending` before
+  the HTTP call and retried *in place* by `manage.py flush_webhooks`.
+- Fields: `id (uuid)`, `webhook_id (fk)`, `payload_type`, `payload (jsonb)`,
+  `status (pending|delivered|failed)`, `response_status`, `attempts`,
+  `last_error`, `created_at`, `last_attempt_at`.
 
-**`api_certificate`**
-- Purpose: certificate record.
-- Fields: `id`, `event_id`, `user_id`, `kind`, `serial (unique)`, `signature`,
-  `public_key_id`, `generated_at`.
+**`certificates_certificate`**
+- Purpose: HMAC-SHA256-signed public record of one submission.
+- Fields: `id (uuid)`, `public_id (unique)`, `submission_id (fk)`,
+  `signed_payload (jsonb)`, `signature`, `issued_at`, `issued_by_id (fk)`.
+  Served (and verified) at `/api/certificates/<public_id>`.
 
-**`api_signingkey`**
-- Purpose: Ed25519 key.
-- Fields: `id`, `public_key`, `created_at`, `retired_at`.
+**`certificates_judgerecord`**
+- Purpose: HMAC-SHA256-signed public record of one judge's participation
+  (assignment count, scores submitted, judging window).
+- Fields: `id (uuid)`, `public_id (unique)`, `judge_id (fk)`, `event_id (fk)`,
+  `signed_payload (jsonb)`, `signature`, `issued_at`, `issued_by_id (fk)`.
+  Served (and verified) at `/api/records/judge/<public_id>`; index
+  `(event, judge)` for the organizer list endpoint.
 
 ### 4.3 Constraints and validations
 
@@ -682,31 +699,54 @@ on POST/PATCH/DELETE:
         return 403
 ```
 
-For the four pre-baked session headers (acceptance mechanism), CSRF is **not**
-required. The headers are pre-authenticated and trusted.
+For the five pre-baked session cookies (acceptance mechanism), CSRF is **not**
+required. The cookies are pre-authenticated and trusted.
 
-### 5.9 The four pre-baked session headers
+### 5.9 The pre-baked session headers
 
-The seed script generates four session tokens and prints them:
+`manage.py import_fixtures` — run automatically by `entrypoint.sh` on every
+boot — seeds five demo sessions (organizer, judge_a, judge_b, judge_c,
+participant) and prints their headers:
 
 ```
-ORGANIZER_HEADER   = "Cookie: session=<token-for-organizer-user>"
-JUDGE_A_HEADER     = "Cookie: session=<token-for-judge_a-user>"
-JUDGE_B_HEADER     = "Cookie: session=<token-for-judge_b-user>"
-PARTICIPANT_HEADER = "Cookie: session=<token-for-participant-user>"
+organizer   = "Cookie: session=<hex-token>"
+judge_a     = "Cookie: session=<hex-token>"
+judge_b     = "Cookie: session=<hex-token>"
+judge_c     = "Cookie: session=<hex-token>"
+participant = "Cookie: session=<hex-token>"
 ```
 
-These go into `.dogfood.toml`'s `[auth]` block. The acceptance mechanism attaches
-them verbatim.
+The tokens are **deterministic**: each is
+`HMAC-SHA256(DJANGO_SECRET_KEY, "dogfood-2026-demo-session:{label}:{email}")`
+in hex (`Session.create(..., deterministic=True)` in
+`apps/accounts/models.py`). They are derived from the role label and the
+seeded user's email — never from a database primary key — so they are
+identical on every boot, on every machine, and across fresh database
+volumes. All five (organizer, judge_a, judge_b, judge_c, participant) are
+committed verbatim in `.dogfood.toml`'s `[auth]` block, so a fresh
+`docker compose up` followed by the official checker passes with **no
+copy-paste step**. The tokens change only if
+`DJANGO_SECRET_KEY` changes; re-run `manage.py import_fixtures` to print
+the matching headers if it does.
 
-The four users are seeded:
+Real logins are unaffected: sessions created by login always draw random
+tokens (§9.7 covers user session rotation, which stays), and the
+deterministic demo sessions are distinguishable by their
+`import_fixtures/1.0` user-agent.
 
-| Email | Role | Membership |
-|---|---|---|
-| `organizer@example.org` | organizer | organizer of sample-hack-2026 |
-| `judge_a@example.org` | judge | judge of sample-hack-2026 |
-| `judge_b@example.org` | judge | judge of sample-hack-2026 |
-| `participant@example.org` | participant | participant of sample-hack-2026 |
+The demo users are:
+
+| Label | Email | Role | Membership |
+|---|---|---|---|
+| organizer | `organizer@test.local` | organizer | organizer of sample-hack-2026 |
+| judge_a | `tomas.varga@example.org` | judge | fixture judge `jdg_01` |
+| judge_b | `wei.lindqvist@example.org` | judge | fixture judge `jdg_02` |
+| judge_c | `priya.nair@example.org` | judge | fixture judge `jdg_03` |
+| participant | `participant@test.local` | participant | member of the first fixture team |
+
+All demo accounts share the password `dogfood-dev-password`. judge_a/b/c are
+bound to the first three *fixture* judges rather than synthetic ones, so the
+T2 peer-isolation check runs against genuinely different real assignments.
 
 ---
 
@@ -1198,16 +1238,15 @@ export async function GET() {
 ### 8.1 The Django app layout
 
 ```
-backend/
+dogfood-hackathon/
 ├── manage.py
-├── backend/
+├── config/
 │   ├── settings.py
 │   ├── urls.py
-│   ├── wsgi.py
-│   └── asgi.py
+│   └── wsgi.py
 ├── apps/
 │   ├── accounts/
-│   │   ├── models.py        # User, Session
+│   │   ├── models.py        # User, Session (+ auth permission through-tables)
 │   │   ├── views.py         # register, login, logout, me
 │   │   ├── serializers.py
 │   │   ├── permissions.py   # IsAuthenticated, etc.
@@ -1215,23 +1254,21 @@ backend/
 │   │   ├── urls.py
 │   │   └── management/
 │   │       └── commands/
-│   │           └── seed_users.py
+│   │           ├── import_fixtures.py
+│   │           └── seed_fixtures.py
 │   ├── events/
 │   │   ├── models.py        # Event, Track, Prize, Membership, Rubric, RubricCriterion
 │   │   ├── views.py
 │   │   ├── serializers.py
 │   │   ├── lifecycle.py     # event_state() helper
 │   │   ├── urls.py
-│   │   └── management/
-│   │       └── commands/
-│   │           └── seed_fixtures.py
 │   ├── teams/
 │   │   ├── models.py        # Team, TeamMember, TeamInvite
 │   │   ├── views.py
 │   │   ├── serializers.py
 │   │   └── urls.py
 │   ├── submissions/
-│   │   ├── models.py        # Submission, SubmissionImage, TechTag, SubmissionTag, CustomQuestion, CustomAnswer
+│   │   ├── models.py        # Submission, SubmissionImage, SubmissionAnswer, Comment
 │   │   ├── views.py
 │   │   ├── serializers.py
 │   │   ├── search.py        # tsvector update logic
@@ -1259,36 +1296,36 @@ backend/
 │   │   ├── proof.py         # the proof.txt generator
 │   │   └── tests.py         # unit tests
 │   ├── pairwise/
-│   │   ├── models.py        # PairwiseRun, PairwiseComparison, PairwiseRating
+│   │   ├── models.py        # PairwiseRun, PairwiseBallot, PairwiseRanking
 │   │   ├── views.py
 │   │   ├── fit.py           # the BT fit
 │   │   ├── selection.py     # pair selection by info value
 │   │   └── tests.py
+│   ├── webhooks/
+│   │   ├── models.py        # WebhookDelivery (the delivery log rows)
+│   │   ├── delivery.py      # the delivery engine: sign, POST, record
+│   │   ├── views.py         # organizer delivery-log endpoint
+│   │   └── management/commands/flush_webhooks.py  # batch retry command
+│   ├── certificates/
+│   │   ├── models.py        # Certificate, JudgeRecord + HMAC sign/verify helpers
+│   │   └── views.py         # public verify + organizer list/issue endpoints
+│   ├── billing/
+│   │   └── models.py        # Plan, BillingAccount, Invoice (per-event plan + quotas)
+│   ├── abuse/
+│   │   └── models.py        # AbuseFlag (pending → upheld/dismissed)
 │   └── api/
-│       ├── urls.py          # aggregates everything
-│       ├── schema.py        # drf-spectacular config
-│       ├── webhooks.py      # Webhook, WebhookDelivery, signature, delivery
-│       ├── certificates.py  # Certificate, SigningKey, PDF generation
-│       └── signing.py       # Ed25519 helpers
+│       ├── models.py        # Webhook subscription (per-event, secret stored)
+│       ├── exporter.py       # fixtures-shaped deterministic bulk export
+│       └── urls.py          # aggregates everything
 ├── scripts/
-│   ├── verify_cert.py
-│   └── generate_proof.py
+│   ├── role_isolation_matrix.py   # the role-isolation bonus deliverable
+│   └── matrix.toml
 └── tests/
-    ├── conftest.py
-    ├── unit/
-    │   ├── test_normalization.py
-    │   ├── test_pairwise.py
-    │   ├── test_passwords.py
-    │   └── test_sessions.py
-    └── integration/
-        ├── test_auth.py
-        ├── test_events.py
-        ├── test_teams.py
-        ├── test_submissions.py
-        ├── test_judging.py
-        ├── test_role_isolation.py
-        ├── test_voting.py
-        └── test_acceptance.py
+    ├── conftest.py          # shared fixtures (read-only)
+    ├── pytest.ini           # shared config (read-only)
+    ├── auth/  roles/  events/  submissions/  deadlines/
+    ├── assignment/  csv/  normalization/  golden/
+    └── voting/  security/  …  # 15 categories, one subdirectory + docs block each
 ```
 
 ### 8.2 The apps and their boundaries
@@ -1296,19 +1333,23 @@ backend/
 Each app owns a slice of the schema and the corresponding API surface. Cross-app
 references are by FK, not by import of internals.
 
-**`accounts`** owns: User, Session.
+**`accounts`** owns: User, Session (plus the auth permission through-tables).
 **`events`** owns: Event, Track, Prize, Membership, Rubric, RubricCriterion.
 **`teams`** owns: Team, TeamMember, TeamInvite.
-**`submissions`** owns: Submission, SubmissionImage, TechTag, SubmissionTag,
-CustomQuestion, CustomAnswer.
+**`submissions`** owns: Submission, SubmissionImage, SubmissionAnswer, Comment.
 **`judging`** owns: JudgeBatch, JudgeAssignment, JudgeInvite, Score, Review.
 **`voting`** owns: Vote, VoteBudget, VoteAudit.
 **`audit`** owns: AuditEvent (depends on User, Event).
 **`normalization`** owns: NormalizationRun, NormalizedScore, JudgeBias (depends on
 Event, Submission, User).
-**`pairwise`** owns: PairwiseRun, PairwiseComparison, PairwiseRating (depends on
+**`pairwise`** owns: PairwiseRun, PairwiseBallot, PairwiseRanking (depends on
 Event, Submission, User).
-**`api`** owns: Webhook, WebhookDelivery, Certificate, SigningKey.
+**`api`** owns: Webhook (the subscription; per-event, secret stored) and the
+bulk import/export views.
+**`webhooks`** owns: WebhookDelivery (the delivery log; depends on `api.Webhook`).
+**`certificates`** owns: Certificate, JudgeRecord (+ HMAC sign/verify helpers).
+**`billing`** owns: Plan, BillingAccount, Invoice.
+**`abuse`** owns: AbuseFlag.
 
 ### 8.3 The URL conf
 
@@ -1409,17 +1450,23 @@ class EventAdmin(admin.ModelAdmin):
 
 ### 8.6 The seed commands
 
-Two management commands:
+Two management commands, both under `apps/accounts/management/commands/`:
 
-**`seed_fixtures`** — loads `fixtures.json` into the DB. Idempotent.
+**`import_fixtures`** — loads the official `fixtures.json` into the real
+schema and seeds the five deterministic demo sessions (see §5.9). Idempotent:
+every boot re-imports, and the printed session cookies always match the
+committed `.dogfood.toml`.
 
-**`seed_users`** — creates the four pre-baked users and prints their session
-headers to stdout.
+**`seed_fixtures`** — the older synthetic-data seeder; used only as a
+fallback when `fixtures.json` is missing (see `entrypoint.sh`).
 
-These run on first boot via the Dockerfile:
+`entrypoint.sh` waits for postgres, runs `migrate`, then `import_fixtures`
+(set `SKIP_SEED=1` to skip), on every boot:
 
 ```dockerfile
-CMD ["sh", "-c", "python manage.py migrate && python manage.py seed_fixtures && python manage.py seed_users && gunicorn backend.wsgi:application -w 3 -b 0.0.0.0:8000"]
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", \
+     "--workers", "3", "--threads", "2", "--timeout", "60"]
 ```
 
 ## Part 9 — Cross-Cutting Concerns
@@ -1546,8 +1593,8 @@ DRF's session authentication uses Django's CSRF. The frontend reads the
 `csrftoken` cookie and includes it in the `X-CSRFToken` header for state-changing
 requests.
 
-The four pre-baked session headers (acceptance mechanism) bypass CSRF. This is
-intentional: the headers are pre-authenticated and the spec does not require CSRF
+The five pre-baked session cookies (acceptance mechanism) bypass CSRF. This is
+intentional: the cookies are pre-authenticated and the spec does not require CSRF
 for them.
 
 ### 9.7 Session rotation
@@ -1651,7 +1698,9 @@ COPY backend/ ./backend/
 COPY scripts/ ./scripts/
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
-CMD ["sh", "-c", "python manage.py migrate && python manage.py seed_fixtures && python manage.py seed_users && gunicorn backend.wsgi:application -w 3 -b 0.0.0.0:8000"]
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", \
+     "--workers", "3", "--threads", "2", "--timeout", "60"]
 ```
 
 ### 10.3 The Dockerfile.web
@@ -1805,8 +1854,7 @@ logs:
     docker compose logs -f
 
 accept:
-    docker compose exec -T backend bash -c "python3 scripts/run_accept.sh /app/.dogfood.toml > /app/acceptance-report.txt"
-    @cat acceptance-report.txt
+    docker compose exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
 
 test:
     docker compose exec -T backend pytest
@@ -2105,14 +2153,16 @@ dashboard.
 validation, anti-abuse.
 
 **Must:**
-- Enforce the voting window (submissions_close_at to results_at).
+- Enforce the voting deadline: `@deadline_gated("judging_close_at")` on both
+  POST and DELETE — ballots land on final, submitted work while judging runs
+  and are rejected once judging closes (422 `deadline_passed`).
 - Validate quadratic budgets.
 - Enforce self-vote prohibition.
 - Audit every vote and retraction.
 
 **Must not:**
-- Allow voting before submissions_close_at.
-- Allow voting after results_at.
+- Accept ballots after `judging_close_at`.
+- Expose aggregate results to non-organizers before `results_at`.
 - Allow self-voting.
 
 **Depends on:** accounts.User, events.Event, submissions.Submission.
@@ -2171,15 +2221,17 @@ fit, pair selection.
 
 ### 13.10 apps.api
 
-**Owns:** Webhook, WebhookDelivery, Certificate, SigningKey models, the
-URL aggregator, the schema config, the OpenAPI schema endpoint, the
-admin endpoints, the dump endpoint, signing helpers.
+**Owns:** the `Webhook` subscription model (per-event target + signing secret),
+the URL aggregator, the OpenAPI schema endpoint, the bulk export/import
+endpoints, the admin endpoints. (`WebhookDelivery` lives in `apps.webhooks`;
+`Certificate` and `JudgeRecord` live in `apps.certificates`.)
 
 **Must:**
 - Aggregate URLs from all apps.
 - Generate the OpenAPI schema.
-- Sign certificates with Ed25519.
-- Sign webhook payloads with HMAC.
+- Sign certificates and judge records with HMAC-SHA256 over canonical JSON
+  using `SECRET_KEY` (apps/certificates/models.py).
+- Sign webhook payloads with HMAC-SHA256 using the per-subscription secret.
 - Provide the admin endpoints.
 
 **Must not:**
@@ -2199,7 +2251,7 @@ modes.
 ### 14.1 Check 1: `GET {gallery}` no auth → 200
 
 **Spec:** `GET /api/events/sample-hack-2026/gallery` with no `Authorization`
-header (no session cookie either, since the four pre-baked headers are sent via
+header (no session cookie either, since the five pre-baked cookies are sent via
 `Cookie`).
 
 **Flow:**
@@ -2260,7 +2312,7 @@ nginx → gunicorn → Django
 middleware:
   - SessionMiddleware: cookie → resolve participant user
   - CsrfViewMiddleware: POST → check token
-    Note: For the four pre-baked headers, CSRF is bypassed.
+    Note: For the five pre-baked cookies, CSRF is bypassed.
   - AuthenticationMiddleware: participant user
   - AuditMiddleware: log the action
   - RateLimitMiddleware: 10/min/IP → pass
@@ -2798,190 +2850,263 @@ the answer to `/api/events/{slug}/me/pairwise/{id}/answer`.
 
 ## Part 17 — Webhooks, Certificates, Signing Architecture
 
-### 17.1 The webhook model
+### 17.1 The webhook subscription model
+
+Shipped as `apps/api/models.py::Webhook` (table `api_webhook`):
 
 ```python
 class Webhook(models.Model):
-    event = ForeignKey(Event)
-    url = URLField()
-    secret_hash = CharField()  # hashed before storage; raw shown once
-    events = JSONField()  # list of event types
-    active = BooleanField(default=True)
-    created_at = DateTimeField(auto_now_add=True)
-    created_by = ForeignKey(User)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    event = models.ForeignKey("events.Event", on_delete=models.CASCADE)
+    url = models.URLField(max_length=500)
+    secret = models.CharField(max_length=128)   # server-generated, per subscription
+    events = models.JSONField(default=list)     # empty list = receive everything
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 ```
 
-The `secret_hash` is the SHA-256 hash of the secret. The raw secret is shown
-once at creation; we do not store it.
+Honest note on the secret: it is stored **as plaintext**, because the
+organizer UI re-displays it on the subscription screen. A `secret_hash` +
+"shown once" design was considered and is future work — hashing would
+prevent re-display, and this secret protects the *receiver* (a third party
+who gains nothing from the portal cannot forge deliveries), not the portal.
+Subscription management and the delivery log are organizer-only and
+audited.
 
-### 17.2 The webhook delivery
+### 17.2 The delivery row
+
+Shipped as `apps/webhooks/models.py::WebhookDelivery` (table
+`webhooks_webhookdelivery`). One row is created `pending` *before* the HTTP
+attempt and updated in place:
 
 ```python
 class WebhookDelivery(models.Model):
-    webhook = ForeignKey(Webhook)
-    event_type = CharField()
-    payload = BinaryField()
-    signature = CharField()  # HMAC-SHA256
-    attempted_at = DateTimeField()
-    status_code = IntegerField()
-    response_body = TextField()  # truncated to 1KB
-    next_retry_at = DateTimeField(null=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    webhook = models.ForeignKey("api.Webhook", on_delete=models.CASCADE)
+    payload_type = models.CharField(max_length=64)  # e.g. "score.created"
+    payload = models.JSONField()
+    status = models.CharField(max_length=16, default="pending")  # pending|delivered|failed
+    response_status = models.PositiveIntegerField(null=True, blank=True)
+    attempts = models.PositiveIntegerField(default=0)
+    last_error = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_attempt_at = models.DateTimeField(null=True)
 ```
+
+Retries re-attempt the **existing row** (`attempts` increments; no duplicate
+delivery rows) via `manage.py flush_webhooks --max-attempts N --older-than SECONDS`.
+Organizers read the log at `GET /api/webhooks/<uuid>/deliveries` (most
+recent 200), so "did the score event reach my CI?" is answerable from the
+portal instead of a support ticket.
 
 ### 17.3 The signature
 
+Every delivery is signed with HMAC-SHA256 using the subscription's
+server-generated secret, and the exact signed bytes are the POST body — so a
+receiver verifies without trusting transport, and can re-verify the same
+body later straight from the delivery log:
+
 ```python
-import hmac
-import hashlib
+def build_body(payload_type, payload):
+    envelope = {"type": payload_type, "sent_at": timezone.now().isoformat(), "data": payload}
+    return json.dumps(envelope, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
-def sign_payload(payload: bytes, secret: str) -> str:
-    return hmac.new(
-        secret.encode(), payload, hashlib.sha256
-    ).hexdigest()
+def sign_body(secret, body):
+    return hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
 ```
 
-The receiver verifies by recomputing the signature with their stored secret.
+Headers: `X-Dogfood-Signature: sha256=<hex>` and `X-Dogfood-Event: <type>`.
+The receiver recomputes the HMAC over the raw body with their stored secret
+and compares in constant time. Delivery uses stdlib `urllib` only — no
+outbound HTTP dependency to vet, which keeps the "runs offline on a laptop"
+promise honest.
 
-### 17.4 The retry policy
+### 17.4 The delivery policy
 
-Failed deliveries (non-2xx response or network error) are retried with exponential
-backoff:
+Delivery is **synchronous and single-attempt**: it happens inline in the
+mutating request, bounded by a 3 s socket timeout, and **never raises into
+the caller** — a flaky subscriber must not be able to fail (or noticeably
+slow down) a score submission. Failures land on the delivery row as data
+(`failed` + `last_error`) and are logged at WARNING. There is no exponential
+backoff and no background retry thread.
+
+Retries are a **visible batch job**:
 
 ```
-attempt 1: immediately
-attempt 2: +60 seconds
-attempt 3: +120 seconds
-...
-attempt N: +60 * 2^N seconds, capped at 24 hours
+python manage.py flush_webhooks [--max-attempts 5] [--older-than 600]
 ```
 
-After 24 hours, the delivery is marked `failed` and no further retries.
+`flush_webhooks` re-attempts pending/failed rows below the attempt cap,
+throttled by `--older-than` so a burst of failures from one bad subscriber
+is not hammered on every flush. Why not a hidden background queue:
+self-hosters should not inherit a worker process they did not ask for, and
+a visible retry command (run from cron, a systemd timer, or by hand after
+fixing the subscriber) is easier to operate than a silent queue that dies
+with the process.
 
 ### 17.5 The certificate model
 
+Shipped as `apps/certificates/models.py::Certificate` (table
+`certificates_certificate`). A certificate is a **signed JSON record**, not
+a PDF:
+
 ```python
 class Certificate(models.Model):
-    event = ForeignKey(Event)
-    user = ForeignKey(User)
-    kind = CharField()  # participant, judge, organizer
-    serial = CharField(unique=True)
-    signature = BinaryField()  # Ed25519
-    public_key_id = ForeignKey(SigningKey)
-    generated_at = DateTimeField()
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    public_id = models.CharField(max_length=64, unique=True)  # token_urlsafe(24)
+    submission = models.ForeignKey("submissions.Submission", on_delete=models.CASCADE)
+    signed_payload = models.JSONField()
+    signature = models.CharField(max_length=64)  # HMAC-SHA256 hex
+    issued_at = models.DateTimeField(auto_now_add=True)
+    issued_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True)
 ```
+
+`Certificate.issue(submission, payload=…)` signs the payload and persists
+row + signature in one step; re-issuing signs a fresh snapshot under a fresh
+`public_id`. Served (and verified) unauthenticated at
+`GET /api/certificates/<public_id>`.
 
 ### 17.6 The signing key
 
-```python
-class SigningKey(models.Model):
-    public_key = BinaryField()
-    created_at = DateTimeField()
-    retired_at = DateTimeField(null=True)
-```
-
-Each deployment has one active key. On rotation, the old key is retired (kept for
-verification of existing certificates) and a new key is created.
-
-### 17.7 The certificate PDF
-
-Generated server-side with `reportlab`:
+There is no key model and no `api_signingkey` table. Certificates and judge
+records are signed with the server's `SECRET_KEY`:
 
 ```python
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-
-def render_certificate(certificate: Certificate) -> bytes:
-    """Render the certificate PDF."""
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
-    
-    c.setFont('Helvetica-Bold', 24)
-    c.drawString(72, 700, f'Certificate of {certificate.kind}')
-    
-    c.setFont('Helvetica', 14)
-    c.drawString(72, 650, f'Event: {certificate.event.name}')
-    c.drawString(72, 620, f'Recipient: {certificate.user.name}')
-    c.drawString(72, 590, f'Date: {certificate.generated_at.date().isoformat()}')
-    c.drawString(72, 560, f'Serial: {certificate.serial}')
-    
-    c.save()
-    return buffer.getvalue()
+def sign_payload(payload: dict, *, key: bytes | None = None) -> str:
+    secret = key if key is not None else settings.SECRET_KEY.encode("utf-8")
+    return hmac.new(secret, _canonical_json(payload), hashlib.sha256).hexdigest()
 ```
 
-### 17.8 The certificate verifier
+Key rotation — signing records under a versioned key so old records stay
+verifiable after a change — is **future work, not shipped**. Today,
+rotating `SECRET_KEY` invalidates existing record signatures; the honest
+mitigation is that `SECRET_KEY` is a deployment constant.
 
-A standalone script (`scripts/verify_cert.py`) that verifies the signature:
+### 17.7 The certificate artifact
 
-```python
-import sys
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-
-def verify(cert_pdf: bytes, public_key_bytes: bytes) -> bool:
-    """Verify the signature on a certificate."""
-    # Extract the signature from the PDF metadata
-    # Verify with the public key
-    ...
-```
-
-The verifier is offline (does not need the portal running). The PDF includes the
-signature in its metadata.
-
-### 17.9 The participation record
-
-A JSON record per judge, signed with Ed25519:
+No PDF is generated and `reportlab` is not a dependency. The certificate is
+the JSON served by `GET /api/certificates/<public_id>`:
 
 ```json
 {
-  "judge": "judge_a@example.org",
-  "event": "sample-hack-2026",
-  "projects_reviewed": [
-    {"id": "uuid", "title": "...", "track": "...", "scores": [...]}
-  ],
-  "rubric_hash": "sha256:...",
-  "generated_at": "...",
-  "signature": "ed25519:..."
+  "public_id": "…",
+  "submission_id": "…",
+  "issued_at": "2026-09-27T…",
+  "signed_payload": { "submission_id": "…", "team_name": "…", "event_slug": "…" },
+  "signature": "<hmac-sha256 hex over canonical JSON>",
+  "signature_algorithm": "HMAC-SHA256"
 }
 ```
 
-The record is portable: it does not require the portal to be running. The
-verifier can check the signature offline.
+Anyone with the `public_id` — a third party, a printed QR code — can fetch
+and check it. A rendered PDF export would be a presentation-layer feature,
+not a trust feature; none is shipped.
+
+### 17.8 The verification path
+
+Verification runs through the portal's own endpoints — the same view that
+serves a record also verifies it (`verify()` recomputes the HMAC over the
+stored payload and compares with `hmac.compare_digest`), so a tampered row
+returns 400 `signature_invalid` instead of its content:
+
+- `GET /api/certificates/<public_id>`
+- `GET /api/records/judge/<public_id>`
+
+There is **no offline verifier** script (`scripts/` contains only the
+role-isolation matrix tooling). Stated honestly: the
+verifying party must trust the portal — the same boundary that protects
+Django sessions. An offline public-key verifier (Ed25519 with a published
+public key, plus a CLI) is the natural production upgrade and is labeled
+future work; for the self-hosted trust model — the same operator that runs
+the event publishes the records — HMAC is proportionate
+(THREAT-MODEL.md §5.5).
+
+### 17.9 The judge participation record
+
+Shipped as `apps/certificates/models.py::JudgeRecord` (table
+`certificates_judgerecord`) — the T4 verifiable-record artifact. A JSON
+record per judge, signed with HMAC-SHA256, served unauthenticated at
+`GET /api/records/judge/<public_id>`:
+
+```json
+{
+  "kind": "judge_participation",
+  "event": "Sample Hack 2026",
+  "event_slug": "sample-hack-2026",
+  "judge": "judge_a",
+  "assignments": 3,
+  "scores_submitted": 9,
+  "judging_window": { "open": "…", "close": "…" },
+  "issued_at": "…"
+}
+```
+
+The signed payload carries the judge's **display name only** (profile name,
+falling back to the email local-part) — never the full email; the email
+appears only on the organizer-authenticated list endpoint. Organizers issue
+via `POST /api/events/<slug>/records/judge` with `{"judge": "<email>"}` or
+`{"all": true}` (every judge holding at least one assignment); issuing is
+deliberately not idempotent — re-issuing signs a fresh snapshot under a
+fresh `public_id`, mirroring certificate re-issuance. Issuing is
+audit-logged.
 
 ### 17.10 The signing flow
 
-```python
-def sign_record(record: dict, signing_key: SigningKey) -> bytes:
-    """Sign a record with Ed25519."""
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-    from cryptography.hazmat.primitives import serialization
-    
-    private_bytes = base64.b64decode(get_private_key())
-    private_key = Ed25519PrivateKey.from_private_bytes(private_bytes)
-    
-    payload = json.dumps(record, sort_keys=True).encode()
-    signature = private_key.sign(payload)
-    
-    return signature
-```
-
-The private key is stored in `.env` (production) or generated on first boot and
-stored in the DB (dev).
-
-### 17.11 Key rotation
+Both record shapes share one helper pair — canonical JSON (sorted keys,
+compact separators, UTF-8), then HMAC-SHA256 with `SECRET_KEY`:
 
 ```python
-def rotate_signing_key():
-    """Generate a new key, retire the old one."""
-    new_key = generate_signing_key()
-    SigningKey.objects.filter(retired_at__isnull=True).update(retired_at=timezone.now())
-    SigningKey.objects.create(
-        public_key=new_key['public'],
-        created_at=timezone.now(),
-    )
-    # Store private key in .env (manual step)
+def _canonical_json(payload: dict) -> bytes:
+    return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+def sign_payload(payload: dict) -> str:
+    return hmac.new(settings.SECRET_KEY.encode("utf-8"),
+                    _canonical_json(payload), hashlib.sha256).hexdigest()
+
+def verify_payload(payload: dict, signature: str) -> bool:
+    return hmac.compare_digest(sign_payload(payload), signature)
 ```
 
-Old certificates remain verifiable because their `public_key_id` references the
-old key.
+`Certificate.issue()` and `JudgeRecord.issue()` build the payload, sign it,
+and persist payload + signature in one step. There is no private key in
+`.env` and no key row in the DB — the signing material is `SECRET_KEY`, the
+same secret that protects Django sessions.
+
+### 17.11 Future work, labeled as such
+
+Not shipped, and documented as gaps so the boundary is explicit:
+
+- **Offline public-key verification** — Ed25519 with a published public key
+  plus a standalone CLI would remove the "trust the portal to verify"
+  limitation (see THREAT-MODEL.md §5.5).
+- **Key rotation for record signing** — needs a versioned-key scheme once
+  `SECRET_KEY`-bound HMAC stops being proportionate.
+- **Hashed webhook secrets** (`secret_hash` + show-once) — trades the
+  organizer's ability to re-display a subscription secret for a smaller
+  database-exposure surface.
+
+None of these is claimed anywhere in the shipped docs.
+
+### 17.12 Bulk import/export
+
+The T4 bulk transfer pair, both organizer-gated (inline role check — an
+importer must also be able to *create* an event, so `IsOrganizer` alone is
+wrong for the bootstrap case):
+
+- `POST /api/events/<slug>/import` — accepts a `fixtures.json`-shaped body,
+  reusing the battle-tested `import_fixtures` importer (idempotent + atomic:
+  re-importing the same body is safe, a failed import leaves the event as it
+  was). A body over 5 MiB is rejected with 413 *before* parsing; malformed
+  JSON or a truncated/mis-shaped body returns 422, never a 500. Importing
+  into a fresh slug bootstraps a new event (any organizer/admin).
+- `GET /api/events/<slug>/export` — streams the event as fixtures-shaped
+  JSON, byte-for-byte re-importable by the import endpoint.
+
+The property that makes the pair useful: export ids are deterministic
+(`trk_`/`jdg_`/`tm_`/`prj_` derived from the *name*, not from row UUIDs or
+timestamps), so export → import → export is byte-identical — provable end
+to end, and the reason the export derives ids from stable data instead of
+dumping primary keys.
 
 ---
 
@@ -3030,8 +3155,11 @@ Postgres
 3. **Django → Postgres.** Django trusts the network. Internal network only.
 4. **External → webhook.** The webhook receiver trusts our signature. The
    signature is verified.
-5. **Anyone → certificate verifier.** The verifier trusts the published public
-   key. The key is in the repo.
+5. **Anyone → record verification.** The verifying party trusts the portal:
+   the serving endpoint recomputes the HMAC-SHA256 over the stored canonical
+   JSON payload and compares, so a tampered row fails closed (400
+   `signature_invalid` instead of content). An offline public-key verifier is
+   labeled future work (§17.11).
 
 ### 18.4 The mitigations per threat
 
@@ -3048,7 +3176,7 @@ See THREAT-MODEL.md for the full list. Architectural mitigations:
 | Audit log tampering | DB-level grants revoke UPDATE/DELETE |
 | Brute-force login | Rate limits; Argon2id (slow) |
 | Webhook URL takeover | HMAC signature; per-webhook secret |
-| Certificate forgery | Ed25519; offline verifier |
+| Certificate forgery | HMAC-SHA256 (SECRET_KEY) over canonical JSON; verify-on-read (§17.8) |
 
 ### 18.5 The residual risks
 
@@ -3112,13 +3240,10 @@ script is the oracle.
 ```
 make accept
   ↓
-docker compose exec backend bash scripts/run_accept.sh
+docker compose exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
   ↓
-scripts/run_accept.sh:
-  cd /app
-  python3 run.py .dogfood.toml > acceptance-report.txt
-  ↓
-run.py:
+acceptance.py (vendored byte-for-byte from the spec's run.py — only the
+filename differs; see README §"The acceptance checks"):
   reads .dogfood.toml
   for each check:
     make HTTP request
@@ -3132,66 +3257,71 @@ git commit -m "docs: publish acceptance-report.txt for <gate>"
 ```
 
 ### 19.3 The .dogfood.toml architecture
-
-The file has four sections, all required:
+The file has five sections: the four the checker reads (`[portal]`, `[tiers]`,
+`[auth]`, `[routes]`) plus our `[bonuses]` block. The checker reads them; we
+do not modify the schema.
 
 ```toml
 [portal]
-base_url = "http://localhost:8080"
+base_url = "http://localhost:8000"
 
 [tiers]
-claimed = ["T1", "T2"]  # what we assert
-pitch = "One sentence."  # human-readable summary
+claimed = ["T1", "T2", "T3", "T4"]
+pitch = "…"                        # the committed one-sentence pitch
 
 [auth]
-# Four pre-baked session headers
-organizer   = "Cookie: session=<token>"
-judge_a     = "Cookie: session=<token>"
-judge_b     = "Cookie: session=<token>"
-participant = "Cookie: session=<token>"
+# Five pre-baked session headers
+organizer   = "Cookie: session=<hex-token>"
+judge_a     = "Cookie: session=<hex-token>"
+judge_b     = "Cookie: session=<hex-token>"
+judge_c     = "Cookie: session=<hex-token>"
+participant = "Cookie: session=<hex-token>"
 
 [routes]
-# Five route names
-gallery      = "/api/events/sample-hack-2026/gallery"
-submit       = "/api/events/sample-hack-2026/submissions/<id>/submit"
+gallery      = "/api/gallery"
+submit       = "/api/events/sample-hack-2026/submit"
 judge_scores = "/api/judge/scores"
-peer_scores  = "/api/judge/scores?judge=judge_a"
-csv_export   = "/api/events/sample-hack-2026/export.csv"
+peer_scores  = "/api/judge/peer-scores?judge=judge_a"
+csv_export   = "/api/csv_export"
+
+[bonuses]
+claimed = ["normalization_proof", "pairwise_mode", "threat_model", "api_first"]
 ```
 
 The file is the contract. It is committed at the repo root.
 
 ### 19.4 The acceptance report architecture
 
-The report is whatever `run.py` prints. We do not modify the format. We redirect
-to `acceptance-report.txt` and commit.
+The report is whatever the checker prints. We do not modify the format. We
+redirect to `acceptance-report.txt` and commit. The committed report:
 
 ```
 DOGFOOD 2026 acceptance report
-portal: http://localhost:8080
-claimed: T1 T2 T3 T4
+portal: http://localhost:8000
+claimed: T1 T2 T3
 fixtures: fixtures.json
 
-T1  gallery is public ......................... PASS
-T1  project from fixtures shown ............... PASS
-T1  closed event refuses submissions .......... PASS
-T2  judge sees own scores ..................... PASS
-T2  judge cannot see peer scores .............. PASS
-T2  participant blocked ....................... PASS
-T2  csv export works .......................... PASS
+T1  gallery is public ................. PASS
+T1  project from fixtures shown ....... PASS
+T1  closed event refuses submissions .. PASS
+T2  judge sees own scores ............. PASS
+T2  judge cannot see peer scores ...... PASS
+T2  participant blocked ............... PASS
+T2  csv export works .................. PASS
 
 claimed T1 T2 T3 T4, verified T1 T2
+note: claimed but not verified: T3
 ```
 
-The last line is the gap. We claim T3 and T4; they are not verified (zero checks).
-The gap is honest.
+The last line is the gap. We claim T3; it is not verified (zero checks). We do
+not claim T4. The gap is honest.
 
 ### 19.5 The acceptance as a contract
 
 The acceptance mechanism is the contract between our portal and the spec. We
 satisfy it by:
 - Building the five route URLs that exist and respond correctly.
-- Generating the four pre-baked session headers at boot.
+- Generating the five pre-baked session headers at boot.
 - Returning the expected responses for each check.
 
 If the contract changes (run.py is updated), we update our endpoints to match. If
@@ -3205,16 +3335,20 @@ At each gate G2-G7, the acceptance suite is run. If any check fails:
 - The acceptance report is regenerated and committed.
 
 The suite is also run after every backend change that touches the five routes or
-the four auth headers. This is the "run it constantly" rule.
+the five auth headers. This is the "run it constantly" rule.
 
-### 19.7 The acceptance in CI (best-effort)
+### 19.7 The test suite in CI
 
-If time permits, a GitHub Actions workflow:
+CI is real, committed, and not best-effort: `.github/workflows/tests.yml` runs
+on every push to `main`/`dev` and on every pull request.
 
 ```yaml
-# .github/workflows/ci.yml
-name: CI
-on: [push, pull_request]
+# .github/workflows/tests.yml (condensed)
+name: tests
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -3222,19 +3356,33 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: dogfood
+          POSTGRES_PASSWORD: dogfood
+          POSTGRES_DB: dogfood
         ports: ['5432:5432']
-        options: --health-cmd pg_isready --health-interval 5s
+        options: >-
+          --health-cmd "pg_isready -U dogfood"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      POSTGRES_HOST: 127.0.0.1
+      DJANGO_SECRET_KEY: ci-test-secret-key-not-used-anywhere-else
+      SKIP_SEED: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt
-      - run: pytest backend/tests
+      - run: python manage.py migrate --noinput
+      - run: python manage.py import_fixtures
+      - run: python -m pytest -q
 ```
 
-This is best-effort; not graded.
+A separate `.github/workflows/lint.yml` runs `ruff check` +
+`ruff format --check` on pushes to `main`/`manas` and on pull requests. The
+acceptance checks themselves are deliberately not in CI — they need the live
+portal — so the graded artifact remains `make accept` + the committed report
+(§19.4).
 
 ---
 
@@ -3380,7 +3528,7 @@ service is overkill for the 72-hour scope. DB grants are bulletproof.
 configuration) for a feature the brief doesn't require. The eventual Raptors
 deployment may need this, but the 72-hour scope doesn't.
 
-### 20.10 The four pre-baked session headers (Sep 23)
+### 20.10 The five pre-baked session headers (Sep 23)
 
 **Context:** How the acceptance mechanism authenticates.
 
@@ -3508,17 +3656,27 @@ Mode-specific (open, email, authenticated, quadratic). Reasons:
 
 ### 21.8 Webhooks: synchronous delivery
 
-Synchronous delivery, with retry. Reasons:
-- No background workers.
-- The receiver's slowness is the request's slowness; acceptable for 72 hours.
-- At-least-once delivery via retry.
+Synchronous, single attempt. Reasons:
+- No background workers; the delivery happens inside the request.
+- A 3-second timeout, and a slow receiver never raises into the
+  organizer's request path.
+- Retry is an explicit, in-place operator action
+  (`manage.py flush_webhooks`), backed by the per-webhook delivery log
+  (`GET /api/webhooks/<uuid>/deliveries`) — no hidden background queue.
 
-### 21.9 Certificates: Ed25519
+### 21.9 Certificates: HMAC-SHA256
 
-Ed25519, not RSA. Reasons:
-- Faster signing and verification.
-- Smaller signatures (64 bytes vs 256 for RSA).
-- Modern; supported by cryptography library.
+HMAC-SHA256 keyed by `SECRET_KEY`, not a public-key scheme. Reasons:
+- The self-hosted trust model: the operator who runs the event publishes
+  the records, so a symmetric secret is proportionate (THREAT-MODEL.md §5.5).
+- No key ceremony: the signing material is the same `SECRET_KEY` that
+  protects sessions; no key row, no rotation story to get wrong.
+- Verification is verify-on-read: the serving endpoint recomputes the HMAC
+  over the canonical JSON payload and compares, so a tampered row returns
+  400 `signature_invalid` instead of content (§17.8).
+
+An Ed25519 offline verifier with a published public key is labeled future
+work (§17.11).
 
 ### 21.10 Widget: zero dependencies
 
@@ -3527,12 +3685,18 @@ Zero JS dependencies. Reasons:
 - Offline-first means no CDN.
 - The widget is small enough that zero deps is feasible.
 
-### 21.11 Bulk import: streaming CSV
+### 21.11 Bulk import/export: fixtures-shaped JSON
 
-Streaming CSV parser, not in-memory. Reasons:
-- A 10MB CSV is plausible.
-- Validation is per-row; streaming is straightforward.
-- The response includes row numbers for failed validations.
+JSON, not CSV. Reasons:
+- Import consumes the same `fixtures.json` shape the seeder uses
+  (`POST /api/events/<slug>/import`) — one parser, one shape, no second
+  format. (CSV remains the organizer's *score export* format; bulk import
+  is JSON-only.)
+- All-or-nothing: a body over 5 MiB is rejected pre-parse with 413,
+  malformed JSON with 422 — no partial row state to unwind.
+- Export (`GET /api/events/<slug>/export`) is deterministic — name-derived
+  `trk_`/`jdg_`/`tm_`/`prj_` ids — so export→import→export is
+  byte-identical (§17.12).
 
 ### 21.12 Audit log: append-only with DB grants
 
@@ -3667,7 +3831,6 @@ The terms used in this document. Same as the PRD glossary but with technical det
 - Docker: `https://docs.docker.com/`
 - Docker Compose: `https://docs.docker.com/compose/`
 - Argon2id: `https://github.com/P-H-C/phc-winner-argon2`
-- Ed25519: `https://ed25519.cr.yp.to/`
 - HMAC-SHA256: `https://datatracker.ietf.org/doc/html/rfc2104`
 
 ### 24.4 Algorithms
@@ -3929,20 +4092,21 @@ G9 H+70   Clean-machine run
 
 ```toml
 [routes]
-gallery      = "/api/events/sample-hack-2026/gallery"
-submit       = "/api/events/sample-hack-2026/submissions/<id>/submit"
+gallery      = "/api/gallery"
+submit       = "/api/events/sample-hack-2026/submit"
 judge_scores = "/api/judge/scores"
-peer_scores  = "/api/judge/scores?judge=judge_a"
-csv_export   = "/api/events/sample-hack-2026/export.csv"
+peer_scores  = "/api/judge/peer-scores?judge=judge_a"
+csv_export   = "/api/csv_export"
 ```
 
-### 28.5 The four auth headers
+### 28.5 The five auth headers
 
 ```toml
 [auth]
-organizer   = "Cookie: session=<token>"   # from seed script
+organizer   = "Cookie: session=<token>"   # from the deterministic seed
 judge_a     = "Cookie: session=<token>"
 judge_b     = "Cookie: session=<token>"
+judge_c     = "Cookie: session=<token>"
 participant = "Cookie: session=<token>"
 ```
 
@@ -4019,7 +4183,7 @@ make down       # docker compose down
 make logs       # docker compose logs -f
 make accept     # run.py .dogfood.toml > acceptance-report.txt
 make test       # pytest
-make seed       # seed_fixtures + seed_users
+make seed       # python manage.py import_fixtures (official fixtures + demo sessions)
 make clean      # docker compose down -v
 make lint       # ruff + mypy + prettier + eslint
 docker ps       # check containers

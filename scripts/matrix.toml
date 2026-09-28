@@ -1,0 +1,16 @@
+[server]
+base_url = "http://localhost:8000"
+
+[auth]
+organizer_HEADER = "Cookie: session=f6b85c6ef1a26610e46338168d9cdeb57981352bc49c2f0354143fa9a71cdb04"
+judge_a_HEADER = "Cookie: session=15a056f0daf204cd4cd1c05a075c2795b0b003cef2e0d616c35f6e0861f708a0"
+judge_b_HEADER = "Cookie: session=da81db3be52aeeccfd69b6f53c9f6194646ccabcdb602c32b8b9ddb70dfde497"
+judge_c_HEADER = "Cookie: session=8932dba43aa530e0035c15591d0121a2ff82f7843978f3f1834b12859aa815ec"
+participant_HEADER = "Cookie: session=5630afa3363fab34ab1dee5a34b3b9d3cb33ff6e0834e7a410c75be3db89e74c"
+
+[routes]
+judge_scores = "/api/judge/scores"
+peer_scores = "/api/judge/peer-scores?judge=judge_a"
+csv_export = "/api/csv_export"
+gallery = "/api/gallery"
+submit = "/api/events/sample-hack-2026/submit"

@@ -24,6 +24,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.webhooks.delivery import notify
+
 from apps.accounts.models import User
 from apps.audit.helpers import log as audit_log
 from apps.events.decorators import deadline_gated
@@ -338,6 +340,21 @@ class ScoreSubmitView(APIView):
         review, _ = Review.objects.get_or_create(assignment=assignment)
         review.submitted_at = timezone.now()
         review.save()
+
+        # T4 webhooks: review completed → notify subscribers. The judge's
+        # email travels here because webhook subscriptions are
+        # organizer-only channels (documented in THREAT-MODEL.md).
+        notify(
+            assignment.batch.event,
+            "score.created",
+            {
+                "event": slug,
+                "project_id": str(assignment.project_id),
+                "project": assignment.project.name,
+                "judge": request.user.email,
+                "submitted_at": review.submitted_at.isoformat(),
+            },
+        )
         return Response({"submitted_at": review.submitted_at.isoformat()})
 
 

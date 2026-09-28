@@ -54,14 +54,29 @@ components:
           - withdrawn
     Certificate:
       type: object
+      description: |
+        Signed, publicly verifiable record of a submission (project).
+        The organizer-only issue response (POST /api/events/{slug}/
+        certificates/issue) additionally carries `event`, `project` and
+        `verify_url`; the public verify endpoint serves the remaining
+        fields only.
       properties:
         public_id:
           type: string
         submission_id:
           type: string
           format: uuid
+        event:
+          type: string
+          description: Event slug — only on the organizer issue response
+        project:
+          type: string
+          description: Project title — only on the organizer issue response
         signed_payload:
           type: object
+          description: |
+            {kind, event, event_slug, submission_id, project,
+            team_name, track} — signed with HMAC-SHA256
         signature:
           type: string
         signature_algorithm:
@@ -70,6 +85,198 @@ components:
         issued_at:
           type: string
           format: date-time
+        verify_url:
+          type: string
+          description: Public verify URL for this certificate — only on
+            the organizer issue response
+    WebhookDelivery:
+      type: object
+      description: |
+        One recorded delivery attempt to a webhook subscriber, as shown in
+        the organizer's delivery log (GET /api/webhooks/{webhook_id}/deliveries).
+        The exact signed bytes POSTed to the subscriber are reproducible from
+        payload_type + payload; `X-Dogfood-Signature` is HMAC-SHA256 over
+        those bytes keyed by the subscription secret.
+      properties:
+        id:
+          type: string
+          format: uuid
+        payload_type:
+          type: string
+          enum:
+          - submission.created
+          - score.created
+          - vote.created
+          - results.published
+        status:
+          type: string
+          enum:
+          - pending
+          - delivered
+          - failed
+        response_status:
+          type: integer
+          nullable: true
+          description: HTTP status the subscriber answered with; null when the
+            POST never reached a listener (connection refused, timeout).
+        attempts:
+          type: integer
+          description: Inline attempt plus batch retries; retry is in-place —
+            the same row is updated (no duplicates), capped by --max-attempts.
+        last_error:
+          type: string
+          description: Empty string on success; the transport error otherwise.
+        created_at:
+          type: string
+          format: date-time
+        last_attempt_at:
+          type: string
+          format: date-time
+          nullable: true
+    JudgeRecord:
+      type: object
+      description: |
+        Signed, publicly verifiable record of one judge's participation.
+        The signed payload never contains the judge's email — only the
+        display name; the organizer-only list/issue responses add
+        `judge_email`.
+      properties:
+        public_id:
+          type: string
+        event:
+          type: string
+          description: Event slug
+        judge:
+          type: string
+          description: Display name carried inside the signed payload
+        judge_email:
+          type: string
+          description: Only present on the organizer-authenticated
+            list/issue endpoints, never on the public verify endpoint.
+        signed_payload:
+          type: object
+          description: |
+            {kind, event, event_slug, judge, assignments,
+            scores_submitted, judging_window{open,close}, issued_at}
+        signature:
+          type: string
+        signature_algorithm:
+          type: string
+          example: HMAC-SHA256
+        issued_at:
+          type: string
+          format: date-time
+        verify_url:
+          type: string
+          description: Public verify URL for this record
+    JudgeRecordIssueRequest:
+      type: object
+      description: |
+        Issue one record for a named judge (`{"judge": "<email>"}` —
+        must be a member with the judge role) or one record per judge
+        holding at least one assignment (`{"all": true}`). Provide
+        exactly one of the two keys.
+      properties:
+        judge:
+          type: string
+          format: email
+        all:
+          type: boolean
+    CertificateIssueRequest:
+      type: object
+      description: |
+        Issue one certificate for a named project (`{"project": "<uuid>"}`)
+        or one certificate per accepted/submitted project in the event
+        (`{"all": true}`). Provide exactly one of the two keys. Issuance
+        is idempotent: a submission that already has a certificate keeps
+        it, so re-issuing returns the existing row.
+      properties:
+        project:
+          type: string
+          format: uuid
+        all:
+          type: boolean
+    FixtureImport:
+      type: object
+      description: |
+        Body shaped like the repo's fixtures.json: `event` (object with
+        name + submissions_close), `tracks`/`judges`/`teams`/`projects`
+        (lists), optional `scores`. Truncated bodies (missing required
+        sections) and bodies over 5 MiB are rejected with 422/413.
+        Re-importing the same body is idempotent; the importer is atomic
+        (a failed import changes nothing).
+      properties:
+        event:
+          type: object
+        tracks:
+          type: array
+          items:
+            type: object
+        judges:
+          type: array
+          items:
+            type: object
+        teams:
+          type: array
+          items:
+            type: object
+        projects:
+          type: array
+          items:
+            type: object
+        scores:
+          type: array
+          items:
+            type: object
+    ImportResult:
+      type: object
+      properties:
+        imported:
+          type: object
+          properties:
+            projects:
+              type: integer
+            judges:
+              type: integer
+            teams:
+              type: integer
+            scores:
+              type: integer
+        event:
+          type: string
+    FixtureExport:
+      type: object
+      description: |
+        The event as fixtures.json-shaped JSON — byte-for-byte
+        re-importable by POST /api/events/{slug}/import (and the
+        import_fixtures management command). Export -> import -> export
+        is byte-identical for importer-seeded events; documented
+        caveats (non-standard rubric criteria, synthetic demo
+        memberships, duplicate-team resubmits, drafts) live in
+        apps/api/exporter.py.
+      properties:
+        event:
+          type: object
+        tracks:
+          type: array
+          items:
+            type: object
+        judges:
+          type: array
+          items:
+            type: object
+        teams:
+          type: array
+          items:
+            type: object
+        projects:
+          type: array
+          items:
+            type: object
+        scores:
+          type: array
+          items:
+            type: object
 paths:
   /healthz:
     get:
@@ -1023,6 +1230,245 @@ paths:
           description: Not found
         '429':
           description: Rate limited
+  /api/records/judge/{public_id}:
+    get:
+      summary: Public, HMAC-signed judge participation record
+      description: |
+        Public verify endpoint for a judge's signed participation
+        record (assignments, scores submitted, judging window). No
+        authentication — the record is meant to be checked by anyone,
+        and the payload deliberately excludes the judge's email
+        (display name only). A 400 means the stored payload or signature
+        was tampered with.
+      parameters:
+      - name: public_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Record payload + signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JudgeRecord'
+        '400':
+          description: Signature does not verify (tampered record)
+        '404':
+          description: No such judge record
+        '429':
+          description: Rate limited
+  /api/events/{slug}/records/judge:
+    get:
+      summary: List judge participation records for an event (organizer only)
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Records newest first; includes judge_email
+            (organizer-only data, never part of the signed payload)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JudgeRecord'
+        '401':
+          description: Authentication required
+        '403':
+          description: Forbidden (organizer role required)
+        '404':
+          description: Event not found (reachable by admins only —
+            non-admins get 403 at the permission layer for unknown slugs)
+        '429':
+          description: Rate limited
+    post:
+      summary: Issue judge participation records (organizer only)
+      description: |
+        `{"judge": "<email>"}` issues one record for a member with the
+        judge role; `{"all": true}` issues one record per judge holding
+        at least one assignment in the event. Not idempotent by design:
+        re-issuing signs a fresh snapshot under a new public_id, like
+        certificate re-issuance.
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JudgeRecordIssueRequest'
+      responses:
+        '201':
+          description: Records issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event:
+                    type: string
+                  issued:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JudgeRecord'
+        '401':
+          description: Authentication required
+        '403':
+          description: Forbidden (organizer role required)
+        '404':
+          description: Unknown judge email, or event not found (admins only)
+        '415':
+          description: Unsupported media type
+        '422':
+          description: Validation failed (bad body, or the named user is
+            not a judge of this event)
+        '429':
+          description: Rate limited
+  /api/events/{slug}/certificates/issue:
+    post:
+      summary: Issue submission certificates (organizer only)
+      description: |
+        `{"project": "<uuid>"}` issues one certificate for the named
+        project (its submission must be accepted/submitted — status
+        `submitted` or `locked` — in the event); `{"all": true}` issues
+        one certificate for every accepted/submitted project in the
+        event. Idempotent, unlike judge-record issuance: a submission
+        keeps the certificate it already has, so re-issuing (or
+        re-running `all` after new submissions arrive) returns the
+        existing rows without duplicating anything.
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertificateIssueRequest'
+      responses:
+        '201':
+          description: Certificates issued (or already present — idempotent)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event:
+                    type: string
+                  issued:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Certificate'
+        '401':
+          description: Authentication required
+        '403':
+          description: Forbidden (organizer role required)
+        '404':
+          description: Unknown project id, or event not found (admins only)
+        '415':
+          description: Unsupported media type
+        '422':
+          description: Validation failed (bad body, or the named project
+            is not an accepted/submitted project of this event)
+        '429':
+          description: Rate limited
+  /api/events/{slug}/import:
+    post:
+      summary: Bulk-import a fixtures.json-shaped body into the event
+        (organizer only)
+      description: |
+        Reuses the import_fixtures management command via a tempfile,
+        so the importer's idempotent + atomic guarantees carry over
+        unchanged. If the event does not exist yet, the import
+        bootstraps it (any organizer may do so — you cannot hold a
+        membership in an event that doesn't exist yet). Bodies larger
+        than 5 MiB are rejected with 413; truncated bodies (missing
+        required sections) are rejected with 422, never a 500.
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FixtureImport'
+      responses:
+        '200':
+          description: Import result (idempotent, so re-import returns 200 too)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResult'
+        '401':
+          description: Authentication required
+        '403':
+          description: Forbidden (organizer role required)
+        '413':
+          description: Body exceeds the 5 MiB import limit
+        '415':
+          description: Unsupported media type
+        '422':
+          description: Validation failed (truncated or malformed fixture body)
+        '429':
+          description: Rate limited
+  /api/events/{slug}/export:
+    get:
+      summary: Export the event as fixtures-shaped JSON (organizer only)
+      description: |
+        Streams the event in the exact shape POST /api/events/{slug}/import
+        (and import_fixtures) consume. Deterministic ordering and
+        fixture-style ids (trk_01, jdg_01, tm_01, prj_01) make
+        export -> import -> export byte-identical for importer-seeded
+        events; round-trip caveats are documented in apps/api/exporter.py.
+      security:
+      - cookie: []
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Fixtures-shaped export (streamed; attachment)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FixtureExport'
+        '401':
+          description: Authentication required
+        '403':
+          description: Forbidden (organizer role required)
+        '404':
+          description: Event not found (reachable by admins only —
+            non-admins get 403 at the permission layer for unknown slugs)
+        '429':
+          description: Rate limited
   /widget.js:
     get:
       summary: Embeddable gallery widget script (CORS open)
@@ -1096,6 +1542,28 @@ paths:
           description: Unauthenticated
     post:
       summary: Create a webhook (organizer only)
+      description: |
+        Subscribe `url` to notifications for the event named by `event_slug`.
+        The server generates a per-subscription `secret` and returns it ONCE in
+        the 201 response — store it immediately; it is never shown again.
+
+        Every delivery is a POST with a JSON envelope `{type, sent_at, data}`
+        and three headers: `Content-Type: application/json`, `X-Dogfood-Event`
+        (the payload type), and `X-Dogfood-Signature: sha256=<HMAC-SHA256 of
+        the exact request body, keyed by the subscription secret>`. Receivers
+        MUST verify the signature over the raw received bytes before trusting
+        a delivery.
+
+        `events` is an allowlist of the four payload types: `submission.created`,
+        `score.created`, `vote.created`, `results.published`. An empty or omitted
+        list receives ALL event types.
+
+        Deliveries are attempted synchronously inside the triggering request
+        with a 3 s timeout and never fail or slow that request materially; a
+        failing subscriber is recorded as data. Failed/pending deliveries are
+        retried in place (same row, attempts increments, capped at
+        --max-attempts) by the visible batch command:
+        `manage.py flush_webhooks [--max-attempts N]`.
       security:
       - cookie: []
       requestBody:
@@ -1111,8 +1579,15 @@ paths:
                   type: string
                 events:
                   type: array
+                  description: Allowlist of payload types to receive; an empty
+                    or omitted list receives ALL event types.
                   items:
                     type: string
+                    enum:
+                    - submission.created
+                    - score.created
+                    - vote.created
+                    - results.published
       responses:
         '201':
           description: Webhook created (secret returned ONCE)
@@ -1122,6 +1597,59 @@ paths:
           description: "Unsupported media type \u2014 request body must be JSON"
         '401':
           description: Unauthenticated
+  /api/webhooks/{webhook_id}/deliveries:
+    get:
+      summary: List webhook deliveries (organizer only)
+      description: |
+        The organizer's delivery log — the answer to "did my webhook fire?".
+        Returns the subscription summary plus its most recent delivery rows
+        (up to 200), each $ref'ing WebhookDelivery. Only the organizer of the
+        webhook's event (or an admin) may read it; non-organizers and unknown
+        webhook ids both get 403 so the endpoint does not leak which ids exist.
+      security:
+      - cookie: []
+      parameters:
+      - name: webhook_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Webhook subscription with its delivery log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  webhook:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      url:
+                        type: string
+                      events:
+                        type: array
+                        description: Payload-type allowlist; empty means all.
+                        items:
+                          type: string
+                      is_active:
+                        type: boolean
+                  deliveries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WebhookDelivery'
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden (caller does not organize this webhook's event, or the id is unknown)
+        '404':
+          description: Unknown webhook id
+        '429':
+          description: Rate limited
   /api/{slug}/teams:
     post:
       summary: Create a team in an event (participant only)

@@ -28,6 +28,12 @@ G7 (T4 surface):
   /api/certificates/<public_id>              signed certificate
   /api/webhooks                               organizer subscriptions
   /api/schema/                                OpenAPI 3 as JSON
+
+T4 (records + bulk import/export):
+  /api/records/judge/<public_id>             public, HMAC-signed judge record
+  /api/events/<slug>/records/judge          organizer: issue/list judge records
+  /api/events/<slug>/import                  organizer: bulk import (fixtures.json)
+  /api/events/<slug>/export                  organizer: bulk export (fixtures shape)
 """
 
 from django.http import JsonResponse
@@ -38,8 +44,8 @@ def root(request):
     return JsonResponse(
         {
             "service": "dogfood-portal",
-            "stage": "G8",
-            "tiers_claimed": ["t1", "t2"],
+            "stage": "G9",
+            "tiers_claimed": ["t1", "t2", "t3"],
         }
     )
 
@@ -58,7 +64,9 @@ urlpatterns = [
     path("api/", include("apps.abuse.urls")),
     path("api/", include("apps.pairwise.urls")),
     path("api/", include("apps.api.urls")),
+    path("api/", include("apps.webhooks.urls")),
     path("api/certificates/", include("apps.certificates.urls")),
+    path("api/", include("apps.certificates.records_urls")),
     path("api/", include("apps.widget.urls")),
     path("widget.js", include("apps.widget.urls_root")),
     path("api/billing/", include("apps.billing.urls")),
