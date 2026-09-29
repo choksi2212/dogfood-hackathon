@@ -1,4 +1,4 @@
-name: hack-hamster-portal
+name: dogfood-portal
 
 # NOTE: per PLAN.md §10 — never publish the DB port. A judge's laptop is
 # very likely already running native Postgres on 5432. Backend debug port

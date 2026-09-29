@@ -9,14 +9,14 @@
 # (separate restartable containers + the observability stack —
 # Prometheus, Alertmanager, Grafana).
 
-name: hack-hamster-portal
+name: dogfood-portal
 
 services:
   portal:
     build:
       context: .
       dockerfile: Dockerfile.all-in-one
-    image: hack-hamster-portal:latest
+    image: dogfood-portal:latest
     restart: unless-stopped
     volumes:
       # Persist the in-container Postgres data so `docker compose down`

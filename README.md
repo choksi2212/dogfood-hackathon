@@ -109,7 +109,7 @@ flowchart LR
         NG["nginx :8000<br/>TLS-ready · Host $host ·<br/>X-Forwarded-For/Proto"]
     end
 
-    subgraph App["🐳 Single container — hack-hamster-portal:latest"]
+    subgraph App["🐳 Single container — dogfood-portal:latest"]
         direction TB
         subgraph Sup["🧭 supervisord (PID 1)"]
             direction LR
