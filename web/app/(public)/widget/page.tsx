@@ -38,7 +38,7 @@ export default function WidgetPage() {
   const snippet = [
     '<div id="hack-hamster-widget"></div>',
     "<script>",
-    "  window.HACK HAMSTER_WIDGET = {",
+    "  window.HH_WIDGET = {",
     `    event: "${EVENT_SLUG}",`,
     '    target: document.getElementById("hack-hamster-widget"),',
     "  };",

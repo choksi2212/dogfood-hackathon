@@ -9,7 +9,7 @@ from apps.events.models import Event
 from apps.submissions.models import Submission
 
 WIDGET_JS = """(function() {
-  var cfg = window.HACK HAMSTER_WIDGET || {};
+  var cfg = window.HH_WIDGET || {};
   var api = cfg.api || '/api/widget/gallery';
   var eventSlug = cfg.event || '';
   var target = cfg.target || document.currentScript.parentNode;
