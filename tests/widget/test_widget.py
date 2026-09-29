@@ -20,8 +20,12 @@ in their page and have our feed show up.
 
 from __future__ import annotations
 
+import re
+import shutil
+import subprocess
 from datetime import timedelta
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from django.utils import timezone
@@ -176,16 +180,61 @@ def _make_submission(event, track, organizer, name: str, *, status: str = "submi
 
 def test_widget_js_returns_javascript(client):
     """/widget.js is served as application/javascript and contains the
-    HACK HAMSTER_WIDGET global the embedder is expected to read."""
+    HH_WIDGET global the embedder is expected to read."""
     response = client.get("/widget.js")
     assert response.status_code == 200
     assert response["Content-Type"].startswith("application/javascript")
     body = response.content.decode("utf-8")
-    assert "HACK HAMSTER_WIDGET" in body
+    assert "window.HH_WIDGET" in body
     # It's a self-contained IIFE — must be valid script (starts with
     # `(function()` or similar) and references our gallery endpoint.
     assert "function" in body
     assert "/api/widget/gallery" in body
+
+
+def test_widget_js_body_is_valid_javascript(client, tmp_path):
+    """Regression test for issue #13: the mechanical Ledger → Hack Hamster
+    rebrand rewrote the widget's config global as `window.HACK HAMSTER_WIDGET`
+    — a space inside a JS identifier, i.e. a guaranteed SyntaxError on every
+    host page that embedded the script. The served body must now parse.
+
+    Verified with `node --check` when node is on PATH (the CI runner images
+    ship it); structural checks below always run as a fallback.
+    """
+    body = client.get("/widget.js").content.decode("utf-8")
+
+    # 1. The config global must be one valid identifier — no spaces, and
+    #    the pre-fix broken token must never come back.
+    assert "HACK HAMSTER_WIDGET" not in body
+    assert re.search(r"window\.HH_WIDGET\b", body)
+    # 2. A self-contained embed script must be an IIFE — not an HTML
+    #    document (a `<`-leading body would mean a 404 page leaked in).
+    assert body.lstrip().startswith("(function")
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node not on PATH — cannot syntax-check the widget body")
+    script = tmp_path / "widget.js"
+    script.write_text(body, encoding="utf-8")
+    result = subprocess.run(
+        ["node", "--check", str(script)], capture_output=True, text=True
+    )
+    assert result.returncode == 0, f"widget.js is not valid JS: {result.stderr}"
+
+
+def test_next_config_proxies_widget_js_to_django():
+    """Regression test for issue #13: the deployed portal's public surface is
+    the Next.js server itself (nginx fronts the app only in the all-in-one
+    container build). next.config.ts rewrites are what keep GET /widget.js
+    from falling through to Next's 404 HTML page, so the exact-path rewrite
+    must exist — mirroring the `location /widget.js` block
+    nginx-all-in-one.conf already carries.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    config = (repo_root / "web" / "next.config.ts").read_text(encoding="utf-8")
+    assert '"/widget.js"' in config, (
+        "web/next.config.ts must rewrite /widget.js to the Django backend"
+    )
 
 
 def test_widget_js_cors_header(client):
