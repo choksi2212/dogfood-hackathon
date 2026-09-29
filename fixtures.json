@@ -628,7 +628,7 @@
       "team": "tm_01",
       "track": "trk_04",
       "title": "Glass Signal",
-      "summary": "One line of what it does.",
+      "summary": "Realtime signal analysis that flags suspicious auth patterns before they become breaches.",
       "repo_url": "https://example.org/repo/01",
       "submitted_at": "2026-02-27T04:08:00Z"
     },
@@ -637,7 +637,7 @@
       "team": "tm_02",
       "track": "trk_03",
       "title": "Small Meadow",
-      "summary": "One line of what it does.",
+      "summary": "Turns dense dashboards into calm, screen-reader-first layouts with one import.",
       "repo_url": "https://example.org/repo/02",
       "submitted_at": "2026-02-27T20:06:00Z"
     },
@@ -646,7 +646,7 @@
       "team": "tm_03",
       "track": "trk_03",
       "title": "Deep Compass",
-      "summary": "One line of what it does.",
+      "summary": "Wayfinding overlays that guide keyboard users through complex web apps.",
       "repo_url": "https://example.org/repo/03",
       "submitted_at": "2026-02-28T16:58:00Z"
     },
@@ -655,7 +655,7 @@
       "team": "tm_04",
       "track": "trk_07",
       "title": "Green Switch",
-      "summary": "One line of what it does.",
+      "summary": "A classroom energy monitor that turns school power data into lesson plans.",
       "repo_url": "https://example.org/repo/04",
       "submitted_at": "2026-02-27T17:00:00Z"
     },
@@ -664,7 +664,7 @@
       "team": "tm_05",
       "track": "trk_02",
       "title": "North Compass",
-      "summary": "One line of what it does.",
+      "summary": "Privacy-first analytics that compass-plot user journeys without cookies.",
       "repo_url": "https://example.org/repo/05",
       "submitted_at": "2026-02-27T04:40:00Z"
     },
@@ -673,7 +673,7 @@
       "team": "tm_06",
       "track": "trk_01",
       "title": "Dry Compass",
-      "summary": "One line of what it does.",
+      "summary": "A CLI that keeps your repo's north star: lint, test and release from one config.",
       "repo_url": "https://example.org/repo/06",
       "submitted_at": "2026-03-01T10:24:00Z"
     },
@@ -682,7 +682,7 @@
       "team": "tm_07",
       "track": "trk_03",
       "title": "Dry Harbour",
-      "summary": "One line of what it does.",
+      "summary": "Dry-run accessibility audits that catch contrast traps before you ship.",
       "repo_url": "https://example.org/repo/07",
       "submitted_at": "2026-03-01T04:29:00Z"
     },
@@ -691,7 +691,7 @@
       "team": "tm_08",
       "track": "trk_04",
       "title": "North Drift",
-      "summary": "One line of what it does.",
+      "summary": "Tracks credential drift across repos and revokes stale tokens automatically.",
       "repo_url": "https://example.org/repo/08",
       "submitted_at": "2026-03-01T01:09:00Z"
     },
@@ -700,7 +700,7 @@
       "team": "tm_09",
       "track": "trk_06",
       "title": "Hollow Signal",
-      "summary": "One line of what it does.",
+      "summary": "Stethoscope-to-cloud pipeline that surfaces irregular heartbeats for triage nurses.",
       "repo_url": "https://example.org/repo/09",
       "submitted_at": "2026-03-01T15:47:00Z"
     },
@@ -709,7 +709,7 @@
       "team": "tm_10",
       "track": "trk_08",
       "title": "Still Beacon",
-      "summary": "One line of what it does.",
+      "summary": "A solar beacon node that keeps mesh networks alive through week-long blackouts.",
       "repo_url": "https://example.org/repo/10",
       "submitted_at": "2026-03-01T05:44:00Z"
     },
@@ -718,7 +718,7 @@
       "team": "tm_11",
       "track": "trk_02",
       "title": "Salt Hack Hamster",
-      "summary": "One line of what it does.",
+      "summary": "A salting framework that stress-tests data pipelines with generated edge cases.",
       "repo_url": "https://example.org/repo/11",
       "submitted_at": "2026-02-28T13:14:00Z"
     },
@@ -727,7 +727,7 @@
       "team": "tm_12",
       "track": "trk_07",
       "title": "Open Beacon",
-      "summary": "One line of what it does.",
+      "summary": "Offline-first course beacons that sync schoolwork when connectivity returns.",
       "repo_url": "https://example.org/repo/12",
       "submitted_at": "2026-02-28T09:46:00Z"
     },
@@ -736,7 +736,7 @@
       "team": "tm_13",
       "track": "trk_05",
       "title": "Quiet Anchor",
-      "summary": "One line of what it does.",
+      "summary": "Anchors noise-pollution readings to tide and wind data for coastal studies.",
       "repo_url": "https://example.org/repo/13",
       "submitted_at": "2026-03-01T14:20:00Z"
     },
@@ -745,7 +745,7 @@
       "team": "tm_14",
       "track": "trk_07",
       "title": "Green Lantern",
-      "summary": "One line of what it does.",
+      "summary": "A lantern-style night reader that dims screens to protect young sleep cycles.",
       "repo_url": "https://example.org/repo/14",
       "submitted_at": "2026-02-27T10:21:00Z"
     },
@@ -754,7 +754,7 @@
       "team": "tm_15",
       "track": "trk_04",
       "title": "Copper Orbit",
-      "summary": "One line of what it does.",
+      "summary": "Zero-trust request orbits: every internal call re-verifies identity in transit.",
       "repo_url": "https://example.org/repo/15",
       "submitted_at": "2026-03-01T08:30:00Z"
     },
@@ -763,7 +763,7 @@
       "team": "tm_16",
       "track": "trk_04",
       "title": "Salt Kiln",
-      "summary": "One line of what it does.",
+      "summary": "A password-hardening kiln that bakes breach lists into slow, auditable rotations.",
       "repo_url": "https://example.org/repo/16",
       "submitted_at": "2026-02-28T14:00:00Z"
     },
@@ -772,7 +772,7 @@
       "team": "tm_17",
       "track": "trk_06",
       "title": "Small Loom",
-      "summary": "One line of what it does.",
+      "summary": "Weaves appointment reminders into local-dialect voice calls for rural clinics.",
       "repo_url": "https://example.org/repo/17",
       "submitted_at": "2026-03-01T09:09:00Z"
     },
@@ -781,7 +781,7 @@
       "team": "tm_18",
       "track": "trk_07",
       "title": "Open Kiln",
-      "summary": "One line of what it does.",
+      "summary": "Fires lesson plans from any syllabus: paste text, get quizzes and slides.",
       "repo_url": "https://example.org/repo/18",
       "submitted_at": "2026-03-01T15:30:00Z"
     },
@@ -790,7 +790,7 @@
       "team": "tm_19",
       "track": "trk_06",
       "title": "Small Relay",
-      "summary": "One line of what it does.",
+      "summary": "Relays symptom checklists between field medics and city hospitals over SMS.",
       "repo_url": "https://example.org/repo/19",
       "submitted_at": "2026-02-27T09:30:00Z"
     },
@@ -799,7 +799,7 @@
       "team": "tm_20",
       "track": "trk_08",
       "title": "Paper Thread",
-      "summary": "One line of what it does.",
+      "summary": "Printable circuit threads that turn paper cards into touch-sensitive hardware.",
       "repo_url": "https://example.org/repo/20",
       "submitted_at": "2026-02-27T05:18:00Z"
     },
@@ -808,7 +808,7 @@
       "team": "tm_21",
       "track": "trk_02",
       "title": "Copper Kiln",
-      "summary": "One line of what it does.",
+      "summary": "Bakes raw CSVs into clean, typed datasets with anomaly kiln-firing reports.",
       "repo_url": "https://example.org/repo/21",
       "submitted_at": "2026-02-28T01:03:00Z"
     },
@@ -817,7 +817,7 @@
       "team": "tm_22",
       "track": "trk_04",
       "title": "Dry Bridge",
-      "summary": "One line of what it does.",
+      "summary": "An air-gap bridge that moves signed payloads across locked networks safely.",
       "repo_url": "https://example.org/repo/22",
       "submitted_at": "2026-03-01T07:47:00Z"
     },
@@ -826,7 +826,7 @@
       "team": "tm_23",
       "track": "trk_08",
       "title": "Slow Quarry",
-      "summary": "One line of what it does.",
+      "summary": "A low-power sensor quarry that extracts years of data from a single coin cell.",
       "repo_url": "https://example.org/repo/23",
       "submitted_at": "2026-03-01T10:30:00Z"
     },
@@ -835,7 +835,7 @@
       "team": "tm_24",
       "track": "trk_03",
       "title": "Glass Beacon",
-      "summary": "One line of what it does.",
+      "summary": "Glass-thin beacon mode: announces page changes to non-visual users instantly.",
       "repo_url": "https://example.org/repo/24",
       "submitted_at": "2026-02-28T17:09:00Z"
     },
@@ -844,7 +844,7 @@
       "team": "tm_25",
       "track": "trk_02",
       "title": "Dry Relay",
-      "summary": "One line of what it does.",
+      "summary": "Relays dry, schema-validated data between services with zero manual glue.",
       "repo_url": "https://example.org/repo/25",
       "submitted_at": "2026-02-28T22:36:00Z"
     },
@@ -853,7 +853,7 @@
       "team": "tm_26",
       "track": "trk_05",
       "title": "Amber Hours",
-      "summary": "One line of what it does.",
+      "summary": "Maps amber-alert heat windows so cities can schedule grid load intelligently.",
       "repo_url": "https://example.org/repo/26",
       "submitted_at": "2026-02-27T03:56:00Z"
     },
@@ -862,7 +862,7 @@
       "team": "tm_27",
       "track": "trk_08",
       "title": "Flat Thread",
-      "summary": "One line of what it does.",
+      "summary": "Flat-flex wiring thread for wearables that survives ten thousand bends.",
       "repo_url": "https://example.org/repo/27",
       "submitted_at": "2026-02-28T10:34:00Z"
     },
@@ -871,7 +871,7 @@
       "team": "tm_28",
       "track": "trk_02",
       "title": "Flat Meadow",
-      "summary": "One line of what it does.",
+      "summary": "Flattens nested survey data into explorable meadow plots for field teams.",
       "repo_url": "https://example.org/repo/28",
       "submitted_at": "2026-03-01T10:22:00Z"
     },
@@ -880,7 +880,7 @@
       "team": "tm_29",
       "track": "trk_01",
       "title": "Flat Relay",
-      "summary": "One line of what it does.",
+      "summary": "A single-file relay server that mocks your microservices in one command.",
       "repo_url": "https://example.org/repo/29",
       "submitted_at": "2026-02-28T20:34:00Z"
     },
@@ -889,7 +889,7 @@
       "team": "tm_30",
       "track": "trk_07",
       "title": "Paper Harbour",
-      "summary": "One line of what it does.",
+      "summary": "Harbours homework for offline students and syncs automatically on return.",
       "repo_url": "https://example.org/repo/30",
       "submitted_at": "2026-03-01T13:45:00Z"
     },
@@ -898,7 +898,7 @@
       "team": "tm_31",
       "track": "trk_01",
       "title": "Salt Ferry",
-      "summary": "One line of what it does.",
+      "summary": "Ferries environment variables across machines with end-to-end salt encryption.",
       "repo_url": "https://example.org/repo/31",
       "submitted_at": "2026-03-01T05:43:00Z"
     },
@@ -907,7 +907,7 @@
       "team": "tm_32",
       "track": "trk_01",
       "title": "Loud Hack Hamster",
-      "summary": "One line of what it does.",
+      "summary": "The loudmouthed test runner that shouts flaky suites before they reach main.",
       "repo_url": "https://example.org/repo/32",
       "submitted_at": "2026-03-01T14:58:00Z"
     },
@@ -916,7 +916,7 @@
       "team": "tm_33",
       "track": "trk_01",
       "title": "Slow Trail",
-      "summary": "One line of what it does.",
+      "summary": "Leaves a review trail on every slow query so perf debt never hides again.",
       "repo_url": "https://example.org/repo/33",
       "submitted_at": "2026-02-27T20:51:00Z"
     },
@@ -925,7 +925,7 @@
       "team": "tm_34",
       "track": "trk_08",
       "title": "Iron Switch",
-      "summary": "One line of what it does.",
+      "summary": "A rugged network switch for workshops: survives dust, drops and demo day.",
       "repo_url": "https://example.org/repo/34",
       "submitted_at": "2026-02-28T01:13:00Z"
     },
@@ -934,7 +934,7 @@
       "team": "tm_35",
       "track": "trk_05",
       "title": "Warm Beacon",
-      "summary": "One line of what it does.",
+      "summary": "Turns rooftop heat-sensor meshes into open climate datasets for any city.",
       "repo_url": "https://example.org/repo/35",
       "submitted_at": "2026-02-27T09:33:00Z"
     },
@@ -943,7 +943,7 @@
       "team": "tm_36",
       "track": "trk_08",
       "title": "Salt Drift",
-      "summary": "One line of what it does.",
+      "summary": "Corrosion-hardened sensor buoys that drift with currents and report salinity weekly.",
       "repo_url": "https://example.org/repo/36",
       "submitted_at": "2026-02-27T01:20:00Z"
     },
@@ -952,7 +952,7 @@
       "team": "tm_37",
       "track": "trk_07",
       "title": "Salt Loom",
-      "summary": "One line of what it does.",
+      "summary": "Weaves practice questions from textbooks into spaced-repetition threads.",
       "repo_url": "https://example.org/repo/37",
       "submitted_at": "2026-02-27T21:42:00Z"
     },
@@ -961,7 +961,7 @@
       "team": "tm_38",
       "track": "trk_02",
       "title": "Deep Beacon",
-      "summary": "One line of what it does.",
+      "summary": "Deep anomaly beacons that ping you when metrics drift beyond learned baselines.",
       "repo_url": "https://example.org/repo/38",
       "submitted_at": "2026-02-27T03:39:00Z"
     },
@@ -970,7 +970,7 @@
       "team": "tm_39",
       "track": "trk_03",
       "title": "Paper Anchor",
-      "summary": "One line of what it does.",
+      "summary": "Printable braille templates and anchors that make forms navigable by touch.",
       "repo_url": "https://example.org/repo/39",
       "submitted_at": "2026-02-26T23:30:00Z"
     },
@@ -979,7 +979,7 @@
       "team": "tm_40",
       "track": "trk_01",
       "title": "Slow Loom",
-      "summary": "One line of what it does.",
+      "summary": "A profile visualizer that weaves slow traces into one readable thread map.",
       "repo_url": "https://example.org/repo/40",
       "submitted_at": "2026-02-28T15:26:00Z"
     },
@@ -988,7 +988,7 @@
       "team": "tm_07",
       "track": "trk_03",
       "title": "Dry Harbour",
-      "summary": "One line of what it does.",
+      "summary": "A dry-run screen-reader sandbox for testing labels, focus order and landmarks.",
       "repo_url": "https://example.org/repo/07",
       "submitted_at": "2026-03-01T17:57:00Z"
     }

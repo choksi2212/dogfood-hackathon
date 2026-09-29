@@ -50,17 +50,17 @@ function LogoLockup() {
   return (
     <>
       <Image
-        src="/hack-hamster-logo/01-horizontal-dark.svg"
+        src="/hack-hamster-logo/logo.svg"
         alt="Hack Hamster"
-        width={120}
+        width={202}
         height={30}
         className="hidden h-7 w-auto dark:block"
         priority
       />
       <Image
-        src="/hack-hamster-logo/02-horizontal-light.svg"
+        src="/hack-hamster-logo/logo-light.svg"
         alt="Hack Hamster"
-        width={120}
+        width={202}
         height={30}
         className="block h-7 w-auto dark:hidden"
         priority
