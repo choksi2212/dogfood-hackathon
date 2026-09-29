@@ -439,6 +439,73 @@ paths:
           description: Malformed cursor or sort/cursor mismatch
         '429':
           description: Rate limited
+  /api/events/{slug}/gallery:
+    get:
+      summary: Public gallery of one event's submitted projects
+      description: |
+        Event-scoped variant of `/api/gallery` (issue #17). Same
+        envelope, sort modes, and cursor pagination — but only
+        submissions belonging to the event are returned. Public, no
+        auth. An unknown event slug 404s.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Event slug, e.g. `sample-hack-2026`
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [track, alpha, newest]
+        - name: after
+          in: query
+          schema:
+            type: string
+          description: Cursor from a previous response's `next` field
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: Opt into offset pagination (legacy)
+      responses:
+        '200':
+          description: Event-scoped list of submissions
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - title: Cursor response
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Submission'
+                      next:
+                        type: string
+                        nullable: true
+                      page_size:
+                        type: integer
+                  - title: Offset response (?page=N)
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Submission'
+                      total:
+                        type: integer
+                      page:
+                        type: integer
+                      page_size:
+                        type: integer
+        '404':
+          description: Event not found
+        '429':
+          description: Rate limited
   /api/submissions/{id}:
     get:
       summary: Single submission detail (public read)

@@ -3,6 +3,7 @@
 T1 (G2):
   /healthz                          liveness (G1)
   /api/gallery                      public, returns submitted projects
+  /api/events/<slug>/gallery         public, same gallery scoped to one event (#17)
   /api/events/<slug>/submit         participant, deadline-gated
 
 T2 (G3):
