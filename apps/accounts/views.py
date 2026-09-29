@@ -31,10 +31,23 @@ class RegisterView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        # Issue #58: a non-dict body (e.g. a bare JSON list or an int)
+        # must be a clean 4xx, not an AttributeError 500 from .get().
+        if not isinstance(request.data, dict):
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_failed",
+                        "message": "Body must be a JSON object.",
+                    }
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
         # Validate required fields up-front so a missing/invalid payload
         # is rejected with 422 *before* a User row gets created.
-        email = (request.data.get("email") or "").strip()
-        password = request.data.get("password") or ""
+        email = (request.data.get("email") or "").strip() if isinstance(request.data.get("email"), str) else ""
+        raw_password = request.data.get("password")
+        password = raw_password if isinstance(raw_password, str) else ""
 
         field_errors: dict[str, str] = {}
         if not email:
@@ -91,8 +104,21 @@ class LoginView(APIView):
     parser_classes = [JSONParser, FormParser]
 
     def post(self, request):
-        email = (request.data.get("email") or "").lower()
-        password = request.data.get("password") or ""
+        # Issue #58: a non-dict body must be a clean 4xx, not a 500.
+        if not isinstance(request.data, dict):
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_failed",
+                        "message": "Body must be a JSON object.",
+                    }
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+        raw_email = request.data.get("email")
+        email = (raw_email.lower() if isinstance(raw_email, str) else "")
+        raw_password = request.data.get("password")
+        password = raw_password if isinstance(raw_password, str) else ""
 
         try:
             user = User.objects.get(email__iexact=email)

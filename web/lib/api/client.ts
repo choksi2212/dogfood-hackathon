@@ -107,9 +107,10 @@ export const api = {
     return [...items.values()];
   },
 
-  galleryPage({ track, sort = "alpha", after }: { track?: string; sort?: "alpha" | "newest"; after?: string } = {}): Promise<GalleryResponse> {
+  galleryPage({ track, q, sort = "alpha", after }: { track?: string; q?: string; sort?: "alpha" | "newest"; after?: string } = {}): Promise<GalleryResponse> {
     const params = new URLSearchParams({ sort });
     if (track) params.set("track", track);
+    if (q) params.set("q", q);
     if (after) params.set("after", after);
     return request(`${routes.gallery()}?${params.toString()}`);
   },

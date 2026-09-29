@@ -134,7 +134,9 @@ class RateLimitMiddleware:
         return self.get_response(request)
 
     def _classify(self, request):
-        if "/api/auth/" in request.path:
+        # Issue #56: the old prefix "/api/auth/" matched no route — the
+        # real auth endpoints are /api/register, /api/login, /api/logout.
+        if request.path in ("/api/login", "/api/register", "/api/logout"):
             return "auth"
         if request.method in ("POST", "PATCH", "DELETE", "PUT"):
             return "write"

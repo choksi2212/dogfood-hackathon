@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Event, Membership, Rubric, RubricCriterion
-from .permissions import IsInEvent, IsOrganizer
+from .permissions import IsInEvent, IsOrganizer, IsOrganizerAnywhere
 from .serializers import (
     EventSerializer,
     MembershipSerializer,
@@ -17,12 +17,26 @@ from apps.judging.models import Score
 
 
 class EventCreateView(APIView):
-    permission_classes = [IsAuthenticated, IsOrganizer]
+    """POST /api/events/ (issue #46).
+
+    ``IsOrganizerAnywhere`` (not per-event ``IsOrganizer``) — the URL
+    has no slug to resolve. Authenticated admins and users who already
+    organize any event may create a new one; the creator is granted an
+    organizer Membership on the new event so they can immediately
+    manage it (tracks, rubric, memberships) like any other organizer.
+    """
+
+    permission_classes = [IsAuthenticated, IsOrganizerAnywhere]
 
     def post(self, request):
         serializer = EventSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         event = serializer.save(created_by=request.user)
+        Membership.objects.get_or_create(
+            user=request.user,
+            event=event,
+            defaults={"role": "organizer", "created_by": request.user},
+        )
         return Response(EventSerializer(event).data, status=status.HTTP_201_CREATED)
 
 

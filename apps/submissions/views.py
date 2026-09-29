@@ -15,6 +15,7 @@ from __future__ import annotations
 import base64
 import json
 
+from django.db import models
 from django.utils import timezone
 from django.utils.cache import patch_cache_control
 from rest_framework import status
@@ -347,6 +348,19 @@ class SubmitView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # Issue #58: a non-dict body (e.g. a bare JSON list) must be a
+        # clean 4xx, not an AttributeError 500.
+        if not isinstance(request.data, dict):
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_failed",
+                        "message": "Body must be a JSON object.",
+                    }
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
         team = self._resolve_team(request, event)
         if isinstance(team, Response):
             return team
@@ -413,25 +427,32 @@ class SubmitView(APIView):
             },
         )
         if not created:
-            submission.name = name
-            submission.tagline = tagline
-            submission.description = request.data.get("description", "")
-            submission.thumbnail_path = request.data.get(
-                "thumbnail_path", submission.thumbnail_path
-            )
-            submission.demo_video_url = request.data.get(
-                "demo_video_url", submission.demo_video_url
-            )
-            submission.repo_url = request.data.get("repo_url", submission.repo_url)
-            submission.live_url = request.data.get("live_url", submission.live_url)
-            submission.tech_tags = clean_tags
-            submission.track = track
+            # Issue #49: partial edit — only overwrite the fields the
+            # request actually carries, so an edit that omits e.g.
+            # description no longer wipes it.
+            if "name" in request.data:
+                submission.name = name
+            if "tagline" in request.data:
+                submission.tagline = tagline
+            for field in (
+                "description",
+                "thumbnail_path",
+                "demo_video_url",
+                "repo_url",
+                "live_url",
+            ):
+                if field in request.data:
+                    setattr(submission, field, request.data.get(field, "") or "")
+            if "tech_tags" in request.data:
+                submission.tech_tags = clean_tags
+            if "track_slug" in request.data:
+                submission.track = track
             submission.save()
 
-        # Image gallery: replace the list wholesale. Same reason as the
-        # serializer-level wholesale-replace — reorders are easier as
-        # delete+create than as partial updates.
-        images_in = request.data.get("images", []) or []
+        # Image gallery: replace the list wholesale WHEN the request
+        # carries it (issue #49: an edit without ``images`` used to
+        # delete every existing image). Reorders stay delete+create.
+        images_in = request.data.get("images") if "images" in request.data else None
         if isinstance(images_in, list):
             submission.images.all().delete()
             from .models import SubmissionImage as _Img  # local import
@@ -473,6 +494,18 @@ class SubmitView(APIView):
                     }
                 },
                 status=status.HTTP_410_GONE,
+            )
+
+        # Issue #50: accept status=draft — the submission is stored but
+        # stays out of the public gallery (gallery + widget filter
+        # status="submitted"). Publishing is a later edit that omits
+        # status (or sends status="submitted").
+        if request.data.get("status") == "draft":
+            submission.status = "draft"
+            submission.save(update_fields=["status", "updated_at"])
+            return Response(
+                SubmissionSerializer(submission).data,
+                status=status.HTTP_201_CREATED,
             )
 
         submission.status = "submitted"
@@ -570,13 +603,24 @@ class SubmissionImageView(APIView):
         except _S.DoesNotExist:
             return None
 
-    def get(self, request, slug, id):
+    def get(self, request, slug, id, image_id=None):
+        # ``image_id`` is present on the .../images/<image_id> route;
+        # the previous signature omitted it, so every GET on the
+        # declared route crashed with a TypeError (issue #51).
         submission = self._submission(slug, id)
         if submission is None or submission.status == "draft":
             return Response(
                 {"error": {"code": "not_found", "message": "Submission not found."}},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        if image_id is not None:
+            image = submission.images.filter(id=image_id).first()
+            if image is None:
+                return Response(
+                    {"error": {"code": "not_found", "message": "Image not found."}},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            return Response(SubmissionImageSerializer(image).data)
         return Response(SubmissionImageSerializer(submission.images.all(), many=True).data)
 
     def post(self, request, slug, id):
@@ -710,7 +754,20 @@ class CommentListCreateView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        body = (request.data.get("body") or "").strip()
+        # Issue #58: a non-dict body (e.g. a bare JSON list) must be a
+        # clean 4xx, not an AttributeError 500.
+        if not isinstance(request.data, dict):
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_failed",
+                        "message": "Body must be a JSON object with a 'body' field.",
+                    }
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+        raw_body = request.data.get("body")
+        body = (raw_body if isinstance(raw_body, str) else "").strip()
         if not body:
             return Response(
                 {

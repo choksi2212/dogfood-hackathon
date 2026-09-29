@@ -62,3 +62,24 @@ class IsOrganizer(IsInEvent):
             return False
         event = _get_event(view)
         return _has_role(request, event, "organizer")
+
+
+class IsOrganizerAnywhere(BasePermission):
+    """EventCreateView permission (issue #46).
+
+    The per-event ``IsOrganizer`` resolves the event from the URL slug,
+    which a create route can never have — so ``POST /api/events/`` was a
+    structural 403 for everyone, including the seeded organizer, and
+    event creation was dead. Creation is allowed for admins and for
+    anyone who already organizes at least one event; the view then
+    grants the creator an organizer Membership on the new event.
+    """
+
+    message = "Only organizers can create events."
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if getattr(request.user, "is_admin_role", False):
+            return True
+        return Membership.objects.filter(user=request.user, role="organizer").exists()

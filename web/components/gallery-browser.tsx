@@ -26,16 +26,26 @@ export function GalleryBrowser({ preview = false }: { preview?: boolean }) {
   const [tracks, setTracks] = useState<string[]>([]);
   const [sort, setSort] = useState<"alpha" | "newest">("alpha");
   const [search, setSearch] = useState("");
+  // Issue #55: the search box used to filter only already-loaded items
+  // client-side ("Search loaded projects"), so anything past page 1 was
+  // unsearchable. The query now goes to the server (?q=) — debounced
+  // so typing doesn't fire a request per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [retry, setRetry] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState(false);
   const generation = useRef(0);
 
   useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
     let active = true;
     generation.current += 1;
     api
-      .galleryPage({ track: track === "all" ? undefined : track, sort })
+      .galleryPage({ track: track === "all" ? undefined : track, q: debouncedSearch || undefined, sort })
       .then((result) => {
         if (!active) return;
         setData(result);
@@ -51,7 +61,7 @@ export function GalleryBrowser({ preview = false }: { preview?: boolean }) {
     return () => {
       active = false;
     };
-  }, [track, sort, retry]);
+  }, [track, sort, debouncedSearch, retry]);
 
   function resetQuery() {
     generation.current += 1;
@@ -98,12 +108,7 @@ export function GalleryBrowser({ preview = false }: { preview?: boolean }) {
       if (currentGeneration === generation.current) setLoadingMore(false);
     }
   }
-  const items =
-    data?.items.filter((item) =>
-      `${item.name} ${item.tagline}`
-        .toLowerCase()
-        .includes(search.toLowerCase()),
-    ) ?? [];
+  const items = data?.items ?? [];
 
   return (
     <div>
@@ -114,7 +119,7 @@ export function GalleryBrowser({ preview = false }: { preview?: boolean }) {
               htmlFor="gallery-search"
               className="text-xs text-text-secondary"
             >
-              Search loaded projects
+              Search projects
             </Label>
             <div className="relative">
               <Search
