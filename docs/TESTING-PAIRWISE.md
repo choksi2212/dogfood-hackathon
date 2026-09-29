@@ -12,25 +12,25 @@
 
 ```mermaid
 flowchart LR
-    subgraph IN["📥 Ballots"]
+    subgraph IN["Ballots"]
         direction TB
-        B1["📥 pairwise/ballots<br/>POST {a, b, winner}"]
-        B2["🗄️ pairwise_ballot table<br/>(phantom prior 0.5)"]
+        B1["pairwise slash ballots<br/>POST a b winner"]
+        B2["pairwise ballot table<br/>phantom prior 0.5"]
     end
 
-    subgraph MM["⚖️ Bradley-Terry MM"]
+    subgraph MM["Bradley-Terry MM"]
         direction TB
-        M1["🧮 for each project i:<br/>wins_i = Σ [winner=i] + ½ Σ [winner=tie & i∈a,b]"]
-        M2["🧮 for each project i:<br/>theta_i = log(<br/>wins_i / Σ_j (n_ij / (theta_i − theta_j)))]
-        M3["🔁 MM iteration<br/>until convergence<br/>max Δθ &lt; 1e-9"]
-        M4["⚖️ recentre:<br/>sum(theta) = 0"]
+        M1["for each project i<br/>wins sub i = sum over winner=i<br/>plus 0.5 times sum over tie"]
+        M2["for each project i<br/>theta sub i from MM step"]
+        M3["MM iteration<br/>until convergence"]
+        M4["recentre<br/>sum theta = 0"]
     end
 
-    subgraph OUT["📤 Ranking"]
+    subgraph OUT["Ranking"]
         direction TB
-        R1["🏆 order by θ descending"]
-        R2["📦 ranking response<br/>(projects in θ order)"]
-        R3["🗄️ cached rankings<br/>(idempotent on re-run)"]
+        R1["order by theta descending"]
+        R2["ranking response<br/>projects in theta order"]
+        R3["cached rankings<br/>idempotent on re-run"]
     end
 
     B1 --> B2 --> M1 --> M2 --> M3 --> M4

@@ -14,65 +14,59 @@
 
 ```mermaid
 flowchart TB
-    subgraph AXES["🧭 Axes"]
-        direction LR
-        ACT["🧑 Actors<br/>(6)"]
-        ROUTE["📍 Routes<br/>(8)"]
+    subgraph ACTORS["Actors (rows)"]
+        direction TB
+        A1["organizer"]
+        A2["judge a"]
+        A3["judge b"]
+        A4["judge c"]
+        A5["participant"]
+        A6["anonymous"]
     end
 
-    subgraph ACTORS["🧑 Actors (rows)"]
+    subgraph ROUTES["Routes (cols)"]
         direction TB
-        A1[🧑‍💼 organizer]
-        A2[👤 judge_a]
-        A3[👤 judge_b]
-        A4[👤 judge_c]
-        A5[🧑 participant]
-        A6[🌐 anonymous]
+        R1["api gallery"]
+        R2["api events submit"]
+        R3["api judge scores"]
+        R4["api judge peer scores"]
+        R5["api csv export"]
+        R6["api events normalize"]
+        R7["api events assignments run"]
+        R8["api webhooks"]
     end
 
-    subgraph ROUTES["📍 Routes (cols)"]
+    subgraph OK["200 OK cells"]
         direction TB
-        R1["/api/gallery"]
-        R2["/api/events/.../submit"]
-        R3["/api/judge/scores"]
-        R4["/api/judge/peer-scores"]
-        R5["/api/csv_export"]
-        R6["/api/events/.../normalize"]
-        R7["/api/events/.../assignments/run"]
-        R8["/api/webhooks"]
+        O1["organizer sees gallery"]
+        O2["judges see gallery"]
+        O3["participant sees gallery"]
+        O4["anonymous sees gallery"]
+        O5["organizer sees csv export"]
+        O6["organizer sees normalize"]
+        O7["organizer sees assignments run"]
+        O8["organizer sees webhooks"]
+        O9["judges see judge scores"]
     end
 
-    subgraph OK["✅ 200 OK cells"]
+    subgraph FORBID["403 / 401 cells"]
         direction TB
-        O1["organizer × gallery 200"]
-        O2["judge_a/b/c × gallery 200"]
-        O3["participant × gallery 200"]
-        O4["anonymous × gallery 200"]
-        O5["organizer × csv_export 200"]
-        O6["organizer × normalize 200"]
-        O7["organizer × assignments/run 200"]
-        O8["organizer × webhooks 200"]
-        O9["judge_a/b/c × judge_scores 200"]
+        F1["judges blocked from peer scores"]
+        F2["judges blocked from submit"]
+        F3["judges blocked from csv export"]
+        F4["judges blocked from normalize"]
+        F5["judges blocked from assignments run"]
+        F6["judges blocked from webhooks"]
+        F7["organizer blocked from submit"]
+        F8["organizer blocked from judge scores"]
+        F9["organizer blocked from peer scores"]
+        F10["participant blocked from everything else"]
+        F11["anonymous blocked from everything else"]
     end
 
-    subgraph FORBID["🔴 403 / 401 cells"]
+    subgraph DRIFT["Drift cells"]
         direction TB
-        F1["judge_a/b/c × peer-scores 403"]
-        F2["judge_a/b/c × submit 403"]
-        F3["judge_a/b/c × csv_export 403"]
-        F4["judge_a/b/c × normalize 403"]
-        F5["judge_a/b/c × assignments/run 403"]
-        F6["judge_a/b/c × webhooks 403"]
-        F7["organizer × submit 403"]
-        F8["organizer × judge_scores 403"]
-        F9["organizer × peer-scores 403"]
-        F10["participant × everything else 403"]
-        F11["anonymous × everything else 401"]
-    end
-
-    subgraph DRIFT["⚠️ Drift cells"]
-        direction TB
-        D1["participant × submit 422<br/>(deadline_passed in demo)"]
+        D1["participant submit 422<br/>deadline passed in demo"]
     end
 
     ACTORS --> OK

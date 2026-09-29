@@ -41,56 +41,56 @@ the implementation wins — and the prose gets fixed.
 ```mermaid
 sequenceDiagram
     autonumber
-    participant O as ⚖️ Organizer
-    participant P as 📦 Pairwise console
-    participant J as 🧭 Judge console
-    participant API as 🐍 Django and DRF
-    participant DB as 🗄️ Postgres
-    participant Pub as 🌐 Public
+    participant O as Organizer
+    participant P as Pairwise console
+    participant J as Judge console
+    participant API as Django and DRF
+    participant DB as Postgres
+    participant Pub as Public
 
     Note over O,DB: Pre-judging setup
-    O->>API: POST /assignments/run (seed=N)
-    API->>DB: insert JudgeBatch + JudgeAssignment rows
-    DB-->>API: 3 judges / project, disjoint batches
+    O->>API: POST assignments run, seed N
+    API->>DB: insert JudgeBatch and JudgeAssignment rows
+    DB-->>API: 3 judges per project, disjoint batches
     Note over J,DB: Rubric scoring path
-    J->>API: GET /me/batch
-    API->>DB: SELECT assignments WHERE judge=j
+    J->>API: GET me batch
+    API->>DB: SELECT assignments WHERE judge is j
     DB-->>API: project list
-    API-->>J: 200 + projects + rubric
+    API-->>J: 200 with projects and rubric
     loop per project
-        J->>API: PUT /scores (1–5 per criterion)
+        J->>API: PUT scores 1 to 5 per criterion
         API->>DB: upsert Score rows
         API->>DB: append AuditEvent
-        J->>API: POST /submit
-        API->>DB: stamp Review.submitted_at
+        J->>API: POST submit
+        API->>DB: stamp Review submitted at
     end
     Note over O,DB: Calibration
-    O->>API: POST /normalize
+    O->>API: POST normalize
     API->>DB: read Score rows
     API->>API: alternating-means fit
-    API->>DB: insert NormalizationRun + NormalizedScore + JudgeBias
-    API-->>O: 200 + raw_sigma, normalized_sigma, is_connected
+    API->>DB: insert NormalizationRun and NormalizedScore and JudgeBias
+    API-->>O: 200 with raw sigma, normalized sigma, is connected
     Note over P,DB: Pairwise path (bonus)
     loop per comparison
-        P->>API: GET /pairwise/next
-        API->>DB: pick (left, right) by info value
+        P->>API: GET pairwise next
+        API->>DB: pick left right by info value
         DB-->>API: pair
-        API-->>P: 200 + pair
-        P->>API: POST /pairwise/{id}/answer
+        API-->>P: 200 with pair
+        P->>API: POST pairwise id answer
         API->>DB: insert PairwiseBallot row
     end
-    O->>API: POST /pairwise/run
+    O->>API: POST pairwise run
     API->>DB: read PairwiseBallot rows
-    API->>API: Hunter (2004) MM fit
-    API->>DB: insert PairwiseRun + PairwiseRanking
+    API->>API: Hunter 2004 MM fit
+    API->>DB: insert PairwiseRun and PairwiseRanking
     Note over Pub,DB: Publish
-    O->>API: POST /publish
-    API->>DB: set results_at; allow GET /results for non-organizers
+    O->>API: POST publish
+    API->>DB: set results at, allow GET results for non-organizers
     Note over Pub,DB: Public gallery now visible
-    Pub->>API: GET /gallery
-    API->>DB: filter event + status=submitted
+    Pub->>API: GET gallery
+    API->>DB: filter event and status submitted
     DB-->>API: projects
-    API-->>Pub: 200 + ranked projects
+    API-->>Pub: 200 with ranked projects
 ```
 
 **Reading the diagram.** Three lifecycles share one event. The rubric path produces per-criterion scores, which the alternating-means fit in §3 calibrates. The pairwise path produces ballots, which the Bradley-Terry fit in §4 converts to a ranking. Both feed the same public results page. The role-isolation boundary (§5) is enforced at every Django view — a denied request never reaches the DB.
