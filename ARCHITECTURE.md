@@ -13,18 +13,52 @@
 
 ---
 
+## Hero
+
+**One-sentence role:** the single source of truth for how the four processes, one database, and one exposed port are wired together to satisfy the seven acceptance checks under `docker compose up`.
+
+## Table of contents
+
+- [Part 1 — Goals, constraints, and what we are NOT](#part-1--architectural-goals-and-constraints)
+- [Part 2 — High-level shape (nginx · Django · Next.js · Postgres)](#part-2--high-level-architecture)
+- [Part 3 — Request flow and the seven checks](#part-3--request-flow-architecture)
+- [Part 4 — Database architecture (40 tables)](#part-4--database-architecture)
+- [Parts 5–14 — Auth, API, frontend, modules, observability, threat surface, acceptance](#parts-5-14--cross-cutting-concerns)
+- [Parts 15–28 — Contracts, signing, decision log, glossary, quick reference](#parts-15-28--contracts-decisions-and-quick-reference)
+
+---
+
+## System diagram
+
+```mermaid
+flowchart LR
+    Browser(["🌐 Browser"]):::yellow --> Nginx{{"🚪 nginx :8000"}}:::orange
+    Nginx -->|"/api/*"| Django["🐍 Django + DRF<br/>(3 gunicorn workers)"]:::orange
+    Nginx -->|"/, /event, /judge"| Next["⚛️ Next.js :3000"]:::orange
+    Django -->|ORM| DB[("🗄️ Postgres 16<br/>postgres-data volume")]:::blue
+    Next -. "fetch /api/" .-> Django
+    Webhook["📡 External subscriber"]:::yellow -. "HMAC-SHA256<br/>signed POST" .-> Django
+    Django -- "append-only<br/>audit row" --> Audit[["📜 AuditEvent"]]:::violet
+    Audit -. "DB grants<br/>REVOKE UPDATE/DELETE" .-> DB
+
+    classDef orange fill:#F4A261,stroke:#6C567B,stroke-width:1px,color:#1f2937
+    classDef yellow fill:#E9C46A,stroke:#6C567B,stroke-width:1px,color:#1f2937
+    classDef blue fill:#A8DADC,stroke:#2A9D8F,stroke-width:2px,color:#1f2937
+    classDef violet fill:#6C567B,stroke:#ffffff,stroke-width:1px,color:#ffffff
+```
+
+**Reading the diagram.** A single exposed port (`${WEB_PORT:-8000}:80`) on `nginx` is the only public face. nginx terminates HTTP and fans requests out: `/api/*` → Django, everything else → Next.js (which itself reaches Django on the internal network for authenticated fetches). The Next.js server does *not* expose a separate port. The only persistent state is Postgres on the `postgres-data` Docker volume. Every consequential action appends an `AuditEvent` row — append-only is enforced at the DB layer, not in application code. Webhook subscribers receive HMAC-SHA256-signed payloads directly from the view.
+
+---
+
 ## Part 1 — Architectural Goals and Constraints
 
 ### 1.1 Goals (in priority order)
 
-1. **Pass the seven acceptance checks.** They are the 40% Tier Completion criterion.
-   Every architectural decision is checked against this goal first.
-2. **Enforce role isolation at the API.** The 25% Judging Integrity criterion.
-   Permission classes, not templates.
-3. **`docker compose up` works cold.** The 20% Adoptability criterion. No external
-   dependencies.
-4. **Ship a documented schema.** The 15% Code Quality criterion, plus the
-   "explain the schema" thesis from the brief.
+1. **Pass the seven acceptance checks.** They are the 40% Tier Completion criterion. Every architectural decision is checked against this goal first.
+2. **Enforce role isolation at the API.** The 25% Judging Integrity criterion. Permission classes, not templates.
+3. **`docker compose up` works cold.** The 20% Adoptability criterion. No external dependencies.
+4. **Ship a documented schema.** The 15% Code Quality criterion, plus the "explain the schema" thesis from the brief.
 5. **Defend the maths in writing.** The +5 Normalization Proof bonus.
 6. **Recover a known ranking from pairwise outcomes.** The +5 Pairwise Mode bonus.
 7. **Document the threat surface.** The +3 Threat Model bonus.
@@ -32,39 +66,29 @@
 
 ### 1.2 Constraints
 
-- **Offline-first.** The portal runs on `localhost` with the network off. No external
-  service, no cloud account, no API key. (Spec §11 rule 1.)
+- **Offline-first.** The portal runs on `localhost` with the network off. No external service, no cloud account, no API key. (Spec §11 rule 1.)
 - **Single deployment.** One event per deployment. Multi-tenancy is out of scope.
 - **Three branches.** `main`, `manas`, `mihir`. Mihir is the sole integrator.
-
 - **72 hours.** Code freeze on Sep 29 18:00 UTC.
 - **Two developers.** Manas (backend/data/maths) + Mihir (frontend/threat/integrator).
 - **No new dependencies after Sep 13.** Versions are frozen.
-- **No scope cutting.** All four tiers + all four bonuses. See `no-scope-cutting`
-  memory.
+- **No scope cutting.** All four tiers + all four bonuses.
 
 ### 1.3 Architectural principles
 
-- **Permissions over templates.** A deny is enforced at the API layer. Templates can
-  hide controls; APIs must deny first.
-- **Server-rendered public, client-rendered auth.** The public gallery is server-
-  rendered for SEO and offline-first. Authenticated views are client-rendered for
-  interactivity.
+- **Permissions over templates.** A deny is enforced at the API layer. Templates can hide controls; APIs must deny first.
+- **Server-rendered public, client-rendered auth.** The public gallery is server-rendered for SEO and offline-first. Authenticated views are client-rendered for interactivity.
 - **Disjoint ownership.** No file has two editors. See Part 6.
-- **Frozen `.hack-hamster.toml` at H+20.** The contract with the acceptance mechanism is
-  fixed.
-- **Backend is the source of truth.** The frontend never has business logic that
-  diverges from the backend.
+- **Frozen `.hack-hamster.toml` at H+20.** The contract with the acceptance mechanism is fixed.
+- **Backend is the source of truth.** The frontend never has business logic that diverges from the backend.
 
 ### 1.4 What the architecture is NOT
 
-- Not a microservices architecture. One Django process, one Next.js process, one
-  Postgres, one nginx.
+- Not a microservices architecture. One Django process, one Next.js process, one Postgres, one nginx.
 - Not a serverless architecture. The portal runs on a single host.
 - Not a real-time architecture. SSE is used only for the dashboard.
 - Not a multi-region architecture. One deployment, one database.
-- Not an event-sourced architecture. The audit log is append-only, but the rest of
-  the system is CRUD.
+- Not an event-sourced architecture. The audit log is append-only, but the rest of the system is CRUD.
 - Not a CQRS architecture. The same DB serves reads and writes.
 
 ---
@@ -105,7 +129,7 @@
 - Serves `/_next/static/*` and `/static/*` directly.
 - Reverse-proxies `/api/*` to Django.
 - Reverse-proxies everything else to Next.js.
-- One port exposed (`${WEB_PORT:-8080}:80`).
+- One port exposed (`${WEB_PORT:-8000}:80`).
 
 **Django (3 gunicorn workers):**
 - Serves the API surface.
@@ -125,8 +149,7 @@
 
 ### 2.3 The internal network
 
-Docker Compose creates a network named `hack-hamster_default`. Containers reach each other
-by service name:
+Docker Compose creates a network named `hack-hamster_default`. Containers reach each other by service name:
 
 - `db:5432` — Postgres
 - `backend:8000` — Django
@@ -135,23 +158,19 @@ by service name:
 
 ### 2.4 The exposed surface
 
-Only one port is exposed: `${WEB_PORT:-8080}`. From the user's perspective:
+Only one port is exposed: `${WEB_PORT:-8000}`. From the user's perspective:
 
-- `http://localhost:8080/` — landing page
-- `http://localhost:8080/api/...` — API
-- `http://localhost:8080/healthz` — liveness
-- `http://localhost:8080/readyz` — readiness
+- `http://localhost:8000/` — landing page
+- `http://localhost:8000/api/...` — API
+- `http://localhost:8000/healthz` — liveness
+- `http://localhost:8000/readyz` — readiness
 
 The web port is configurable so a host with a collision can use a different port.
 
 ### 2.5 Why this shape
 
-- **One exposed port.** The brief says "no cloud account, no API key". A single
-  port is the simplest model. The README's first command is `docker compose up`
-  and the URL is `http://localhost:8080`.
-- **Reverse proxy, not direct.** nginx terminates HTTP and serves static assets.
-  The Django app doesn't serve static in production. The Next.js server doesn't
-  proxy to the API.
+- **One exposed port.** The brief says "no cloud account, no API key". A single port is the simplest model. The README's first command is `docker compose up` and the URL is `http://localhost:8000`.
+- **Reverse proxy, not direct.** nginx terminates HTTP and serves static assets. The Django app doesn't serve static in production. The Next.js server doesn't proxy to the API.
 - **No API gateway.** DRF's permission classes are the authorization layer.
 - **No service mesh.** Two services that talk to one DB don't need mesh.
 
@@ -249,16 +268,13 @@ Each acceptance check maps to a specific request flow:
 
 Two endpoints stream:
 
-**`GET /api/events/{slug}/export.csv`:** uses Django's `StreamingHttpResponse`. The
-CSV is generated row-by-row, not buffered.
+**`GET /api/events/{slug}/export.csv`:** uses Django's `StreamingHttpResponse`. The CSV is generated row-by-row, not buffered.
 
-**`GET /api/events/{slug}/dashboard/stream`:** SSE. The view holds the connection open
-and emits chunks every 10 seconds.
+**`GET /api/events/{slug}/dashboard/stream`:** SSE. The view holds the connection open and emits chunks every 10 seconds.
 
 ### 3.5 The async considerations
 
-There are no async endpoints. Django runs in WSGI mode (gunicorn sync workers). The
-72-hour scope does not require async.
+There are no async endpoints. Django runs in WSGI mode (gunicorn sync workers). The 72-hour scope does not require async.
 
 ---
 
@@ -295,15 +311,11 @@ User ──┬──< Session
        │                            └──< JudgeRecord
 ```
 
-No `SigningKey` table exists — signing is HMAC-SHA256 over the server's
-`SECRET_KEY` (see Part 17), so there are no key rows to store.
+No `SigningKey` table exists — signing is HMAC-SHA256 over the server's `SECRET_KEY` (see Part 17), so there are no key rows to store.
 
 ### 4.2 The core tables
 
-40 tables exist; this section sketches the core one per concern. Real table
-names for the signed-record and webhook machinery: `api_webhook`,
-`webhooks_webhookdelivery`, `certificates_certificate`,
-`certificates_judgerecord`.
+40 tables exist; this section sketches the core one per concern. Real table names for the signed-record and webhook machinery: `api_webhook`, `webhooks_webhookdelivery`, `certificates_certificate`, `certificates_judgerecord`.
 
 For each: purpose, key fields, indexes.
 
@@ -311,23 +323,19 @@ For each: purpose, key fields, indexes.
 
 **`users_user`**
 - Purpose: the only authentication identity.
-- Fields: `id (uuid)`, `email (citext, unique)`, `password_hash`, `name`, `is_active`,
-  `created_at`, `updated_at`.
+- Fields: `id (uuid)`, `email (citext, unique)`, `password_hash`, `name`, `is_active`, `created_at`, `updated_at`.
 - Indexes: `email` (unique btree).
 
 **`users_session`**
 - Purpose: server-side sessions.
-- Fields: `id (uuid)`, `user_id (fk)`, `token_hash (sha256, unique)`, `created_at`,
-  `last_seen_at`, `expires_at`, `ip`, `user_agent`.
+- Fields: `id (uuid)`, `user_id (fk)`, `token_hash (sha256, unique)`, `created_at`, `last_seen_at`, `expires_at`, `ip`, `user_agent`.
 - Indexes: `token_hash` (unique btree), `(user_id, last_seen_at)`.
 
 #### events
 
 **`events_event`**
 - Purpose: one hackathon instance.
-- Fields: `id (uuid)`, `slug (unique)`, `name`, `description`, `open_at`,
-  `submissions_close_at`, `judging_open_at`, `judging_close_at`, `results_at`,
-  `created_at`, `created_by_id (fk)`.
+- Fields: `id (uuid)`, `slug (unique)`, `name`, `description`, `open_at`, `submissions_close_at`, `judging_open_at`, `judging_close_at`, `results_at`, `created_at`, `created_by_id (fk)`.
 - Indexes: `slug` (unique).
 
 **`events_track`**
@@ -337,14 +345,12 @@ For each: purpose, key fields, indexes.
 
 **`events_prize`**
 - Purpose: prize definition.
-- Fields: `id (uuid)`, `event_id (fk)`, `track_id (fk nullable)`, `name`, `value`,
-  `order`.
+- Fields: `id (uuid)`, `event_id (fk)`, `track_id (fk nullable)`, `name`, `value`, `order`.
 - Indexes: `(event_id, order)`.
 
 **`events_membership`**
 - Purpose: role assignment.
-- Fields: `id (uuid)`, `user_id (fk)`, `event_id (fk)`, `role (enum)`,
-  `created_at`, `created_by_id (fk)`.
+- Fields: `id (uuid)`, `user_id (fk)`, `event_id (fk)`, `role (enum)`, `created_at`, `created_by_id (fk)`.
 - Indexes: `(user_id, event_id)` (unique).
 
 **`events_rubric`**
@@ -354,45 +360,36 @@ For each: purpose, key fields, indexes.
 
 **`events_rubriccriterion`**
 - Purpose: one criterion of a rubric.
-- Fields: `id (uuid)`, `rubric_id (fk)`, `name`, `description`, `weight`, `min`, `max`,
-  `order`.
+- Fields: `id (uuid)`, `rubric_id (fk)`, `name`, `description`, `weight`, `min`, `max`, `order`.
 - Indexes: `(rubric_id, order)`.
 
 #### teams
 
 **`teams_team`**
 - Purpose: 1–4 participants forming a submission unit.
-- Fields: `id (uuid)`, `event_id (fk)`, `name`, `created_by_id (fk)`, `created_at`,
-  `locked_at (nullable)`.
+- Fields: `id (uuid)`, `event_id (fk)`, `name`, `created_by_id (fk)`, `created_at`, `locked_at (nullable)`.
 - Indexes: `(event_id, name)`.
 
 **`teams_teammember`**
 - Purpose: membership in a team.
-- Fields: `id (uuid)`, `team_id (fk)`, `user_id (fk)`, `joined_at`,
-  `role_in_team (enum)`.
+- Fields: `id (uuid)`, `team_id (fk)`, `user_id (fk)`, `joined_at`, `role_in_team (enum)`.
 - Indexes: `(team_id, user_id)` (unique).
 
 **`teams_teaminvite`**
 - Purpose: single-use invite link.
-- Fields: `id (uuid)`, `team_id (fk)`, `token_hash (unique)`, `created_by_id`,
-  `created_at`, `expires_at`, `consumed_at`, `consumed_by_id (fk nullable)`.
+- Fields: `id (uuid)`, `team_id (fk)`, `token_hash (unique)`, `created_by_id`, `created_at`, `expires_at`, `consumed_at`, `consumed_by_id (fk nullable)`.
 - Indexes: `token_hash` (unique).
 
 #### submissions
 
 **`submissions_submission`**
 - Purpose: a team's project.
-- Fields: `id (uuid)`, `team_id (fk)`, `event_id (fk)`, `track_id (fk)`, `name`,
-  `tagline`, `description`, `thumbnail_path`, `demo_video_url`, `repo_url`,
-  `live_url`, `status (enum)`, `submitted_at`, `locked_at`, `withdrawn_at`,
-  `created_at`, `updated_at`, `search_vector (tsvector)`.
-- Indexes: `(team_id, event_id)` (unique), `(event_id, status, track_id)`,
-  `search_vector` (GIN).
+- Fields: `id (uuid)`, `team_id (fk)`, `event_id (fk)`, `track_id (fk)`, `name`, `tagline`, `description`, `thumbnail_path`, `demo_video_url`, `repo_url`, `live_url`, `status (enum)`, `submitted_at`, `locked_at`, `withdrawn_at`, `created_at`, `updated_at`, `search_vector (tsvector)`.
+- Indexes: `(team_id, event_id)` (unique), `(event_id, status, track_id)`, `search_vector` (GIN).
 
 **`submissions_submissionimage`**
 - Purpose: gallery image.
-- Fields: `id (uuid)`, `submission_id (fk)`, `path`, `width`, `height`, `order`,
-  `mime_type`.
+- Fields: `id (uuid)`, `submission_id (fk)`, `path`, `width`, `height`, `order`, `mime_type`.
 - Indexes: `(submission_id, order)`.
 
 **`submissions_techtag`**
@@ -405,54 +402,44 @@ For each: purpose, key fields, indexes.
 
 **`submissions_customquestion`**
 - Purpose: organizer-defined question.
-- Fields: `id (uuid)`, `event_id (fk)`, `prompt`, `type (enum)`, `required`,
-  `order`.
+- Fields: `id (uuid)`, `event_id (fk)`, `prompt`, `type (enum)`, `required`, `order`.
 - Indexes: `(event_id, order)`.
 
 **`submissions_customanswer`**
 - Purpose: a team's answer to a custom question.
-- Fields: `id (uuid)`, `submission_id (fk)`, `question_id (fk)`, `value_text`,
-  `value_number`, `value_bool`. Unique together.
+- Fields: `id (uuid)`, `submission_id (fk)`, `question_id (fk)`, `value_text`, `value_number`, `value_bool`. Unique together.
 - Indexes: `(submission_id, question_id)` (unique).
 
 #### judging
 
 **`judging_judgebatch`**
 - Purpose: one run of the assignment algorithm.
-- Fields: `id (uuid)`, `event_id (fk)`, `seed`, `created_at`, `created_by_id`,
-  `reviews_per_project`, `projects_per_judge`.
+- Fields: `id (uuid)`, `event_id (fk)`, `seed`, `created_at`, `created_by_id`, `reviews_per_project`, `projects_per_judge`.
 - Indexes: `(event_id, created_at)`.
 
 **`judging_judgeassignment`**
 - Purpose: one (judge, project) pair.
-- Fields: `id (uuid)`, `batch_id (fk)`, `judge_id (fk)`, `project_id (fk)`,
-  `assigned_at`.
-- Indexes: `(batch_id, judge_id, project_id)` (unique), `(judge_id, batch_id)`,
-  `project_id`.
+- Fields: `id (uuid)`, `batch_id (fk)`, `judge_id (fk)`, `project_id (fk)`, `assigned_at`.
+- Indexes: `(batch_id, judge_id, project_id)` (unique), `(judge_id, batch_id)`, `project_id`.
 
 **`judging_judgeinvite`**
 - Purpose: judge invitation record.
-- Fields: `id (uuid)`, `event_id (fk)`, `email`, `token_hash (unique)`,
-  `created_at`, `expires_at`, `consumed_at`, `consumed_by_id`.
+- Fields: `id (uuid)`, `event_id (fk)`, `email`, `token_hash (unique)`, `created_at`, `expires_at`, `consumed_at`, `consumed_by_id`.
 
 **`judging_score`**
 - Purpose: per-criterion score.
-- Fields: `id (uuid)`, `assignment_id (fk)`, `criterion_id (fk)`, `value`,
-  `updated_at`. Unique together.
+- Fields: `id (uuid)`, `assignment_id (fk)`, `criterion_id (fk)`, `value`, `updated_at`. Unique together.
 - Indexes: `(assignment_id, criterion_id)` (unique).
 
 **`judging_review`**
 - Purpose: a judge's submitted review.
-- Fields: `id (uuid)`, `assignment_id (fk, unique)`, `comment`, `submitted_at`,
-  `created_at`, `updated_at`.
+- Fields: `id (uuid)`, `assignment_id (fk, unique)`, `comment`, `submitted_at`, `created_at`, `updated_at`.
 
 #### voting
 
 **`voting_vote`**
 - Purpose: a single vote.
-- Fields: `id (uuid)`, `event_id (fk)`, `project_id (fk)`, `voter_key`,
-  `voter_user_id (fk nullable)`, `voter_email_hash`, `votes (int)`,
-  `created_at`, `retracted_at`. Unique together.
+- Fields: `id (uuid)`, `event_id (fk)`, `project_id (fk)`, `voter_key`, `voter_user_id (fk nullable)`, `voter_email_hash`, `votes (int)`, `created_at`, `retracted_at`. Unique together.
 - Indexes: `(event_id, project_id, voter_key)` (unique), `(event_id, voter_key)`.
 
 **`voting_votebudget`**
@@ -467,23 +454,19 @@ For each: purpose, key fields, indexes.
 
 **`audit_auditevent`**
 - Purpose: every consequential action.
-- Fields: `id (uuid)`, `event_id (fk nullable)`, `actor_id (fk nullable)`,
-  `action (str)`, `target_type (str)`, `target_id (uuid)`, `payload (jsonb)`,
-  `ip`, `user_agent`, `created_at`, `result (enum: success, denied, error)`.
+- Fields: `id (uuid)`, `event_id (fk nullable)`, `actor_id (fk nullable)`, `action (str)`, `target_type (str)`, `target_id (uuid)`, `payload (jsonb)`, `ip`, `user_agent`, `created_at`, `result (enum: success, denied, error)`.
 - Indexes: `(event_id, created_at)`, `(actor_id, created_at)`, `(action, created_at)`.
 
 #### normalization
 
 **`normalization_normalizationrun`**
 - Purpose: one normalization run.
-- Fields: `id (uuid)`, `event_id (fk)`, `method (str)`, `params (jsonb)`,
-  `created_at`, `created_by_id`, `raw_sigma`, `normalized_sigma`, `is_connected`.
+- Fields: `id (uuid)`, `event_id (fk)`, `method (str)`, `params (jsonb)`, `created_at`, `created_by_id`, `raw_sigma`, `normalized_sigma`, `is_connected`.
 - Indexes: `(event_id, created_at)`.
 
 **`normalization_normalizedscore`**
 - Purpose: per-project output of one run.
-- Fields: `run_id`, `project_id`, `raw_mean`, `adjusted`, `rank_before`,
-  `rank_after`. Unique together.
+- Fields: `run_id`, `project_id`, `raw_mean`, `adjusted`, `rank_before`, `rank_after`. Unique together.
 
 **`normalization_judgebias`**
 - Purpose: per-judge bias from one run.
@@ -497,8 +480,7 @@ For each: purpose, key fields, indexes.
 
 **`pairwise_pairwisecomparison`**
 - Purpose: one pairwise outcome.
-- Fields: `id (uuid)`, `judge_id`, `event_id`, `left_project_id`, `right_project_id`,
-  `winner`, `created_at`.
+- Fields: `id (uuid)`, `judge_id`, `event_id`, `left_project_id`, `right_project_id`, `winner`, `created_at`.
 
 **`pairwise_pairwiserating`**
 - Purpose: per-project BT output.
@@ -508,41 +490,28 @@ For each: purpose, key fields, indexes.
 
 **`api_webhook`**
 - Purpose: organizer-registered webhook subscription (one event, one target URL).
-- Fields: `id (uuid)`, `event_id (fk)`, `url`, `secret` (per-subscription
-  HMAC key, stored as-is so the organizer UI can re-display it), `events (jsonb)`
-  allowlist, `is_active`, `created_at`. Index: `(event, is_active)`.
+- Fields: `id (uuid)`, `event_id (fk)`, `url`, `secret` (per-subscription HMAC key, stored as-is so the organizer UI can re-display it), `events (jsonb)` allowlist, `is_active`, `created_at`. Index: `(event, is_active)`.
 
 **`webhooks_webhookdelivery`**
-- Purpose: one delivery row per attempt — the row is created `pending` before
-  the HTTP call and retried *in place* by `manage.py flush_webhooks`.
-- Fields: `id (uuid)`, `webhook_id (fk)`, `payload_type`, `payload (jsonb)`,
-  `status (pending|delivered|failed)`, `response_status`, `attempts`,
-  `last_error`, `created_at`, `last_attempt_at`.
+- Purpose: one delivery row per attempt — the row is created `pending` before the HTTP call and retried *in place* by `manage.py flush_webhooks`.
+- Fields: `id (uuid)`, `webhook_id (fk)`, `payload_type`, `payload (jsonb)`, `status (pending|delivered|failed)`, `response_status`, `attempts`, `last_error`, `created_at`, `last_attempt_at`.
 
 **`certificates_certificate`**
 - Purpose: HMAC-SHA256-signed public record of one submission.
-- Fields: `id (uuid)`, `public_id (unique)`, `submission_id (fk)`,
-  `signed_payload (jsonb)`, `signature`, `issued_at`, `issued_by_id (fk)`.
-  Served (and verified) at `/api/certificates/<public_id>`.
+- Fields: `id (uuid)`, `public_id (unique)`, `submission_id (fk)`, `signed_payload (jsonb)`, `signature`, `issued_at`, `issued_by_id (fk)`. Served (and verified) at `/api/certificates/<public_id>`.
 
 **`certificates_judgerecord`**
-- Purpose: HMAC-SHA256-signed public record of one judge's participation
-  (assignment count, scores submitted, judging window).
-- Fields: `id (uuid)`, `public_id (unique)`, `judge_id (fk)`, `event_id (fk)`,
-  `signed_payload (jsonb)`, `signature`, `issued_at`, `issued_by_id (fk)`.
-  Served (and verified) at `/api/records/judge/<public_id>`; index
-  `(event, judge)` for the organizer list endpoint.
+- Purpose: HMAC-SHA256-signed public record of one judge's participation (assignment count, scores submitted, judging window).
+- Fields: `id (uuid)`, `public_id (unique)`, `judge_id (fk)`, `event_id (fk)`, `signed_payload (jsonb)`, `signature`, `issued_at`, `issued_by_id (fk)`. Served (and verified) at `/api/records/judge/<public_id>`; index `(event, judge)` for the organizer list endpoint.
 
 ### 4.3 Constraints and validations
 
-- All FKs are `ON DELETE CASCADE` for owned relations, `ON DELETE RESTRICT` for
-  shared references.
+- All FKs are `ON DELETE CASCADE` for owned relations, `ON DELETE RESTRICT` for shared references.
 - All FK targets are UUIDs.
 - All datetime fields are UTC.
 - All email fields use `citext` (case-insensitive).
 - All string fields have a `max_length`.
-- The audit log table has DB-level grants revoking UPDATE and DELETE for the
-  application user.
+- The audit log table has DB-level grants revoking UPDATE and DELETE for the application user.
 
 ### 4.4 Migrations policy
 
@@ -561,19 +530,15 @@ Session.token_hash = sha256(session).hexdigest()
 Cookie: session=<raw-token>; HttpOnly; SameSite=Lax; Secure (in prod)
 ```
 
-The raw token is in the cookie; only the hash is in the DB. A DB compromise does
-not leak valid tokens.
+The raw token is in the cookie; only the hash is in the DB. A DB compromise does not leak valid tokens.
 
 ### 5.2 The middleware chain for auth
 
 Every request:
 
-1. **SessionMiddleware** reads `session` cookie. If absent or expired → `request.user =
-   AnonymousUser()`.
-2. **AuthenticationMiddleware** does nothing extra; we use `request.user` from
-   SessionMiddleware.
-3. **Custom `EventContextMiddleware`** resolves the event slug from the URL and
-   attaches `request.event` (cached for the request lifetime).
+1. **SessionMiddleware** reads `session` cookie. If absent or expired → `request.user = AnonymousUser()`.
+2. **AuthenticationMiddleware** does nothing extra; we use `request.user` from SessionMiddleware.
+3. **Custom `EventContextMiddleware`** resolves the event slug from the URL and attaches `request.event` (cached for the request lifetime).
 4. **AuditMiddleware** records denied requests to `AuditEvent`.
 
 ### 5.3 The permission class hierarchy
@@ -618,9 +583,7 @@ class IsOwnJudge(BasePermission):
 
 ### 5.4 The role-isolation matrix as architecture
 
-The matrix is encoded as a 30-row table; the implementation is permission classes.
-The matrix is verified by a parameterized test that asserts the expected status
-code for each (role, endpoint) pair.
+The matrix is encoded as a 30-row table; the implementation is permission classes. The matrix is verified by a parameterized test that asserts the expected status code for each (role, endpoint) pair.
 
 |  | own scores | peer scores | other track | aggregate | audit log |
 |---|---|---|---|---|---|
@@ -699,14 +662,11 @@ on POST/PATCH/DELETE:
         return 403
 ```
 
-For the five pre-baked session cookies (acceptance mechanism), CSRF is **not**
-required. The cookies are pre-authenticated and trusted.
+For the five pre-baked session cookies (acceptance mechanism), CSRF is **not** required. The cookies are pre-authenticated and trusted.
 
 ### 5.9 The pre-baked session headers
 
-`manage.py import_fixtures` — run automatically by `entrypoint.sh` on every
-boot — seeds five demo sessions (organizer, judge_a, judge_b, judge_c,
-participant) and prints their headers:
+`manage.py import_fixtures` — run automatically by `entrypoint.sh` on every boot — seeds five demo sessions (organizer, judge_a, judge_b, judge_c, participant) and prints their headers:
 
 ```
 organizer   = "Cookie: session=<hex-token>"
@@ -716,23 +676,9 @@ judge_c     = "Cookie: session=<hex-token>"
 participant = "Cookie: session=<hex-token>"
 ```
 
-The tokens are **deterministic**: each is
-`HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`
-in hex (`Session.create(..., deterministic=True)` in
-`apps/accounts/models.py`). They are derived from the role label and the
-seeded user's email — never from a database primary key — so they are
-identical on every boot, on every machine, and across fresh database
-volumes. All five (organizer, judge_a, judge_b, judge_c, participant) are
-committed verbatim in `.hack-hamster.toml`'s `[auth]` block, so a fresh
-`docker compose up` followed by the official checker passes with **no
-copy-paste step**. The tokens change only if
-`DJANGO_SECRET_KEY` changes; re-run `manage.py import_fixtures` to print
-the matching headers if it does.
+The tokens are **deterministic**: each is `HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")` in hex (`Session.create(..., deterministic=True)` in `apps/accounts/models.py`). They are derived from the role label and the seeded user's email — never from a database primary key — so they are identical on every boot, on every machine, and across fresh database volumes. All five (organizer, judge_a, judge_b, judge_c, participant) are committed verbatim in `.hack-hamster.toml`'s `[auth]` block, so a fresh `docker compose up` followed by the official checker passes with **no copy-paste step**. The tokens change only if `DJANGO_SECRET_KEY` changes; re-run `manage.py import_fixtures` to print the matching headers if it does.
 
-Real logins are unaffected: sessions created by login always draw random
-tokens (§9.7 covers user session rotation, which stays), and the
-deterministic demo sessions are distinguishable by their
-`import_fixtures/1.0` user-agent.
+Real logins are unaffected: sessions created by login always draw random tokens (§9.7 covers user session rotation, which stays), and the deterministic demo sessions are distinguishable by their `import_fixtures/1.0` user-agent.
 
 The demo users are:
 
@@ -744,9 +690,7 @@ The demo users are:
 | judge_c | `priya.nair@example.org` | judge | fixture judge `jdg_03` |
 | participant | `participant@test.local` | participant | member of the first fixture team |
 
-All demo accounts share the password `hack-hamster-dev-password`. judge_a/b/c are
-bound to the first three *fixture* judges rather than synthetic ones, so the
-T2 peer-isolation check runs against genuinely different real assignments.
+All demo accounts share the password `hack-hamster-dev-password`. judge_a/b/c are bound to the first three *fixture* judges rather than synthetic ones, so the T2 peer-isolation check runs against genuinely different real assignments.
 
 ---
 
@@ -754,15 +698,13 @@ T2 peer-isolation check runs against genuinely different real assignments.
 
 ### 6.1 The OpenAPI schema generation
 
-`drf-spectacular` walks the URL conf, views, serializers, and `@extend_schema`
-decorators to produce an OpenAPI 3.x schema. The schema is served at:
+`drf-spectacular` walks the URL conf, views, serializers, and `@extend_schema` decorators to produce an OpenAPI 3.x schema. The schema is served at:
 
 - `/api/schema/` — YAML
 - `/api/schema/swagger-ui/` — browsable Swagger UI
 - `/api/schema/redoc/` — ReDoc
 
-The schema is committed at the repo root as `openapi.yaml` for offline reference and
-the API First bonus.
+The schema is committed at the repo root as `openapi.yaml` for offline reference and the API First bonus.
 
 ### 6.2 The endpoint namespace
 
@@ -788,7 +730,7 @@ The five spec routes:
 
 ```
 [portal]
-base_url = "http://localhost:8080"
+base_url = "http://localhost:8000"
 
 [routes]
 gallery      = "/api/events/sample-hack-2026/gallery"
@@ -808,7 +750,7 @@ from rest_framework.generics import ListCreateAPIView
 class GalleryView(ListAPIView):
     serializer_class = SubmissionSerializer
     permission_classes = [AllowAny]
-    
+
     def get_queryset(self):
         event = get_event(self.kwargs['slug'])
         return Submission.objects.filter(
@@ -822,7 +764,7 @@ For non-trivial views, we use APIViews:
 ```python
 class SubmitSubmissionView(APIView):
     permission_classes = [IsAuthenticated, IsTeamMember]
-    
+
     @deadline_gated('submissions_close_at')
     def post(self, request, slug, id):
         submission = get_submission(id)
@@ -837,8 +779,7 @@ class SubmitSubmissionView(APIView):
 
 ### 6.4 The serializer layer
 
-DRF serializers translate between ORM instances and JSON. They validate input and
-shape output.
+DRF serializers translate between ORM instances and JSON. They validate input and shape output.
 
 ```python
 class SubmissionSerializer(ModelSerializer):
@@ -848,7 +789,7 @@ class SubmissionSerializer(ModelSerializer):
                   'thumbnail_url', 'demo_video_url', 'repo_url', 'live_url',
                   'tech_tags', 'status', 'submitted_at']
         read_only_fields = ['id', 'status', 'submitted_at']
-    
+
     def validate(self, attrs):
         # Cross-field validation
         if attrs.get('repo_url') and not attrs['repo_url'].startswith('https://'):
@@ -873,23 +814,23 @@ All errors use a single envelope:
 A custom exception handler maps DRF exceptions to this envelope:
 
 ```python
-class Hack HamsterError(Exception):
+class HackHamsterError(Exception):
     code: str
     message: str
     status_code: int = 400
-    
+
     def __init__(self, message=None, detail=None):
         if message:
             self.message = message
         self.detail = detail
 
-class ForbiddenRole(Hack HamsterError):
+class ForbiddenRole(HackHamsterError):
     code = 'forbidden_role'
     message = 'You do not have permission to do that.'
     status_code = 403
 
 def custom_exception_handler(exc, context):
-    if isinstance(exc, Hack HamsterError):
+    if isinstance(exc, HackHamsterError):
         return Response(
             {'error': {'code': exc.code, 'message': exc.message, 'detail': exc.detail}},
             status=exc.status_code,
@@ -907,7 +848,7 @@ class RateLimitMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         self.buckets = {}  # IP -> {endpoint_class: count, reset_at}
-    
+
     def __call__(self, request):
         ip = self._get_ip(request)
         endpoint_class = self._classify(request)
@@ -920,8 +861,7 @@ class RateLimitMiddleware:
         return self.get_response(request)
 ```
 
-The bucket is in-memory per gunicorn worker. Multi-worker means the limit is
-approximate.
+The bucket is in-memory per gunicorn worker. Multi-worker means the limit is approximate.
 
 ### 6.7 The audit middleware
 
@@ -931,7 +871,7 @@ A middleware logs denied requests:
 class AuditMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
-    
+
     def __call__(self, request):
         response = self.get_response(request)
         if response.status_code in (401, 403):
@@ -981,7 +921,7 @@ def deliver_webhook(webhook, event_type, payload):
     signature = hmac.new(
         webhook.secret.encode(), body, hashlib.sha256
     ).hexdigest()
-    
+
     delivery = WebhookDelivery.objects.create(
         webhook=webhook,
         event_type=event_type,
@@ -989,7 +929,7 @@ def deliver_webhook(webhook, event_type, payload):
         signature=signature,
         attempted_at=timezone.now(),
     )
-    
+
     try:
         response = requests.post(
             webhook.url, data=body, headers={
@@ -1004,7 +944,7 @@ def deliver_webhook(webhook, event_type, payload):
     except requests.RequestException as e:
         delivery.status_code = 0
         delivery.response_body = str(e)[:1024]
-    
+
     if delivery.status_code and 200 <= delivery.status_code < 300:
         delivery.next_retry_at = None
     else:
@@ -1015,8 +955,7 @@ def deliver_webhook(webhook, event_type, payload):
     delivery.save()
 ```
 
-The delivery is at-least-once. Failed deliveries retry with exponential backoff up
-to 24 hours.
+The delivery is at-least-once. Failed deliveries retry with exponential backoff up to 24 hours.
 
 ---
 
@@ -1091,8 +1030,7 @@ async function getEvent(slug: string) {
 }
 ```
 
-Authenticated requests use `cache: 'no-store'`. Public requests use
-`next: { revalidate: 60 }` (ISR).
+Authenticated requests use `cache: 'no-store'`. Public requests use `next: { revalidate: 60 }` (ISR).
 
 ### 7.4 The API client
 
@@ -1119,8 +1057,7 @@ export async function apiGet<T>(
 }
 ```
 
-The client is the only place that calls the API from server components. Client
-components use the same client.
+The client is the only place that calls the API from server components. Client components use the same client.
 
 ### 7.5 The mock adapter (H+0 → H+20)
 
@@ -1137,18 +1074,15 @@ The mock returns hardcoded fixtures. The switch is one env var.
 
 ### 7.6 State management
 
-No global state. Each page manages its own state. URL state (query params) is the
-source of truth for filterable views.
+No global state. Each page manages its own state. URL state (query params) is the source of truth for filterable views.
 
 For complex forms (submission, judge scoring), `useReducer` + custom hooks.
 
-For SSR/auth state, cookies. The middleware reads the cookie and redirects if
-needed.
+For SSR/auth state, cookies. The middleware reads the cookie and redirects if needed.
 
 ### 7.7 Forms
 
-Forms are React `useReducer`-based for complex multi-field inputs. Autosave is
-client-side debounced (1 second). Submission is a separate action.
+Forms are React `useReducer`-based for complex multi-field inputs. Autosave is client-side debounced (1 second). Submission is a separate action.
 
 ```typescript
 const [state, dispatch] = useReducer(formReducer, initial);
@@ -1163,8 +1097,7 @@ useEffect(() => {
 
 ### 7.8 Error boundaries
 
-Each route has an `error.tsx` boundary. The boundary renders a fallback and a
-"retry" button.
+Each route has an `error.tsx` boundary. The boundary renders a fallback and a "retry" button.
 
 ```typescript
 'use client';
@@ -1217,9 +1150,7 @@ CSS Modules. No global CSS beyond the system font stack and CSS reset.
 
 ### 7.12 The widget bundle
 
-The widget is a single JS file (~10 KB minified) that fetches the gallery JSON and
-renders it into a target `<div>`. The bundle is built from the same Next.js code as
-the gallery page.
+The widget is a single JS file (~10 KB minified) that fetches the gallery JSON and renders it into a target `<div>`. The bundle is built from the same Next.js code as the gallery page.
 
 ```typescript
 // app/widget/route.ts
@@ -1330,8 +1261,7 @@ hack-hamster-hackathon/
 
 ### 8.2 The apps and their boundaries
 
-Each app owns a slice of the schema and the corresponding API surface. Cross-app
-references are by FK, not by import of internals.
+Each app owns a slice of the schema and the corresponding API surface. Cross-app references are by FK, not by import of internals.
 
 **`accounts`** owns: User, Session (plus the auth permission through-tables).
 **`events`** owns: Event, Track, Prize, Membership, Rubric, RubricCriterion.
@@ -1340,12 +1270,9 @@ references are by FK, not by import of internals.
 **`judging`** owns: JudgeBatch, JudgeAssignment, JudgeInvite, Score, Review.
 **`voting`** owns: Vote, VoteBudget, VoteAudit.
 **`audit`** owns: AuditEvent (depends on User, Event).
-**`normalization`** owns: NormalizationRun, NormalizedScore, JudgeBias (depends on
-Event, Submission, User).
-**`pairwise`** owns: PairwiseRun, PairwiseBallot, PairwiseRanking (depends on
-Event, Submission, User).
-**`api`** owns: Webhook (the subscription; per-event, secret stored) and the
-bulk import/export views.
+**`normalization`** owns: NormalizationRun, NormalizedScore, JudgeBias (depends on Event, Submission, User).
+**`pairwise`** owns: PairwiseRun, PairwiseBallot, PairwiseRanking (depends on Event, Submission, User).
+**`api`** owns: Webhook (the subscription; per-event, secret stored) and the bulk import/export views.
 **`webhooks`** owns: WebhookDelivery (the delivery log; depends on `api.Webhook`).
 **`certificates`** owns: Certificate, JudgeRecord (+ HMAC sign/verify helpers).
 **`billing`** owns: Plan, BillingAccount, Invoice.
@@ -1433,8 +1360,7 @@ DATABASES = {
 
 ### 8.5 The Django admin
 
-Django's built-in admin is enabled for raw data inspection. Organizers and admins
-can use it to view tables, but the user-facing UI is the Next.js app.
+Django's built-in admin is enabled for raw data inspection. Organizers and admins can use it to view tables, but the user-facing UI is the Next.js app.
 
 ```python
 # apps/events/admin.py
@@ -1452,22 +1378,19 @@ class EventAdmin(admin.ModelAdmin):
 
 Two management commands, both under `apps/accounts/management/commands/`:
 
-**`import_fixtures`** — loads the official `fixtures.json` into the real
-schema and seeds the five deterministic demo sessions (see §5.9). Idempotent:
-every boot re-imports, and the printed session cookies always match the
-committed `.hack-hamster.toml`.
+**`import_fixtures`** — loads the official `fixtures.json` into the real schema and seeds the five deterministic demo sessions (see §5.9). Idempotent: every boot re-imports, and the printed session cookies always match the committed `.hack-hamster.toml`.
 
-**`seed_fixtures`** — the older synthetic-data seeder; used only as a
-fallback when `fixtures.json` is missing (see `entrypoint.sh`).
+**`seed_fixtures`** — the older synthetic-data seeder; used only as a fallback when `fixtures.json` is missing (see `entrypoint.sh`).
 
-`entrypoint.sh` waits for postgres, runs `migrate`, then `import_fixtures`
-(set `SKIP_SEED=1` to skip), on every boot:
+`entrypoint.sh` waits for postgres, runs `migrate`, then `import_fixtures` (set `SKIP_SEED=1` to skip), on every boot:
 
 ```dockerfile
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", \
      "--workers", "3", "--threads", "2", "--timeout", "60"]
 ```
+
+---
 
 ## Part 9 — Cross-Cutting Concerns
 
@@ -1517,7 +1440,7 @@ def custom_exception_handler(exc, context):
     response = drf_default_handler(exc, context)
     if response is None:
         return None  # unhandled; Django will produce 500
-    
+
     # Wrap DRF's default error into our envelope
     if isinstance(response.data, dict) and 'detail' in response.data:
         return Response(
@@ -1589,23 +1512,17 @@ location /api/ {
 
 ### 9.6 CSRF
 
-DRF's session authentication uses Django's CSRF. The frontend reads the
-`csrftoken` cookie and includes it in the `X-CSRFToken` header for state-changing
-requests.
+DRF's session authentication uses Django's CSRF. The frontend reads the `csrftoken` cookie and includes it in the `X-CSRFToken` header for state-changing requests.
 
-The five pre-baked session cookies (acceptance mechanism) bypass CSRF. This is
-intentional: the cookies are pre-authenticated and the spec does not require CSRF
-for them.
+The five pre-baked session cookies (acceptance mechanism) bypass CSRF. This is intentional: the cookies are pre-authenticated and the spec does not require CSRF for them.
 
 ### 9.7 Session rotation
 
-On login, the existing session (if any) is deleted and a new one created. This
-prevents session fixation.
+On login, the existing session (if any) is deleted and a new one created. This prevents session fixation.
 
 ### 9.8 Password rotation
 
-A password rotation invalidates all sessions for the user. This is implemented as
-a signal handler on `User.save()`.
+A password rotation invalidates all sessions for the user. This is implemented as a signal handler on `User.save()`.
 
 ### 9.9 File uploads
 
@@ -1620,8 +1537,7 @@ def upload_path(instance, filename):
 
 ### 9.10 Image processing
 
-Images are validated (size, dimensions, format) at upload. No transformation
-(resize, thumbnail generation) — the browser handles responsive sizing.
+Images are validated (size, dimensions, format) at upload. No transformation (resize, thumbnail generation) — the browser handles responsive sizing.
 
 ### 9.11 Markdown rendering
 
@@ -1641,18 +1557,15 @@ def render_markdown(text):
 
 ### 9.12 Internationalization
 
-Dates are stored UTC and rendered in the user's timezone via `Intl.DateTimeFormat`
-on the client. No string translation (English only).
+Dates are stored UTC and rendered in the user's timezone via `Intl.DateTimeFormat` on the client. No string translation (English only).
 
 ### 9.13 Time
 
-`USE_TZ = True`. All datetime fields are timezone-aware UTC. `timezone.now()`
-returns the current UTC time.
+`USE_TZ = True`. All datetime fields are timezone-aware UTC. `timezone.now()` returns the current UTC time.
 
 ### 9.14 Money
 
-Prizes are stored as `DecimalField(max_digits=10, decimal_places=2)`. No currency
-field; the portal does not process payments.
+Prizes are stored as `DecimalField(max_digits=10, decimal_places=2)`. No currency field; the portal does not process payments.
 
 ---
 
@@ -1665,7 +1578,7 @@ field; the portal does not process payments.
                 ┌────────────────────────────────────────┐
                 │ docker compose up                     │
                 │   ┌────────────┐                       │
-                │   │ nginx      │  port 8080 → 80      │
+                │   │ nginx      │  port 8000 → 80      │
                 │   └─────┬──────┘                       │
                 │         │                              │
                 │   ┌─────▼──────┐  ┌────────────┐        │
@@ -1771,7 +1684,7 @@ services:
   nginx:
     image: nginx:1.27-alpine
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - "${WEB_PORT:-8000}:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -1791,10 +1704,10 @@ events { worker_connections 1024; }
 http {
     upstream backend { server backend:8000; }
     upstream web { server web:3000; }
-    
+
     server {
         listen 80;
-        
+
         # API routes
         location /api/ {
             proxy_pass http://backend;
@@ -1804,19 +1717,19 @@ http {
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_set_header Cookie $http_cookie;
         }
-        
+
         # Django admin
         location /admin/ {
             proxy_pass http://backend;
             proxy_set_header Host $host;
             proxy_set_header Cookie $http_cookie;
         }
-        
+
         # Static assets
         location /_next/static/ { proxy_pass http://web; }
         location /static/ { proxy_pass http://backend; }
         location /media/ { proxy_pass http://backend; }
-        
+
         # Everything else → Next.js
         location / {
             proxy_pass http://web;
@@ -1895,28 +1808,25 @@ def readyz(request):
     plan = executor.migration_plan(executor.loader.graph.leaf_nodes())
     if plan:
         return JsonResponse({'status': 'migrations_pending'}, status=503)
-    
+
     # Check seed
     if not Event.objects.filter(slug='sample-hack-2026').exists():
         return JsonResponse({'status': 'seed_pending'}, status=503)
-    
+
     return JsonResponse({'status': 'ready'})
 ```
 
 ### 11.3 Logs
 
-All logs are JSON to stdout. The host's logging stack aggregates them. In dev:
-`docker compose logs -f`.
+All logs are JSON to stdout. The host's logging stack aggregates them. In dev: `docker compose logs -f`.
 
 ### 11.4 Metrics
 
-There are no metrics (no Prometheus, no Datadog). The audit log is the
-application-level observability surface.
+There are no metrics (no Prometheus, no Datadog). The audit log is the application-level observability surface.
 
 ### 11.5 Tracing
 
-There is no distributed tracing. The request flow is short enough that
-end-to-end timing in the logs is sufficient.
+There is no distributed tracing. The request flow is short enough that end-to-end timing in the logs is sufficient.
 
 ### 11.6 Alerts
 
@@ -1924,8 +1834,7 @@ There are no alerts. The organizer monitors `/organize/judging` during the event
 
 ### 11.7 Dashboards
 
-The only "dashboard" is the organizer-facing live judging dashboard. There is no
-operator dashboard.
+The only "dashboard" is the organizer-facing live judging dashboard. There is no operator dashboard.
 
 ---
 
@@ -2021,13 +1930,11 @@ def test_acceptance_mechanism(docker_compose_up):
     assert all(check['status'] == 'PASS' for check in report['checks'])
 ```
 
-This is a slow test (30 seconds for `run.py` to run). It is gated by the
-integration suite, not run on every save.
+This is a slow test (30 seconds for `run.py` to run). It is gated by the integration suite, not run on every save.
 
 ### 12.6 Coverage
 
-Coverage is enforced for the normalization module (90%) and the auth module (95%).
-The rest is best-effort.
+Coverage is enforced for the normalization module (90%) and the auth module (95%). The rest is best-effort.
 
 ```bash
 docker compose exec backend pytest --cov=apps --cov-report=term-missing
@@ -2035,18 +1942,17 @@ docker compose exec backend pytest --cov=apps --cov-report=term-missing
 
 ### 12.7 The fixture snapshot
 
-The fixtures (`fixtures.json`) are committed in the repo. The seed script is
-idempotent. The tests use the fixtures for integration tests.
+The fixtures (`fixtures.json`) are committed in the repo. The seed script is idempotent. The tests use the fixtures for integration tests.
+
+---
 
 ## Part 13 — Module Responsibilities (detailed)
 
-This part is the per-module architectural responsibility. Each section: what the
-module owns, what it must not do, who depends on it.
+This part is the per-module architectural responsibility. Each section: what the module owns, what it must not do, who depends on it.
 
 ### 13.1 apps.accounts
 
-**Owns:** User model, Session model, login/logout/register/me views, auth
-middleware, password hashing.
+**Owns:** User model, Session model, login/logout/register/me views, auth middleware, password hashing.
 
 **Must:**
 - Hash passwords with Argon2id.
@@ -2065,8 +1971,7 @@ middleware, password hashing.
 
 ### 13.2 apps.events
 
-**Owns:** Event, Track, Prize, Membership, Rubric, RubricCriterion models,
-event CRUD views, lifecycle computation, rubric validation.
+**Owns:** Event, Track, Prize, Membership, Rubric, RubricCriterion models, event CRUD views, lifecycle computation, rubric validation.
 
 **Must:**
 - Validate rubric weights sum to 1.0.
@@ -2081,13 +1986,11 @@ event CRUD views, lifecycle computation, rubric validation.
 
 **Depends on:** accounts.User.
 
-**Depended on by:** teams, submissions, judging, voting, audit,
-normalization, pairwise, api.
+**Depended on by:** teams, submissions, judging, voting, audit, normalization, pairwise, api.
 
 ### 13.3 apps.teams
 
-**Owns:** Team, TeamMember, TeamInvite models, team CRUD views, invite
-generation, invite consumption.
+**Owns:** Team, TeamMember, TeamInvite models, team CRUD views, invite generation, invite consumption.
 
 **Must:**
 - Generate single-use invite tokens.
@@ -2105,9 +2008,7 @@ generation, invite consumption.
 
 ### 13.4 apps.submissions
 
-**Owns:** Submission, SubmissionImage, TechTag, SubmissionTag, CustomQuestion,
-CustomAnswer models, submission CRUD views, image upload validation,
-gallery query, full-text search.
+**Owns:** Submission, SubmissionImage, TechTag, SubmissionTag, CustomQuestion, CustomAnswer models, submission CRUD views, image upload validation, gallery query, full-text search.
 
 **Must:**
 - Validate image uploads (size, dimensions, format).
@@ -2123,14 +2024,11 @@ gallery query, full-text search.
 
 **Depends on:** accounts.User, events.Event, events.Track, teams.Team.
 
-**Depended on by:** judging (the assignment references submissions), voting
-(vote targets), normalization, pairwise.
+**Depended on by:** judging (the assignment references submissions), voting (vote targets), normalization, pairwise.
 
 ### 13.5 apps.judging
 
-**Owns:** JudgeBatch, JudgeAssignment, JudgeInvite, Score, Review models,
-judge invitation, assignment algorithm, scoring views, judge console,
-dashboard.
+**Owns:** JudgeBatch, JudgeAssignment, JudgeInvite, Score, Review models, judge invitation, assignment algorithm, scoring views, judge console, dashboard.
 
 **Must:**
 - Enforce assignment invariants (no self-assignment, track balance).
@@ -2149,13 +2047,10 @@ dashboard.
 
 ### 13.6 apps.voting
 
-**Owns:** Vote, VoteBudget, VoteAudit models, voting views, mode-specific
-validation, anti-abuse.
+**Owns:** Vote, VoteBudget, VoteAudit models, voting views, mode-specific validation, anti-abuse.
 
 **Must:**
-- Enforce the voting deadline: `@deadline_gated("judging_close_at")` on both
-  POST and DELETE — ballots land on final, submitted work while judging runs
-  and are rejected once judging closes (422 `deadline_passed`).
+- Enforce the voting deadline: `@deadline_gated("judging_close_at")` on both POST and DELETE — ballots land on final, submitted work while judging runs and are rejected once judging closes (422 `deadline_passed`).
 - Validate quadratic budgets.
 - Enforce self-vote prohibition.
 - Audit every vote and retraction.
@@ -2169,8 +2064,7 @@ validation, anti-abuse.
 
 ### 13.7 apps.audit
 
-**Owns:** AuditEvent model, audit log read view, audit.log() helper,
-AuditMiddleware.
+**Owns:** AuditEvent model, audit log read view, audit.log() helper, AuditMiddleware.
 
 **Must:**
 - Log every consequential action.
@@ -2187,8 +2081,7 @@ AuditMiddleware.
 
 ### 13.8 apps.normalization
 
-**Owns:** NormalizationRun, NormalizedScore, JudgeBias models, the fit
-algorithm, the proof generator.
+**Owns:** NormalizationRun, NormalizedScore, JudgeBias models, the fit algorithm, the proof generator.
 
 **Must:**
 - Fit the additive model with alternating means.
@@ -2204,8 +2097,7 @@ algorithm, the proof generator.
 
 ### 13.9 apps.pairwise
 
-**Owns:** PairwiseRun, PairwiseComparison, PairwiseRating models, the BT
-fit, pair selection.
+**Owns:** PairwiseRun, PairwiseComparison, PairwiseRating models, the BT fit, pair selection.
 
 **Must:**
 - Fit BT with the MM algorithm.
@@ -2221,16 +2113,12 @@ fit, pair selection.
 
 ### 13.10 apps.api
 
-**Owns:** the `Webhook` subscription model (per-event target + signing secret),
-the URL aggregator, the OpenAPI schema endpoint, the bulk export/import
-endpoints, the admin endpoints. (`WebhookDelivery` lives in `apps.webhooks`;
-`Certificate` and `JudgeRecord` live in `apps.certificates`.)
+**Owns:** the `Webhook` subscription model (per-event target + signing secret), the URL aggregator, the OpenAPI schema endpoint, the bulk export/import endpoints, the admin endpoints. (`WebhookDelivery` lives in `apps.webhooks`; `Certificate` and `JudgeRecord` live in `apps.certificates`.)
 
 **Must:**
 - Aggregate URLs from all apps.
 - Generate the OpenAPI schema.
-- Sign certificates and judge records with HMAC-SHA256 over canonical JSON
-  using `SECRET_KEY` (apps/certificates/models.py).
+- Sign certificates and judge records with HMAC-SHA256 over canonical JSON using `SECRET_KEY` (apps/certificates/models.py).
 - Sign webhook payloads with HMAC-SHA256 using the per-subscription secret.
 - Provide the admin endpoints.
 
@@ -2244,19 +2132,15 @@ endpoints, the admin endpoints. (`WebhookDelivery` lives in `apps.webhooks`;
 
 ## Part 14 — The Seven Checks in Detail
 
-This part is the architecture trace of each acceptance check. Each check has the
-exact request flow, the components involved, the response shape, and the failure
-modes.
+This part is the architecture trace of each acceptance check. Each check has the exact request flow, the components involved, the response shape, and the failure modes.
 
 ### 14.1 Check 1: `GET {gallery}` no auth → 200
 
-**Spec:** `GET /api/events/sample-hack-2026/gallery` with no `Authorization`
-header (no session cookie either, since the five pre-baked cookies are sent via
-`Cookie`).
+**Spec:** `GET /api/events/sample-hack-2026/gallery` with no `Authorization` header (no session cookie either, since the five pre-baked cookies are sent via `Cookie`).
 
 **Flow:**
 ```
-run.py → curl http://localhost:8080/api/events/sample-hack-2026/gallery
+run.py → curl http://localhost:8000/api/events/sample-hack-2026/gallery
 nginx: location /api/ → proxy_pass http://backend
 gunicorn: receives request
 Django middleware chain:
@@ -2288,11 +2172,9 @@ response: 200 + JSON body
 
 ### 14.2 Check 2: Gallery shows fixture title
 
-**Spec:** Same endpoint, response body contains a known fixture title (e.g.,
-"Quiet Hours").
+**Spec:** Same endpoint, response body contains a known fixture title (e.g., "Quiet Hours").
 
-**Flow:** Same as check 1. After receiving the response, `run.py` checks for a
-known title in the body.
+**Flow:** Same as check 1. After receiving the response, `run.py` checks for a known title in the body.
 
 **Failure modes:**
 - 200 + empty list (no fixture projects) → check fails.
@@ -2300,13 +2182,11 @@ known title in the body.
 
 ### 14.3 Check 3: `POST {submit}` as participant → 4xx
 
-**Spec:** `POST /api/events/sample-hack-2026/submissions/{id}/submit` with the
-participant auth header. Expected: 4xx (because the fixtures' `submissions_close_at`
-is in the past).
+**Spec:** `POST /api/events/sample-hack-2026/submissions/{id}/submit` with the participant auth header. Expected: 4xx (because the fixtures' `submissions_close_at` is in the past).
 
 **Flow:**
 ```
-run.py → curl -X POST http://localhost:8080/api/events/sample-hack-2026/submissions/{id}/submit
+run.py → curl -X POST http://localhost:8000/api/events/sample-hack-2026/submissions/{id}/submit
   -H "Cookie: session=<participant-token>"
 nginx → gunicorn → Django
 middleware:
@@ -2347,7 +2227,7 @@ view body:
 
 **Flow:**
 ```
-run.py → curl http://localhost:8080/api/judge/scores
+run.py → curl http://localhost:8000/api/judge/scores
   -H "Cookie: session=<judge_a-token>"
 middleware:
   - SessionMiddleware: resolve judge_a user
@@ -2372,7 +2252,7 @@ view body:
 
 **Flow:**
 ```
-run.py → curl http://localhost:8080/api/judge/scores?judge=judge_a
+run.py → curl http://localhost:8000/api/judge/scores?judge=judge_a
   -H "Cookie: session=<judge_b-token>"
 middleware:
   - SessionMiddleware: resolve judge_b user
@@ -2394,8 +2274,7 @@ permission:
 - 200 if the cookie's judge_id is not extracted.
 - 500 if the permission class has a bug.
 
-**This is the canonical role isolation test.** If this passes, the 25% criterion's
-core requirement is satisfied.
+**This is the canonical role isolation test.** If this passes, the 25% criterion's core requirement is satisfied.
 
 ### 14.6 Check 6: `GET {judge_scores}` as participant → 401/403
 
@@ -2403,7 +2282,7 @@ core requirement is satisfied.
 
 **Flow:**
 ```
-run.py → curl http://localhost:8080/api/judge/scores
+run.py → curl http://localhost:8000/api/judge/scores
   -H "Cookie: session=<participant-token>"
 middleware:
   - SessionMiddleware: resolve participant user
@@ -2416,12 +2295,11 @@ permission: IsJudge → DENY (participant is not a judge) → 403
 
 ### 14.7 Check 7: `GET {csv_export}` as organizer → 200 + CSV
 
-**Spec:** `GET /api/events/sample-hack-2026/export.csv` with the organizer auth
-header.
+**Spec:** `GET /api/events/sample-hack-2026/export.csv` with the organizer auth header.
 
 **Flow:**
 ```
-run.py → curl http://localhost:8080/api/events/sample-hack-2026/export.csv
+run.py → curl http://localhost:8000/api/events/sample-hack-2026/export.csv
   -H "Cookie: session=<organizer-token>"
 middleware:
   - SessionMiddleware: resolve organizer user
@@ -2448,7 +2326,7 @@ view body:
                 └──────────────────┬──────────────────────────┘
                                    │
                 ┌──────────────────▼──────────────────────────┐
-                │  nginx (port 8080)                         │
+                │  nginx (port 8000)                         │
                 │  Reverse-proxy /api/* to backend:8000      │
                 └──────────────────┬──────────────────────────┘
                                    │
@@ -2461,13 +2339,14 @@ view body:
                 ┌──────────────────▼──────────────────────────┐
                 │  Postgres 16                               │
                 │  All persistent state                      │
-                └────────────────────────────────────────────┘
+                └─────────────────────────────────────────────┘
 ```
+
+---
 
 ## Part 15 — Frontend ↔ Backend Contract
 
-This part documents the contract between the Next.js frontend and the Django
-backend. The contract is the API surface + the cookie-based auth.
+This part documents the contract between the Next.js frontend and the Django backend. The contract is the API surface + the cookie-based auth.
 
 ### 15.1 The cookie
 
@@ -2477,8 +2356,7 @@ HttpOnly; SameSite=Lax; Secure (in production)
 Path: /
 ```
 
-The frontend reads the cookie via `cookies()` in Server Components and
-`document.cookie` in Client Components. The cookie is set by Django on login.
+The frontend reads the cookie via `cookies()` in Server Components and `document.cookie` in Client Components. The cookie is set by Django on login.
 
 ### 15.2 The CSRF token
 
@@ -2487,8 +2365,7 @@ Cookie: csrftoken=<csrf-token>  (NOT HttpOnly; readable by client JS)
 Header: X-CSRFToken: <csrf-token>  (for state-changing requests)
 ```
 
-The frontend reads the cookie and includes the token in the `X-CSRFToken` header
-for POST/PATCH/DELETE requests. The backend's `CsrfViewMiddleware` validates.
+The frontend reads the cookie and includes the token in the `X-CSRFToken` header for POST/PATCH/DELETE requests. The backend's `CsrfViewMiddleware` validates.
 
 ### 15.3 The five route names
 
@@ -2589,13 +2466,13 @@ export async function apiRequest<T>(
     'Content-Type': 'application/json',
     ...options?.headers,
   };
-  
+
   // Attach CSRF token for state-changing requests
   if (method !== 'GET') {
     const csrf = document.cookie.match(/csrftoken=([^;]+)/)?.[1];
     if (csrf) headers['X-CSRFToken'] = csrf;
   }
-  
+
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers,
@@ -2603,7 +2480,7 @@ export async function apiRequest<T>(
     cache: options?.cache || 'no-store',
     credentials: 'include',
   });
-  
+
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new ApiError(
@@ -2613,7 +2490,7 @@ export async function apiRequest<T>(
       data?.error?.detail,
     );
   }
-  
+
   return res.json();
 }
 
@@ -2641,8 +2518,7 @@ For 5xx: render "something went wrong".
 
 ### 15.7 The data shapes
 
-The frontend serializer shapes match the backend serializer shapes. The OpenAPI
-schema is the source of truth.
+The frontend serializer shapes match the backend serializer shapes. The OpenAPI schema is the source of truth.
 
 ### 15.8 The state surface
 
@@ -2714,21 +2590,21 @@ The service is stateless. The state lives in the database (the runs).
 # apps/normalization/views.py
 class NormalizeView(APIView):
     permission_classes = [IsOrganizer]
-    
+
     def post(self, request, slug):
         event = Event.objects.get(slug=slug)
         # Verify connectivity before running
         if not is_connected(event):
             raise DisconnectedGraph()
-        
+
         # Load scores
         scores = Score.objects.filter(
             assignment__batch__event=event
         ).select_related('assignment__judge', 'assignment__project', 'criterion')
-        
+
         # Fit
         result = normalize(scores)
-        
+
         # Persist
         run = NormalizationRun.objects.create(
             event=event,
@@ -2751,11 +2627,11 @@ class NormalizeView(APIView):
             JudgeBias(run=run, judge=j, bias=b.bias, n_reviews=b.n_reviews, leverage=b.leverage)
             for j, b in result.biases.items()
         ])
-        
+
         # Generate proof file
         proof = generate_proof(run, result)
         # Save proof to the run or to a separate file
-        
+
         audit.log(actor=request.user, action='normalization.run', target=run, request=request)
         return Response({...})
 ```
@@ -2775,7 +2651,7 @@ def generate_proof(run: NormalizationRun, result: FitResult) -> str:
     lines.append(f"raw_sigma: {run.raw_sigma:.2f}")
     lines.append(f"normalized_sigma: {run.normalized_sigma:.2f}")
     lines.append(f"is_connected: {run.is_connected}")
-    
+
     # Rank movement table
     lines.append("")
     lines.append("Rank movement (top 10 by |delta|):")
@@ -2785,7 +2661,7 @@ def generate_proof(run: NormalizationRun, result: FitResult) -> str:
         delta = s.rank_after - s.rank_before
         arrow = '▲' if delta < 0 else '▼' if delta > 0 else '='
         lines.append(f"{s.project_id}  {s.rank_before}  {s.rank_after}  {arrow} {abs(delta)}")
-    
+
     # Zero-variance raters
     zero_var = [b for b in result.biases.values() if b.n_reviews > 0 and abs(b.leverage - 0) < 1e-9]
     if zero_var:
@@ -2793,7 +2669,7 @@ def generate_proof(run: NormalizationRun, result: FitResult) -> str:
         lines.append("Zero-variance raters:")
         for b in zero_var:
             lines.append(f"  {b.judge_id}: leverage=0.00, n_reviews={b.n_reviews} - no ranking signal")
-    
+
     # Method
     lines.append("")
     lines.append("Method:")
@@ -2801,7 +2677,7 @@ def generate_proof(run: NormalizationRun, result: FitResult) -> str:
     lines.append("fit: alternating means until convergence (max change < 1e-9)")
     lines.append("connectivity: required; reported")
     lines.append("z-score: rejected (divides by zero on sigma=0 raters)")
-    
+
     return '\n'.join(lines)
 ```
 
@@ -2828,13 +2704,11 @@ def next_pair(judge_id: UUID, batch_id: UUID) -> tuple[UUID, UUID]:
     # Return the best pair
 ```
 
-The selection is approximate; we re-fit after every 10 comparisons to update the
-information values.
+The selection is approximate; we re-fit after every 10 comparisons to update the information values.
 
 ### 16.6 The pairwise console architecture
 
-The frontend renders two project cards side-by-side. Keyboard: `Q` for left, `P`
-for right, `Esc` for skip. The state:
+The frontend renders two project cards side-by-side. Keyboard: `Q` for left, `P` for right, `Esc` for skip. The state:
 
 ```typescript
 type PairwiseState = {
@@ -2843,8 +2717,7 @@ type PairwiseState = {
 };
 ```
 
-The view polls `/api/events/{slug}/me/pairwise/next` for the next pair and posts
-the answer to `/api/events/{slug}/me/pairwise/{id}/answer`.
+The view polls `/api/events/{slug}/me/pairwise/next` for the next pair and posts the answer to `/api/events/{slug}/me/pairwise/{id}/answer`.
 
 ---
 
@@ -2865,19 +2738,11 @@ class Webhook(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 ```
 
-Honest note on the secret: it is stored **as plaintext**, because the
-organizer UI re-displays it on the subscription screen. A `secret_hash` +
-"shown once" design was considered and is future work — hashing would
-prevent re-display, and this secret protects the *receiver* (a third party
-who gains nothing from the portal cannot forge deliveries), not the portal.
-Subscription management and the delivery log are organizer-only and
-audited.
+Honest note on the secret: it is stored **as plaintext**, because the organizer UI re-displays it on the subscription screen. A `secret_hash` + "shown once" design was considered and is future work — hashing would prevent re-display, and this secret protects the *receiver* (a third party who gains nothing from the portal cannot forge deliveries), not the portal. Subscription management and the delivery log are organizer-only and audited.
 
 ### 17.2 The delivery row
 
-Shipped as `apps/webhooks/models.py::WebhookDelivery` (table
-`webhooks_webhookdelivery`). One row is created `pending` *before* the HTTP
-attempt and updated in place:
+Shipped as `apps/webhooks/models.py::WebhookDelivery` (table `webhooks_webhookdelivery`). One row is created `pending` *before* the HTTP attempt and updated in place:
 
 ```python
 class WebhookDelivery(models.Model):
@@ -2893,18 +2758,11 @@ class WebhookDelivery(models.Model):
     last_attempt_at = models.DateTimeField(null=True)
 ```
 
-Retries re-attempt the **existing row** (`attempts` increments; no duplicate
-delivery rows) via `manage.py flush_webhooks --max-attempts N --older-than SECONDS`.
-Organizers read the log at `GET /api/webhooks/<uuid>/deliveries` (most
-recent 200), so "did the score event reach my CI?" is answerable from the
-portal instead of a support ticket.
+Retries re-attempt the **existing row** (`attempts` increments; no duplicate delivery rows) via `manage.py flush_webhooks --max-attempts N --older-than SECONDS`. Organizers read the log at `GET /api/webhooks/<uuid>/deliveries` (most recent 200), so "did the score event reach my CI?" is answerable from the portal instead of a support ticket.
 
 ### 17.3 The signature
 
-Every delivery is signed with HMAC-SHA256 using the subscription's
-server-generated secret, and the exact signed bytes are the POST body — so a
-receiver verifies without trusting transport, and can re-verify the same
-body later straight from the delivery log:
+Every delivery is signed with HMAC-SHA256 using the subscription's server-generated secret, and the exact signed bytes are the POST body — so a receiver verifies without trusting transport, and can re-verify the same body later straight from the delivery log:
 
 ```python
 def build_body(payload_type, payload):
@@ -2915,20 +2773,11 @@ def sign_body(secret, body):
     return hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
 ```
 
-Headers: `X-Hack-Hamster-Signature: sha256=<hex>` and `X-Hack-Hamster-Event: <type>`.
-The receiver recomputes the HMAC over the raw body with their stored secret
-and compares in constant time. Delivery uses stdlib `urllib` only — no
-outbound HTTP dependency to vet, which keeps the "runs offline on a laptop"
-promise honest.
+Headers: `X-Hack-Hamster-Signature: sha256=<hex>` and `X-Hack-Hamster-Event: <type>`. The receiver recomputes the HMAC over the raw body with their stored secret and compares in constant time. Delivery uses stdlib `urllib` only — no outbound HTTP dependency to vet, which keeps the "runs offline on a laptop" promise honest.
 
 ### 17.4 The delivery policy
 
-Delivery is **synchronous and single-attempt**: it happens inline in the
-mutating request, bounded by a 3 s socket timeout, and **never raises into
-the caller** — a flaky subscriber must not be able to fail (or noticeably
-slow down) a score submission. Failures land on the delivery row as data
-(`failed` + `last_error`) and are logged at WARNING. There is no exponential
-backoff and no background retry thread.
+Delivery is **synchronous and single-attempt**: it happens inline in the mutating request, bounded by a 3 s socket timeout, and **never raises into the caller** — a flaky subscriber must not be able to fail (or noticeably slow down) a score submission. Failures land on the delivery row as data (`failed` + `last_error`) and are logged at WARNING. There is no exponential backoff and no background retry thread.
 
 Retries are a **visible batch job**:
 
@@ -2936,19 +2785,11 @@ Retries are a **visible batch job**:
 python manage.py flush_webhooks [--max-attempts 5] [--older-than 600]
 ```
 
-`flush_webhooks` re-attempts pending/failed rows below the attempt cap,
-throttled by `--older-than` so a burst of failures from one bad subscriber
-is not hammered on every flush. Why not a hidden background queue:
-self-hosters should not inherit a worker process they did not ask for, and
-a visible retry command (run from cron, a systemd timer, or by hand after
-fixing the subscriber) is easier to operate than a silent queue that dies
-with the process.
+`flush_webhooks` re-attempts pending/failed rows below the attempt cap, throttled by `--older-than` so a burst of failures from one bad subscriber is not hammered on every flush. Why not a hidden background queue: self-hosters should not inherit a worker process they did not ask for, and a visible retry command (run from cron, a systemd timer, or by hand after fixing the subscriber) is easier to operate than a silent queue that dies with the process.
 
 ### 17.5 The certificate model
 
-Shipped as `apps/certificates/models.py::Certificate` (table
-`certificates_certificate`). A certificate is a **signed JSON record**, not
-a PDF:
+Shipped as `apps/certificates/models.py::Certificate` (table `certificates_certificate`). A certificate is a **signed JSON record**, not a PDF:
 
 ```python
 class Certificate(models.Model):
@@ -2961,15 +2802,11 @@ class Certificate(models.Model):
     issued_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True)
 ```
 
-`Certificate.issue(submission, payload=…)` signs the payload and persists
-row + signature in one step; re-issuing signs a fresh snapshot under a fresh
-`public_id`. Served (and verified) unauthenticated at
-`GET /api/certificates/<public_id>`.
+`Certificate.issue(submission, payload=…)` signs the payload and persists row + signature in one step; re-issuing signs a fresh snapshot under a fresh `public_id`. Served (and verified) unauthenticated at `GET /api/certificates/<public_id>`.
 
 ### 17.6 The signing key
 
-There is no key model and no `api_signingkey` table. Certificates and judge
-records are signed with the server's `SECRET_KEY`:
+There is no key model and no `api_signingkey` table. Certificates and judge records are signed with the server's `SECRET_KEY`:
 
 ```python
 def sign_payload(payload: dict, *, key: bytes | None = None) -> str:
@@ -2977,15 +2814,11 @@ def sign_payload(payload: dict, *, key: bytes | None = None) -> str:
     return hmac.new(secret, _canonical_json(payload), hashlib.sha256).hexdigest()
 ```
 
-Key rotation — signing records under a versioned key so old records stay
-verifiable after a change — is **future work, not shipped**. Today,
-rotating `SECRET_KEY` invalidates existing record signatures; the honest
-mitigation is that `SECRET_KEY` is a deployment constant.
+Key rotation — signing records under a versioned key so old records stay verifiable after a change — is **future work, not shipped**. Today, rotating `SECRET_KEY` invalidates existing record signatures; the honest mitigation is that `SECRET_KEY` is a deployment constant.
 
 ### 17.7 The certificate artifact
 
-No PDF is generated and `reportlab` is not a dependency. The certificate is
-the JSON served by `GET /api/certificates/<public_id>`:
+No PDF is generated and `reportlab` is not a dependency. The certificate is the JSON served by `GET /api/certificates/<public_id>`:
 
 ```json
 {
@@ -2998,35 +2831,20 @@ the JSON served by `GET /api/certificates/<public_id>`:
 }
 ```
 
-Anyone with the `public_id` — a third party, a printed QR code — can fetch
-and check it. A rendered PDF export would be a presentation-layer feature,
-not a trust feature; none is shipped.
+Anyone with the `public_id` — a third party, a printed QR code — can fetch and check it. A rendered PDF export would be a presentation-layer feature, not a trust feature; none is shipped.
 
 ### 17.8 The verification path
 
-Verification runs through the portal's own endpoints — the same view that
-serves a record also verifies it (`verify()` recomputes the HMAC over the
-stored payload and compares with `hmac.compare_digest`), so a tampered row
-returns 400 `signature_invalid` instead of its content:
+Verification runs through the portal's own endpoints — the same view that serves a record also verifies it (`verify()` recomputes the HMAC over the stored payload and compares with `hmac.compare_digest`), so a tampered row returns 400 `signature_invalid` instead of its content:
 
 - `GET /api/certificates/<public_id>`
 - `GET /api/records/judge/<public_id>`
 
-There is **no offline verifier** script (`scripts/` contains only the
-role-isolation matrix tooling). Stated honestly: the
-verifying party must trust the portal — the same boundary that protects
-Django sessions. An offline public-key verifier (Ed25519 with a published
-public key, plus a CLI) is the natural production upgrade and is labeled
-future work; for the self-hosted trust model — the same operator that runs
-the event publishes the records — HMAC is proportionate
-(THREAT-MODEL.md §5.5).
+There is **no offline verifier** script (`scripts/` contains only the role-isolation matrix tooling). Stated honestly: the verifying party must trust the portal — the same boundary that protects Django sessions. An offline public-key verifier (Ed25519 with a published public key, plus a CLI) is the natural production upgrade and is labeled future work; for the self-hosted trust model — the same operator that runs the event publishes the records — HMAC is proportionate (THREAT-MODEL.md §5.5).
 
 ### 17.9 The judge participation record
 
-Shipped as `apps/certificates/models.py::JudgeRecord` (table
-`certificates_judgerecord`) — the T4 verifiable-record artifact. A JSON
-record per judge, signed with HMAC-SHA256, served unauthenticated at
-`GET /api/records/judge/<public_id>`:
+Shipped as `apps/certificates/models.py::JudgeRecord` (table `certificates_judgerecord`) — the T4 verifiable-record artifact. A JSON record per judge, signed with HMAC-SHA256, served unauthenticated at `GET /api/records/judge/<public_id>`:
 
 ```json
 {
@@ -3041,19 +2859,11 @@ record per judge, signed with HMAC-SHA256, served unauthenticated at
 }
 ```
 
-The signed payload carries the judge's **display name only** (profile name,
-falling back to the email local-part) — never the full email; the email
-appears only on the organizer-authenticated list endpoint. Organizers issue
-via `POST /api/events/<slug>/records/judge` with `{"judge": "<email>"}` or
-`{"all": true}` (every judge holding at least one assignment); issuing is
-deliberately not idempotent — re-issuing signs a fresh snapshot under a
-fresh `public_id`, mirroring certificate re-issuance. Issuing is
-audit-logged.
+The signed payload carries the judge's **display name only** (profile name, falling back to the email local-part) — never the full email; the email appears only on the organizer-authenticated list endpoint. Organizers issue via `POST /api/events/<slug>/records/judge` with `{"judge": "<email>"}` or `{"all": true}` (every judge holding at least one assignment); issuing is deliberately not idempotent — re-issuing signs a fresh snapshot under a fresh `public_id`, mirroring certificate re-issuance. Issuing is audit-logged.
 
 ### 17.10 The signing flow
 
-Both record shapes share one helper pair — canonical JSON (sorted keys,
-compact separators, UTF-8), then HMAC-SHA256 with `SECRET_KEY`:
+Both record shapes share one helper pair — canonical JSON (sorted keys, compact separators, UTF-8), then HMAC-SHA256 with `SECRET_KEY`:
 
 ```python
 def _canonical_json(payload: dict) -> bytes:
@@ -3067,46 +2877,26 @@ def verify_payload(payload: dict, signature: str) -> bool:
     return hmac.compare_digest(sign_payload(payload), signature)
 ```
 
-`Certificate.issue()` and `JudgeRecord.issue()` build the payload, sign it,
-and persist payload + signature in one step. There is no private key in
-`.env` and no key row in the DB — the signing material is `SECRET_KEY`, the
-same secret that protects Django sessions.
+`Certificate.issue()` and `JudgeRecord.issue()` build the payload, sign it, and persist payload + signature in one step. There is no private key in `.env` and no key row in the DB — the signing material is `SECRET_KEY`, the same secret that protects Django sessions.
 
 ### 17.11 Future work, labeled as such
 
 Not shipped, and documented as gaps so the boundary is explicit:
 
-- **Offline public-key verification** — Ed25519 with a published public key
-  plus a standalone CLI would remove the "trust the portal to verify"
-  limitation (see THREAT-MODEL.md §5.5).
-- **Key rotation for record signing** — needs a versioned-key scheme once
-  `SECRET_KEY`-bound HMAC stops being proportionate.
-- **Hashed webhook secrets** (`secret_hash` + show-once) — trades the
-  organizer's ability to re-display a subscription secret for a smaller
-  database-exposure surface.
+- **Offline public-key verification** — Ed25519 with a published public key plus a standalone CLI would remove the "trust the portal to verify" limitation (see THREAT-MODEL.md §5.5).
+- **Key rotation for record signing** — needs a versioned-key scheme once `SECRET_KEY`-bound HMAC stops being proportionate.
+- **Hashed webhook secrets** (`secret_hash` + show-once) — trades the organizer's ability to re-display a subscription secret for a smaller database-exposure surface.
 
 None of these is claimed anywhere in the shipped docs.
 
 ### 17.12 Bulk import/export
 
-The T4 bulk transfer pair, both organizer-gated (inline role check — an
-importer must also be able to *create* an event, so `IsOrganizer` alone is
-wrong for the bootstrap case):
+The T4 bulk transfer pair, both organizer-gated (inline role check — an importer must also be able to *create* an event, so `IsOrganizer` alone is wrong for the bootstrap case):
 
-- `POST /api/events/<slug>/import` — accepts a `fixtures.json`-shaped body,
-  reusing the battle-tested `import_fixtures` importer (idempotent + atomic:
-  re-importing the same body is safe, a failed import leaves the event as it
-  was). A body over 5 MiB is rejected with 413 *before* parsing; malformed
-  JSON or a truncated/mis-shaped body returns 422, never a 500. Importing
-  into a fresh slug bootstraps a new event (any organizer/admin).
-- `GET /api/events/<slug>/export` — streams the event as fixtures-shaped
-  JSON, byte-for-byte re-importable by the import endpoint.
+- `POST /api/events/<slug>/import` — accepts a `fixtures.json`-shaped body, reusing the battle-tested `import_fixtures` importer (idempotent + atomic: re-importing the same body is safe, a failed import leaves the event as it was). A body over 5 MiB is rejected with 413 *before* parsing; malformed JSON or a truncated/mis-shaped body returns 422, never a 500. Importing into a fresh slug bootstraps a new event (any organizer/admin).
+- `GET /api/events/<slug>/export` — streams the event as fixtures-shaped JSON, byte-for-byte re-importable by the import endpoint.
 
-The property that makes the pair useful: export ids are deterministic
-(`trk_`/`jdg_`/`tm_`/`prj_` derived from the *name*, not from row UUIDs or
-timestamps), so export → import → export is byte-identical — provable end
-to end, and the reason the export derives ids from stable data instead of
-dumping primary keys.
+The property that makes the pair useful: export ids are deterministic (`trk_`/`jdg_`/`tm_`/`prj_` derived from the *name*, not from row UUIDs or timestamps), so export → import → export is byte-identical — provable end to end, and the reason the export derives ids from stable data instead of dumping primary keys.
 
 ---
 
@@ -3149,17 +2939,11 @@ Postgres
 
 ### 18.3 The trust boundaries
 
-1. **Browser → nginx.** The browser trusts the cookie; nginx does not trust the
-   browser to be a particular user. Auth is verified server-side.
+1. **Browser → nginx.** The browser trusts the cookie; nginx does not trust the browser to be a particular user. Auth is verified server-side.
 2. **nginx → Django.** nginx trusts the network. Internal network only.
 3. **Django → Postgres.** Django trusts the network. Internal network only.
-4. **External → webhook.** The webhook receiver trusts our signature. The
-   signature is verified.
-5. **Anyone → record verification.** The verifying party trusts the portal:
-   the serving endpoint recomputes the HMAC-SHA256 over the stored canonical
-   JSON payload and compares, so a tampered row fails closed (400
-   `signature_invalid` instead of content). An offline public-key verifier is
-   labeled future work (§17.11).
+4. **External → webhook.** The webhook receiver trusts our signature. The signature is verified.
+5. **Anyone → record verification.** The verifying party trusts the portal: the serving endpoint recomputes the HMAC-SHA256 over the stored canonical JSON payload and compares, so a tampered row fails closed (400 `signature_invalid` instead of content). An offline public-key verifier is labeled future work (§17.11).
 
 ### 18.4 The mitigations per threat
 
@@ -3210,8 +2994,7 @@ def log(actor, action, target, payload, request, result='success'):
     )
 ```
 
-The `result` is `success`, `denied`, or `error`. Denied requests are logged by
-middleware; success and error by views.
+The `result` is `success`, `denied`, or `error`. Denied requests are logged by middleware; success and error by views.
 
 ### 18.7 DB-level audit immutability
 
@@ -3219,8 +3002,9 @@ middleware; success and error by views.
 REVOKE UPDATE, DELETE ON audit_auditevent FROM hack-hamster;
 ```
 
-The application user cannot update or delete audit events. The migrations apply this
-grant on every fresh database.
+The application user cannot update or delete audit events. The migrations apply this grant on every fresh database.
+
+---
 
 ## Part 19 — Acceptance Verification Architecture
 
@@ -3232,8 +3016,7 @@ grant on every fresh database.
 3. Asserts each call's expected response.
 4. Prints a PASS/FAIL report.
 
-We do not modify `run.py`. We do not write our own acceptance suite. The spec's
-script is the oracle.
+We do not modify `run.py`. We do not write our own acceptance suite. The spec's script is the oracle.
 
 ### 19.2 The verification flow
 
@@ -3257,9 +3040,7 @@ git commit -m "docs: publish acceptance-report.txt for <gate>"
 ```
 
 ### 19.3 The .hack-hamster.toml architecture
-The file has five sections: the four the checker reads (`[portal]`, `[tiers]`,
-`[auth]`, `[routes]`) plus our `[bonuses]` block. The checker reads them; we
-do not modify the schema.
+The file has five sections: the four the checker reads (`[portal]`, `[tiers]`, `[auth]`, `[routes]`) plus our `[bonuses]` block. The checker reads them; we do not modify the schema.
 
 ```toml
 [portal]
@@ -3292,8 +3073,7 @@ The file is the contract. It is committed at the repo root.
 
 ### 19.4 The acceptance report architecture
 
-The report is whatever the checker prints. We do not modify the format. We
-redirect to `acceptance-report.txt` and commit. The committed report:
+The report is whatever the checker prints. We do not modify the format. We redirect to `acceptance-report.txt` and commit. The committed report:
 
 ```
 HACK HAMSTER 2026 acceptance report
@@ -3313,19 +3093,16 @@ claimed T1 T2 T3 T4, verified T1 T2
 note: claimed but not verified: T3
 ```
 
-The last line is the gap. We claim T3; it is not verified (zero checks). We do
-not claim T4. The gap is honest.
+The last line is the gap. We claim T3; it is not verified (zero checks). We do not claim T4. The gap is honest.
 
 ### 19.5 The acceptance as a contract
 
-The acceptance mechanism is the contract between our portal and the spec. We
-satisfy it by:
+The acceptance mechanism is the contract between our portal and the spec. We satisfy it by:
 - Building the five route URLs that exist and respond correctly.
 - Generating the five pre-baked session headers at boot.
 - Returning the expected responses for each check.
 
-If the contract changes (run.py is updated), we update our endpoints to match. If
-we cannot, we do not claim the affected tier.
+If the contract changes (run.py is updated), we update our endpoints to match. If we cannot, we do not claim the affected tier.
 
 ### 19.6 The acceptance as a gate
 
@@ -3334,13 +3111,11 @@ At each gate G2-G7, the acceptance suite is run. If any check fails:
 - The failure is fixed before the merge to `main`.
 - The acceptance report is regenerated and committed.
 
-The suite is also run after every backend change that touches the five routes or
-the five auth headers. This is the "run it constantly" rule.
+The suite is also run after every backend change that touches the five routes or the five auth headers. This is the "run it constantly" rule.
 
 ### 19.7 The test suite in CI
 
-CI is real, committed, and not best-effort: `.github/workflows/tests.yml` runs
-on every push to `main`/`dev` and on every pull request.
+CI is real, committed, and not best-effort: `.github/workflows/tests.yml` runs on every push to `main`/`dev` and on every pull request.
 
 ```yaml
 # .github/workflows/tests.yml (condensed)
@@ -3378,18 +3153,13 @@ jobs:
       - run: python -m pytest -q
 ```
 
-A separate `.github/workflows/lint.yml` runs `ruff check` +
-`ruff format --check` on pushes to `main`/`manas` and on pull requests. The
-acceptance checks themselves are deliberately not in CI — they need the live
-portal — so the graded artifact remains `make accept` + the committed report
-(§19.4).
+A separate `.github/workflows/lint.yml` runs `ruff check` + `ruff format --check` on pushes to `main`/`manas` and on pull requests. The acceptance checks themselves are deliberately not in CI — they need the live portal — so the graded artifact remains `make accept` + the committed report (§19.4).
 
 ---
 
 ## Part 20 — Architecture Decision Log
 
-This part documents architectural decisions. Each entry: date, context, choice,
-reason, alternatives considered.
+This part documents architectural decisions. Each entry: date, context, choice, reason, alternatives considered.
 
 ### 20.1 The four-process shape (Sep 13)
 
@@ -3403,10 +3173,7 @@ reason, alternatives considered.
 
 **Choice:** Three processes: Next.js + Django + nginx.
 
-**Reason:** One process puts API and UI in the same deployable unit; a deploy
-fails both. Two processes need a reverse proxy for clean URL routing. Three
-processes is the minimum that gives clean separation. Microservices is overkill
-for 40 projects / 30 judges.
+**Reason:** One process puts API and UI in the same deployable unit; a deploy fails both. Two processes need a reverse proxy for clean URL routing. Three processes is the minimum that gives clean separation. Microservices is overkill for 40 projects / 30 judges.
 
 ### 20.2 The single-port exposure (Sep 13)
 
@@ -3417,12 +3184,9 @@ for 40 projects / 30 judges.
 - Single port (8080) via nginx (chosen).
 - No ports exposed (offline only).
 
-**Choice:** Single port 8080 via nginx.
+**Choice:** Single port 8000 via nginx.
 
-**Reason:** Multiple ports require the user to know which port for which service.
-A judge cloning `main` and running `docker compose up` should see the portal at
-`localhost:8080`, not three different URLs. nginx terminates HTTP and serves
-static.
+**Reason:** Multiple ports require the user to know which port for which service. A judge cloning `main` and running `docker compose up` should see the portal at `localhost:8000`, not three different URLs. nginx terminates HTTP and serves static.
 
 ### 20.3 Server-rendered public, client-rendered auth (Sep 13)
 
@@ -3435,9 +3199,7 @@ static.
 
 **Choice:** Server-rendered public, client-rendered auth.
 
-**Reason:** The public gallery is the primary visitor surface; SEO and offline-first
-matter. The judge console has interactivity (autosave, scoring); client-side
-state is needed.
+**Reason:** The public gallery is the primary visitor surface; SEO and offline-first matter. The judge console has interactivity (autosave, scoring); client-side state is needed.
 
 ### 20.4 Disjoint file ownership (Sep 13)
 
@@ -3450,8 +3212,7 @@ state is needed.
 
 **Choice:** Per-developer branches with disjoint ownership.
 
-**Reason:** Disjoint ownership means no file has two editors. Conflicts are
-prevented by construction, not by careful merging.
+**Reason:** Disjoint ownership means no file has two editors. Conflicts are prevented by construction, not by careful merging.
 
 ### 20.5 The deadline decorator (Sep 23)
 
@@ -3465,8 +3226,7 @@ prevented by construction, not by careful merging.
 
 **Choice:** A decorator on the view.
 
-**Reason:** The decorator reads the event and the deadline; it's reusable across
-views. The serializer would be data-layer; the middleware would be too coarse.
+**Reason:** The decorator reads the event and the deadline; it's reusable across views. The serializer would be data-layer; the middleware would be too coarse.
 
 ### 20.6 The role-isolation matrix as a parameterized test (Sep 13)
 
@@ -3479,8 +3239,7 @@ views. The serializer would be data-layer; the middleware would be too coarse.
 
 **Choice:** Parameterized pytest.
 
-**Reason:** The matrix is data; parameterized tests handle data cleanly. One
-parametrize block, 30 cases, clear output.
+**Reason:** The matrix is data; parameterized tests handle data cleanly. One parametrize block, 30 cases, clear output.
 
 ### 20.7 No message queue (Sep 13)
 
@@ -3494,9 +3253,7 @@ parametrize block, 30 cases, clear output.
 
 **Choice:** No queue.
 
-**Reason:** There are no messages to queue. Webhook delivery is direct from the
-view. The dashboard SSE is direct from the view. There is no fan-out to multiple
-consumers.
+**Reason:** There are no messages to queue. Webhook delivery is direct from the view. The dashboard SSE is direct from the view. There is no fan-out to multiple consumers.
 
 ### 20.8 The audit log as append-only (Sep 13)
 
@@ -3509,8 +3266,7 @@ consumers.
 
 **Choice:** DB-level immutability.
 
-**Reason:** Application-level checks can be bypassed by raw SQL. An external log
-service is overkill for the 72-hour scope. DB grants are bulletproof.
+**Reason:** Application-level checks can be bypassed by raw SQL. An external log service is overkill for the 72-hour scope. DB grants are bulletproof.
 
 ### 20.9 No ORM-level multi-tenancy (Sep 13)
 
@@ -3524,9 +3280,7 @@ service is overkill for the 72-hour scope. DB grants are bulletproof.
 
 **Choice:** One event per deployment.
 
-**Reason:** Multi-tenancy adds complexity (per-event migrations, per-event
-configuration) for a feature the brief doesn't require. The eventual Raptors
-deployment may need this, but the 72-hour scope doesn't.
+**Reason:** Multi-tenancy adds complexity (per-event migrations, per-event configuration) for a feature the brief doesn't require. The eventual Raptors deployment may need this, but the 72-hour scope doesn't.
 
 ### 20.10 The five pre-baked session headers (Sep 23)
 
@@ -3539,8 +3293,7 @@ deployment may need this, but the 72-hour scope doesn't.
 
 **Choice:** Pre-baked session headers.
 
-**Reason:** The spec explicitly says so. The seed script prints the headers; the
-mechanism attaches them. No login flow needed.
+**Reason:** The spec explicitly says so. The seed script prints the headers; the mechanism attaches them. No login flow needed.
 
 ### 20.11 The DRF permission class architecture (Sep 13)
 
@@ -3554,9 +3307,7 @@ mechanism attaches them. No login flow needed.
 
 **Choice:** DRF permission classes.
 
-**Reason:** Permission classes are evaluated before the view body runs. A deny
-is 403 before any data is read. Templates can hide buttons; APIs must deny
-first.
+**Reason:** Permission classes are evaluated before the view body runs. A deny is 403 before any data is read. Templates can hide buttons; APIs must deny first.
 
 ### 20.12 The OpenAPI generation via drf-spectacular (Sep 13)
 
@@ -3568,8 +3319,7 @@ first.
 
 **Choice:** Generated from code.
 
-**Reason:** Hand-written gets out of sync. Generated from code is always
-current. The bonus is demonstrated, not asserted.
+**Reason:** Hand-written gets out of sync. Generated from code is always current. The bonus is demonstrated, not asserted.
 
 ### 20.13 The single-gunicorn-worker-pool (Sep 13)
 
@@ -3582,9 +3332,7 @@ current. The bonus is demonstrated, not asserted.
 
 **Choice:** 3 workers.
 
-**Reason:** 1 worker means a single-threaded server; a slow request blocks all
-others. 3 workers handle 3 concurrent requests. `auto` would use all CPUs but
-is harder to reason about.
+**Reason:** 1 worker means a single-threaded server; a slow request blocks all others. 3 workers handle 3 concurrent requests. `auto` would use all CPUs but is harder to reason about.
 
 ### 20.14 The seed script at startup (Sep 13)
 
@@ -3596,8 +3344,7 @@ is harder to reason about.
 
 **Choice:** At startup.
 
-**Reason:** The portal is useless without fixtures (the acceptance check expects
-known titles). Auto-loading on first boot is the simplest model.
+**Reason:** The portal is useless without fixtures (the acceptance check expects known titles). Auto-loading on first boot is the simplest model.
 
 ---
 
@@ -3658,25 +3405,17 @@ Mode-specific (open, email, authenticated, quadratic). Reasons:
 
 Synchronous, single attempt. Reasons:
 - No background workers; the delivery happens inside the request.
-- A 3-second timeout, and a slow receiver never raises into the
-  organizer's request path.
-- Retry is an explicit, in-place operator action
-  (`manage.py flush_webhooks`), backed by the per-webhook delivery log
-  (`GET /api/webhooks/<uuid>/deliveries`) — no hidden background queue.
+- A 3-second timeout, and a slow receiver never raises into the organizer's request path.
+- Retry is an explicit, in-place operator action (`manage.py flush_webhooks`), backed by the per-webhook delivery log (`GET /api/webhooks/<uuid>/deliveries`) — no hidden background queue.
 
 ### 21.9 Certificates: HMAC-SHA256
 
 HMAC-SHA256 keyed by `SECRET_KEY`, not a public-key scheme. Reasons:
-- The self-hosted trust model: the operator who runs the event publishes
-  the records, so a symmetric secret is proportionate (THREAT-MODEL.md §5.5).
-- No key ceremony: the signing material is the same `SECRET_KEY` that
-  protects sessions; no key row, no rotation story to get wrong.
-- Verification is verify-on-read: the serving endpoint recomputes the HMAC
-  over the canonical JSON payload and compares, so a tampered row returns
-  400 `signature_invalid` instead of content (§17.8).
+- The self-hosted trust model: the operator who runs the event publishes the records, so a symmetric secret is proportionate (THREAT-MODEL.md §5.5).
+- No key ceremony: the signing material is the same `SECRET_KEY` that protects sessions; no key row, no rotation story to get wrong.
+- Verification is verify-on-read: the serving endpoint recomputes the HMAC over the canonical JSON payload and compares, so a tampered row returns 400 `signature_invalid` instead of content (§17.8).
 
-An Ed25519 offline verifier with a published public key is labeled future
-work (§17.11).
+An Ed25519 offline verifier with a published public key is labeled future work (§17.11).
 
 ### 21.10 Widget: zero dependencies
 
@@ -3688,15 +3427,9 @@ Zero JS dependencies. Reasons:
 ### 21.11 Bulk import/export: fixtures-shaped JSON
 
 JSON, not CSV. Reasons:
-- Import consumes the same `fixtures.json` shape the seeder uses
-  (`POST /api/events/<slug>/import`) — one parser, one shape, no second
-  format. (CSV remains the organizer's *score export* format; bulk import
-  is JSON-only.)
-- All-or-nothing: a body over 5 MiB is rejected pre-parse with 413,
-  malformed JSON with 422 — no partial row state to unwind.
-- Export (`GET /api/events/<slug>/export`) is deterministic — name-derived
-  `trk_`/`jdg_`/`tm_`/`prj_` ids — so export→import→export is
-  byte-identical (§17.12).
+- Import consumes the same `fixtures.json` shape the seeder uses (`POST /api/events/<slug>/import`) — one parser, one shape, no second format. (CSV remains the organizer's *score export* format; bulk import is JSON-only.)
+- All-or-nothing: a body over 5 MiB is rejected pre-parse with 413, malformed JSON with 422 — no partial row state to unwind.
+- Export (`GET /api/events/<slug>/export`) is deterministic — name-derived `trk_`/`jdg_`/`tm_`/`prj_` ids — so export→import→export is byte-identical (§17.12).
 
 ### 21.12 Audit log: append-only with DB grants
 
@@ -3727,9 +3460,9 @@ This document covers the architecture. The other docs:
 | Webhooks | §3.4.1 | §6.9 | §7.1 |
 | Certificates | §3.4.2 | §17 | §7.2 |
 
-Every feature is locatable in all four docs by its FR-NNN number. The architecture
-doc is the system-shape view; the TRD is the per-feature spec; the PRD is the
-product spec; the backend impl doc is exactly what to type.
+Every feature is locatable in all four docs by its FR-NNN number. The architecture doc is the system-shape view; the TRD is the per-feature spec; the PRD is the product spec; the backend impl doc is exactly what to type.
+
+---
 
 ## Part 23 — Glossary
 
@@ -3737,32 +3470,24 @@ The terms used in this document. Same as the PRD glossary but with technical det
 
 ### 23.1 Architecture terms
 
-- **Process.** A running program. The deployment has four: browser (not a server
-  process), nginx, Django (3 gunicorn workers), Next.js, Postgres.
+- **Process.** A running program. The deployment has four: browser (not a server process), nginx, Django (3 gunicorn workers), Next.js, Postgres.
 - **Container.** A Docker container running one process.
-- **Service.** A named container in docker compose; reachable by name on the
-  internal network.
-- **Middleware.** A Django middleware is a request/response processor. The chain
-  runs in order on every request.
+- **Service.** A named container in docker compose; reachable by name on the internal network.
+- **Middleware.** A Django middleware is a request/response processor. The chain runs in order on every request.
 - **Permission class.** A DRF class that decides if the request is allowed.
 - **Serializer.** A DRF class that translates between ORM instances and JSON.
 - **View.** A DRF class that handles a request and returns a response.
-- **Decorator.** A Python function that wraps another function. The deadline
-  decorator wraps the view.
+- **Decorator.** A Python function that wraps another function. The deadline decorator wraps the view.
 - **Migration.** A Django ORM schema change, committed in the repo.
 - **Fixture.** Seed data for tests, committed in `fixtures.json`.
 
 ### 23.2 The roles (architectural view)
 
 - **Visitor.** No session. Read-only on public surface.
-- **Participant.** Session + Membership(role=participant). Read+write on team and
-  submission.
-- **Judge.** Session + Membership(role=judge). Read+write on assigned projects
-  and the pairwise console.
-- **Organizer.** Session + Membership(role=organizer). Read+write on event, judging,
-  voting, audit log.
-- **Admin.** Session + Membership(role=admin) platform-wide. Read+write on global
-  state.
+- **Participant.** Session + Membership(role=participant). Read+write on team and submission.
+- **Judge.** Session + Membership(role=judge). Read+write on assigned projects and the pairwise console.
+- **Organizer.** Session + Membership(role=organizer). Read+write on event, judging, voting, audit log.
+- **Admin.** Session + Membership(role=admin) platform-wide. Read+write on global state.
 
 ### 23.3 The components
 
@@ -3847,53 +3572,43 @@ For each major screen, the architectural decision and the reason.
 
 ### 25.1 Public gallery (`/{event_slug}/gallery`)
 
-**Architecture:** Server Component, server-rendered. Fetches from internal API at
-request time. Cached for 60 seconds (ISR).
+**Architecture:** Server Component, server-rendered. Fetches from internal API at request time. Cached for 60 seconds (ISR).
 
-**Reason:** The gallery is the primary visitor surface; SEO and offline-first
-matter. Server rendering means the page works without JS.
+**Reason:** The gallery is the primary visitor surface; SEO and offline-first matter. Server rendering means the page works without JS.
 
 ### 25.2 Project detail (`/{event_slug}/projects/{id}`)
 
-**Architecture:** Server Component. Fetches from internal API. Open Graph metadata
-in the response.
+**Architecture:** Server Component. Fetches from internal API. Open Graph metadata in the response.
 
-**Reason:** Sharing on social media requires Open Graph. Server rendering means
-the page is shareable.
+**Reason:** Sharing on social media requires Open Graph. Server rendering means the page is shareable.
 
 ### 25.3 Judge console (`/judge/projects/{id}`)
 
-**Architecture:** Client Component (autosave needs client state). Fetches rubric
-from API. PUT to `/scores` on debounce.
+**Architecture:** Client Component (autosave needs client state). Fetches rubric from API. PUT to `/scores` on debounce.
 
 **Reason:** The judge scores with autosave; client-side state is required.
 
 ### 25.4 Pairwise console (`/judge/pairwise`)
 
-**Architecture:** Client Component. Polls `/pairwise/next` for the next pair;
-POSTs the answer to `/pairwise/{id}/answer`. Keyboard-only.
+**Architecture:** Client Component. Polls `/pairwise/next` for the next pair; POSTs the answer to `/pairwise/{id}/answer`. Keyboard-only.
 
 **Reason:** Keyboard navigation is fast; mouse is not used.
 
 ### 25.5 Organizer dashboard (`/organize/judging`)
 
-**Architecture:** Server Component for the initial render; Client Component for the
-SSE stream. Server-Sent Events update every 10 seconds.
+**Architecture:** Server Component for the initial render; Client Component for the SSE stream. Server-Sent Events update every 10 seconds.
 
-**Reason:** SSE is the right tool for one-way server→client updates. Polling is
-the fallback.
+**Reason:** SSE is the right tool for one-way server→client updates. Polling is the fallback.
 
 ### 25.6 Submission form (`/submissions/{id}`)
 
-**Architecture:** Client Component. Complex form with autosave. PUT on debounce;
-POST on submit.
+**Architecture:** Client Component. Complex form with autosave. PUT on debounce; POST on submit.
 
 **Reason:** Multi-field form with autosave; client state is required.
 
 ### 25.7 Vote button (`/projects/{id}/vote`)
 
-**Architecture:** Client Component for quadratic mode (budget tracking); server
-form for simple mode.
+**Architecture:** Client Component for quadratic mode (budget tracking); server form for simple mode.
 
 **Reason:** Quadratic mode needs to show remaining credits; client state helps.
 
@@ -3905,36 +3620,31 @@ form for simple mode.
 
 ### 25.9 The widget (`/widget.js`)
 
-**Architecture:** Standalone JS bundle. Fetches the gallery JSON from the public
-API. Embeds into a target div.
+**Architecture:** Standalone JS bundle. Fetches the gallery JSON from the public API. Embeds into a target div.
 
 **Reason:** Embeddable means zero dependencies; the bundle must be self-contained.
 
 ### 25.10 The verifier (`/verify`)
 
-**Architecture:** Static page. Renders the public key and the verifier
-instructions. No client state.
+**Architecture:** Static page. Renders the public key and the verifier instructions. No client state.
 
 **Reason:** Verification is an offline activity; the page is documentation.
 
 ### 25.11 The Django admin (`/admin/`)
 
-**Architecture:** Django's built-in admin. Used for raw data inspection by
-organizers. Not the user-facing UI.
+**Architecture:** Django's built-in admin. Used for raw data inspection by organizers. Not the user-facing UI.
 
 **Reason:** Django admin is a power tool; the user-facing UI is Next.js.
 
 ### 25.12 The OpenAPI schema (`/api/schema/`)
 
-**Architecture:** drf-spectacular generates YAML at request time. ReDoc and
-Swagger UI for browsable access.
+**Architecture:** drf-spectacular generates YAML at request time. ReDoc and Swagger UI for browsable access.
 
 **Reason:** The schema is generated from the same code; it cannot drift.
 
 ### 25.13 The health endpoints (`/healthz`, `/readyz`)
 
-**Architecture:** Plain Django views. No DB query for `/healthz`; DB query for
-`/readyz`.
+**Architecture:** Plain Django views. No DB query for `/healthz`; DB query for `/readyz`.
 
 **Reason:** Liveness is a process check; readiness is a state check.
 
@@ -3953,8 +3663,7 @@ cp .env.example .env  (and edit)
 docker compose up -d
 ```
 
-The Dockerfile.backend runs migrations and seeds before starting gunicorn. The
-Dockerfile.web builds the Next.js bundle. nginx starts after both are healthy.
+The Dockerfile.backend runs migrations and seeds before starting gunicorn. The Dockerfile.web builds the Next.js bundle. nginx starts after both are healthy.
 
 ### 26.2 The components involved
 
@@ -3998,8 +3707,8 @@ The test for cold start:
 ```
 docker compose down -v  (wipe everything)
 docker compose up       (cold start)
-curl http://localhost:8080/healthz  (wait for 200)
-curl http://localhost:8080/readyz  (wait for 200)
+curl http://localhost:8000/healthz  (wait for 200)
+curl http://localhost:8000/readyz  (wait for 200)
 python3 run.py .hack-hamster.toml  (should pass all 7)
 ```
 
@@ -4029,9 +3738,7 @@ These are documented tradeoffs.
 
 ## Part 27 — Closing Notes
 
-This document is the architectural reference for the HACK HAMSTER hackathon build. It is
-written for Manas and Mihir to read together at H+0 (kickoff hour) and refer to
-during the 72 hours.
+This document is the architectural reference for the HACK HAMSTER hackathon build. It is written for Manas and Mihir to read together at H+0 (kickoff hour) and refer to during the 72 hours.
 
 The architecture is intentionally minimal:
 - Three processes (nginx, Django, Next.js).
@@ -4041,16 +3748,13 @@ The architecture is intentionally minimal:
 - One acceptance mechanism (run.py).
 - One integrator (Mihir).
 
-Everything that does not directly serve a goal in §1.1 is not in the architecture.
-Complexity earns its place or it gets removed.
+Everything that does not directly serve a goal in §1.1 is not in the architecture. Complexity earns its place or it gets removed.
 
-The architecture is frozen at H+0. Changes during the event are local (within a
-module) and do not affect the cross-module boundaries.
+The architecture is frozen at H+0. Changes during the event are local (within a module) and do not affect the cross-module boundaries.
 
 ## Part 28 — Quick Reference
 
-This part is a one-page summary of the architecture for quick reference during the
-build. Print this and pin it to the wall.
+This part is a one-page summary of the architecture for quick reference during the build. Print this and pin it to the wall.
 
 ### 28.1 The stack
 
@@ -4199,14 +3903,12 @@ git log         # check history
 3. `docker compose up` works cold (the 20%).
 4. DATA-MODEL.md is human-readable in 5 minutes (the 15% + "explain the schema").
 
-
 ### 28.13 The 5 things we never do
 
 1. Switch stacks mid-event.
 2. Add features not in the PRD.
 3. Claim a bonus we can't defend.
 4. Commit before kickoff.
-
 
 ### 28.14 The 4 deadlines to remember
 
@@ -4217,7 +3919,19 @@ git log         # check history
 
 ### 28.15 The 1 rule that matters most
 
-**`peer_scores` as `judge_b` returns 403.** If this passes, the 25% criterion's
-core requirement is satisfied. If it fails, we are not in the running. Everything
-else is decoration.
+**`peer_scores` as `judge_b` returns 403.** If this passes, the 25% criterion's core requirement is satisfied. If it fails, we are not in the running. Everything else is decoration.
 
+---
+
+## Where to next
+
+This document is the **system-shape view** — *how the how is shaped*. To trace a specific feature through the four docs:
+
+1. **`ARCHITECTURE.md` (this file)** — the four processes, the database, the request flow, the seven checks.
+2. **[DATA-MODEL.md](DATA-MODEL.md)** — every column of every table, the import/export paths, the per-table rationale, the PII story.
+3. **[JUDGING.md](JUDGING.md)** — the public defence of every scoring, assignment, normalization, and pairwise decision the portal makes (the 25% Judging Integrity criterion).
+4. **[THREAT-MODEL.md](THREAT-MODEL.md)** — the attack surface, the five primary threats, the residual risks, the references to the controls in §18 above.
+5. **[README.md](README.md)** — the operator's first stop: `docker compose up`, the demo accounts, the seven-check oracle.
+
+
+---

@@ -8,6 +8,85 @@
 **Stack:** Django 5 + Django REST Framework + PostgreSQL 16 + Next.js 15, all in `docker compose up`
 **Companion docs:** [PRD](PRD.md), [Architecture](../ARCHITECTURE.md), [Backend Impl](BACKEND-IMPL.md)
 
+---
+
+## Hero
+
+**Role:** Technical requirements for the Hack Hamster 2026 portal. **This doc is for:**
+Manas building the backend, Mihir wiring the frontend, and the judges who want to see
+why Django + DRF + Postgres + Next.js + nginx was the right call, what the API looks
+like, where the time goes, and which security controls back the role isolation claim.
+
+## TOC
+
+- [Part 1 — Tech Stack, Decided](#part-1--tech-stack-decided)
+- [Part 2 — Component Breakdown (browser / nginx / Django / Postgres / media / audit)](#part-2--component-breakdown)
+- [Part 3 — API Surface (the five spec routes, the four auth headers)](#part-3--api-surface)
+- [Part 4 — Data Flow (gallery / peer-scores / deadline / normalization / webhook / SSE)](#part-4--data-flow)
+- [Part 5 — Performance Requirements (per-endpoint budgets, indexes, caching)](#part-5--performance-requirements)
+- [Part 6 — Security Requirements (auth, authz, CSRF, CORS, rate limits, audit)](#part-6--security-requirements)
+- [Part 7 — Scalability Considerations](#part-7--scalability-considerations)
+- [Part 8 — DevOps (layout, compose, Dockerfiles, Makefile, migrations)](#part-8--devops)
+- [Part 9 — Testing Strategy (unit, integration, acceptance, adversarial)](#part-9--testing-strategy)
+- [Part 10 — Integration Points](#part-10--integration-points)
+- [Part 11 — Acceptance Mechanism Mapping](#part-11--acceptance-mechanism-mapping)
+- [Part 12 — Open Questions (resolved + still unknown)](#part-12--open-questions)
+- [Part 13 — Cross-Reference](#part-13--cross-reference)
+- [Parts 14–30 — per-endpoint spec, DB patterns, frontend architecture, pipeline, risks, normalization, pairwise, threat mapping, bonuses, glossary](#parts-1430--per-endpoint-spec-db-patterns-frontend-architecture-pipeline-risks-normalization-pairwise-threat-mapping-bonuses-glossary)
+
+## Technical stack — browser → nginx → Django → ORM → Postgres
+
+```mermaid
+flowchart TB
+    subgraph Client["🌐 Browser (no container)"]
+        NX["Next.js 15 / React 19<br/>App Router, CSS Modules<br/>fetch + useState, no third-party UI"]
+    end
+
+    subgraph Edge["🟠 Edge — one exposed port"]
+        NG["nginx 1.27-alpine<br/>reverse proxy on ${WEB_PORT:-8000}<br/>serves /_next/static/* and /static/* directly"]
+    end
+
+    subgraph App["🟠 Application — internal network"]
+        DJ["Django 5 + DRF 3.15<br/>gunicorn 23, 3 workers<br/>drf-spectacular → OpenAPI"]
+        ORM["🟣 Django ORM<br/>14 apps · migrations = schema history<br/>psycopg connection, no pool"]
+        PERM["🟣 Permission classes<br/>IsOrganizer · IsJudge · IsOwnJudge · …<br/>deny at dispatch(), before view body"]
+        AUD["🟣 Audit log<br/>append-only AuditEvent<br/>DB-level grant revokes UPDATE/DELETE"]
+    end
+
+    subgraph Data["🔵 State — single Postgres, no published port"]
+        PG["PostgreSQL 16-alpine<br/>JSONB · tsvector + GIN · UUID PKs<br/>partial indexes · volume-mounted"]
+    end
+
+    subgraph Files["🟠 Local media"]
+        MED["/app/media/<br/>uploads served by Django<br/>UUID-prefixed file names"]
+    end
+
+    NX -->|HTTPS via nginx| NG
+    NG -->|/api/* · /admin/* · /healthz · /readyz| DJ
+    DJ -->|middleware: session lookup| ORM
+    DJ -->|permission classes| PERM
+    PERM -->|allow| ORM
+    PERM -->|deny 401/403| DJ
+    ORM -->|SELECT / INSERT / UPDATE| PG
+    ORM -->|audit.log actor, action, target| AUD
+    AUD -->|same DB| PG
+    DJ -->|image uploads · thumbnails| MED
+    NX -->|<img> URLs| MED
+
+    style NX fill:#E9C46A,stroke:#E76F51,color:#1D3557
+    style NG fill:#FFE8D6,stroke:#F4A261,color:#1D3557
+    style DJ fill:#FFE8D8,stroke:#F4A261,color:#1D3557
+    style ORM fill:#EDE7F6,stroke:#6C567B,color:#1D3557
+    style PERM fill:#EDE7F6,stroke:#6C567B,color:#1D3557
+    style AUD fill:#EDE7F6,stroke:#6C567B,color:#1D3557
+    style PG fill:#A8DADC,stroke:#2A9D8F,color:#1D3557
+    style MED fill:#FFE8D6,stroke:#F4A261,color:#1D3557
+```
+
+> *Palette: 🟡 yellow (read paths / public surface), 🟠 orange (services / compute),
+> 🔵 blue (state / data stores), 🟣 violet (domain / types), 🟢 teal (data-store
+> borders), 🔴 red (outline only, sparing).*
+
 > The PRD says *what*. This document says *how*. The architecture says *how the how is
 > shaped*. The backend impl doc says *exactly what to type*.
 
@@ -138,7 +217,7 @@ via the nginx reverse proxy.
 **Role.** Single entry point. Serves static assets, proxies API calls to Django.
 **Container.** `nginx:1.27-alpine`.
 **Source.** `nginx/nginx.conf` in the repo.
-**Ports.** One exposed: `${WEB_PORT:-8080}:80`. Internal: nothing exposed.
+**Ports.** One exposed: `${WEB_PORT:-8000}:80`. Internal: nothing exposed.
 **Configuration.** Reverse proxy for `/api/*` and `/admin/*` to `django:8000`. Serves
 `/_next/static/*` and `/static/*` directly. Everything else from the Next.js server.
 
@@ -939,7 +1018,7 @@ services:
   nginx:
     image: nginx:1.27-alpine
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - "${WEB_PORT:-8000}:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -1174,7 +1253,7 @@ Our `.hack-hamster.toml` maps these to:
 
 ```
 [portal]
-base_url = "http://localhost:8080"
+base_url = "http://localhost:8000"
 
 [tiers]
 claimed = ["T1", "T2", "T3", "T4"]
@@ -1199,8 +1278,8 @@ csv_export   = "/api/events/sample-hack-2026/export.csv"
 - Fresh clone.
 - `docker compose down -v && docker compose up`.
 - Wait for "Application startup complete".
-- `curl http://localhost:8080/healthz` → 200.
-- `curl http://localhost:8080/readyz` → 200.
+- `curl http://localhost:8000/healthz` → 200.
+- `curl http://localhost:8000/readyz` → 200.
 - `make accept` → 7 PASS.
 
 **Role-isolation matrix (G3 + final):**
@@ -2441,7 +2520,7 @@ cp .env.example .env  # set DB_PASSWORD and DJANGO_SECRET_KEY
 docker compose up -d
 ```
 
-That's it. The portal runs at `http://localhost:8080`.
+That's it. The portal runs at `http://localhost:8000`.
 
 ### 17.7 What we don't have
 
@@ -3999,4 +4078,21 @@ authoritative definition; this list is the same terms with technical detail.
 - [Master Plan](PLAN.md)
 - [Manas Build Doc](../MANAS.md)
 - [Mihir Build Doc](../MIHIR.md)
+
+---
+
+## Related docs
+
+- [README](../README.md) — the 30-second pitch, the three commands, the limitations
+  section, the architecture diagram, the dependency table.
+- [PLAN](PLAN.md) — gates, hour-by-hour schedule, ownership split, traps, kickoff
+  discipline, post-freeze protocol.
+- [PRD](PRD.md) — what the product is, who each persona is, the per-tier feature
+  list, the per-screen walkthroughs, the user scenarios.
+- [ARCHITECTURE](../ARCHITECTURE.md) — the shape of the system and the reasoning
+  behind it.
+- [JUDGING](../JUDGING.md) — assignment algorithm, scoring maths, normalization
+  proof, pairwise BT fit, the defended methods.
+- [THREAT-MODEL](../THREAT-MODEL.md) — assets, actors, threats, mitigations, the
+  residual-risk section (the +3 bonus).
 
