@@ -106,7 +106,7 @@ Postgres + Next.js on Sep 13 because we know it. We are not changing it.
 
 ### 1.4 What the spec requires that earlier reading missed
 
-- **The checker never logs in.** Instead, the seed script prints four pre-baked session
+- **The checker never logs in.** Instead, the seed script prints five pre-baked session
   headers when the portal boots. Those go straight into `.dogfood.toml`'s `[auth]`
   block. No login flow, no credential exchange — just attach the right header.
 - **The portal is on localhost at whatever port we choose.** `.dogfood.toml` declares
@@ -236,7 +236,7 @@ Conflict-zero by construction: **no file has two owners.**
 `apps/widget/**`, `THREAT-MODEL.md`, `docs/UI.md`, the demo video
 
 **Shared contract:** `.dogfood.toml` is the seam. Manas publishes it at G2; it declares the
-five route names and four pre-baked session headers that run.py will use. **Mihir's frontend
+five route names and five pre-baked session headers that run.py will use. **Mihir's frontend
 hits only the URLs declared in `[routes]` — no special backdoors.** `openapi.yaml` is still
 useful for the API First bonus (every UI action → a documented endpoint → a published spec),
 but the spec is explicit that we own our route names: *"No fixed API routes. Yours are

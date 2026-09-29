@@ -6,12 +6,16 @@ Endpoints (under /api/):
   DELETE /api/events/<slug>/submissions/<id>/vote   retract a ballot
   GET    /api/events/<slug>/votes/results           organizer-only tally
 
-Both are deadline-gated by ``submissions_close_at``: voting shares the
-submission window and closes with it (``@deadline_gated`` rejects once
-``now > submissions_close_at`` — see tests/voting/test_voting.py, which
+Both are deadline-gated by ``judging_close_at``: community voting runs
+alongside judge review — ballots land on final, submitted work — and
+closes when judging closes (``@deadline_gated`` rejects once
+``now > judging_close_at`` — see tests/voting/test_voting.py, which
 builds its own event with that deadline in the future specifically to
-exercise the "voting allowed" paths). Anti-abuse is layered at the
-proxy / abuse-flag app.
+exercise the "voting allowed" paths). Gating on the *submission*
+window would make community voting impossible on any real event, since
+voting is what happens after submissions close. Results stay hidden
+from non-organizers until ``results_at`` regardless. Anti-abuse is
+layered at the proxy / abuse-flag app.
 
 Mode semantics (see ``Event.voting_mode``):
 
@@ -36,6 +40,7 @@ from apps.events.decorators import deadline_gated
 from apps.events.models import Event
 from apps.events.permissions import IsOrganizer
 from apps.submissions.models import Submission
+from apps.webhooks.delivery import notify
 
 from .models import Vote, VoteAudit, VoteBudget
 
@@ -100,7 +105,7 @@ class VoteView(APIView):
     permission_classes = [AllowAny]
     authentication_classes: list = []  # explicitly public — no session lookup
 
-    @deadline_gated("submissions_close_at")
+    @deadline_gated("judging_close_at")
     def post(self, request, slug, id):
         try:
             event = Event.objects.get(slug=slug)
@@ -238,6 +243,21 @@ class VoteView(APIView):
             request=request,
         )
 
+        # T4 webhooks: tally subscribers get the new count. Deliberately
+        # no voter identity in the payload — votes are pseudonymous and
+        # the audit trail (organizer-only) already records the actor.
+        notify(
+            event,
+            "vote.created",
+            {
+                "event": event.slug,
+                "project_id": str(project.id),
+                "project": project.name,
+                "votes": n_votes,
+                "mode": event.voting_mode,
+            },
+        )
+
         return Response(
             {
                 "vote_id": str(vote.id),
@@ -248,7 +268,7 @@ class VoteView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
-    @deadline_gated("submissions_close_at")
+    @deadline_gated("judging_close_at")
     def delete(self, request, slug, id):
         try:
             event = Event.objects.get(slug=slug)

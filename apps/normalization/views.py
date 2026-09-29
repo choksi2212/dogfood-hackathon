@@ -22,6 +22,7 @@ from apps.audit.helpers import log as audit_log
 from apps.events.models import Event
 from apps.events.permissions import IsOrganizer
 from apps.judging.models import Score
+from apps.webhooks.delivery import notify
 
 from .fit import normalize
 from .models import JudgeBias, NormalizationRun, NormalizedScore
@@ -153,6 +154,22 @@ class NormalizeView(APIView):
                 "iterations": run.iterations,
             },
             request=request,
+        )
+
+        # T4 webhooks: this POST *is* the "publish" beat — normalized
+        # results are computed and persisted here.
+        notify(
+            event,
+            "results.published",
+            {
+                "event": slug,
+                "run_id": str(run.id),
+                "method": "two-way additive fit",
+                "raw_sigma": run.raw_sigma,
+                "normalized_sigma": run.normalized_sigma,
+                "n_projects": run.n_projects,
+                "n_judges": run.n_judges,
+            },
         )
 
         return Response(

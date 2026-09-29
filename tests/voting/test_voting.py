@@ -224,11 +224,12 @@ def self_vote_team(db, voting_event, organizer, participant):
 
 @pytest.fixture
 def closed_event(db, organizer):
-    """Event with `submissions_close_at` in the past.
+    """Event with `submissions_close_at` in the past but judging open.
 
-    Per the `@deadline_gated` decorator the vote endpoint returns 422
-    when `now > submissions_close_at`, so this fixture is used to
-    exercise the deadline-passed branch.
+    Voting is gated on the *judging* window (apps/voting/views.py):
+    community ballots run alongside judge review, so submissions having
+    closed does NOT refuse a vote while judging is open. TestVotingWindow
+    pins both sides of that boundary.
     """
     now = _now()
     slug = "voting-closed-2026"
@@ -241,6 +242,34 @@ def closed_event(db, organizer):
             submissions_close_at=now - timedelta(hours=1),
             judging_open_at=now - timedelta(minutes=30),
             judging_close_at=now + timedelta(days=1),
+            results_at=now + timedelta(days=2),
+            voting_mode="simple",
+            pairwise_enabled=False,
+            created_by=organizer,
+        ),
+    )
+    Track.objects.update_or_create(
+        event=event,
+        slug="main",
+        defaults={"name": "Main", "description": "Main", "order": 0},
+    )
+    return event
+
+
+@pytest.fixture
+def judging_closed_event(db, organizer):
+    """Event whose judging window has closed — the vote gate fires."""
+    now = _now()
+    slug = "voting-judging-closed-2026"
+    event, _ = Event.objects.update_or_create(
+        slug=slug,
+        defaults=dict(
+            name="Judging Closed Event",
+            description="judging already closed.",
+            open_at=now - timedelta(hours=3),
+            submissions_close_at=now - timedelta(hours=2),
+            judging_open_at=now - timedelta(hours=90),
+            judging_close_at=now - timedelta(minutes=30),
             results_at=now + timedelta(days=2),
             voting_mode="simple",
             pairwise_enabled=False,
@@ -578,17 +607,19 @@ class TestAbuseFlagModel:
 @pytest.mark.voting
 @pytest.mark.usefixtures("organizer", "judge_a", "judge_b", "judge_c", "participant")
 class TestVotingWindow:
-    """The vote endpoint respects the submissions_close_at deadline."""
+    """The vote endpoint is gated on the *judging* window, not the
+    submission window — community voting is what happens after
+    submissions close."""
 
-    def test_vote_after_submissions_close_returns_422(
+    def test_vote_allowed_after_submissions_close_while_judging_open(
         self,
         participant,
         organizer,
         closed_event,
     ):
-        """`closed_event` has `submissions_close_at` in the past. The
-        `@deadline_gated` decorator rejects the POST with 422 before
-        any Vote logic runs — so no Vote row is written.
+        """`closed_event` has `submissions_close_at` in the past but
+        judging closes tomorrow: ballots land on final, submitted work,
+        so the POST succeeds and writes a Vote row.
         """
         # Build a submission under the closed event.
         captain = User.objects.create_user(
@@ -626,8 +657,59 @@ class TestVotingWindow:
         url = _vote_url(closed_event.slug, submission.id)
         resp = client.post(url, data={}, format="json")
 
+        assert resp.status_code == 201, resp.content
+        assert Vote.objects.filter(
+            event=closed_event,
+            project=submission,
+        ).exists()
+
+    def test_vote_after_judging_close_returns_422(
+        self,
+        participant,
+        organizer,
+        judging_closed_event,
+    ):
+        """`judging_closed_event` closed judging 30 minutes ago: the
+        `@deadline_gated` decorator rejects the POST with 422 before
+        any Vote logic runs — so no Vote row is written.
+        """
+        captain = User.objects.create_user(
+            email="judging_closed_captain@test.local",
+            username="judging_closed_captain@test.local",
+            password=DEMO_PASSWORD,
+        )
+        Membership.objects.create(
+            user=captain,
+            event=judging_closed_event,
+            role="participant",
+            created_by=organizer,
+        )
+        team = Team.objects.create(
+            event=judging_closed_event,
+            name="Judging Closed Team",
+            created_by=captain,
+        )
+        TeamMember.objects.create(
+            team=team,
+            user=captain,
+            role_in_team="captain",
+        )
+        submission = Submission.objects.create(
+            team=team,
+            event=judging_closed_event,
+            track=judging_closed_event.tracks.get(slug="main"),
+            name="Judging Closed Project",
+            tagline="x",
+            status="submitted",
+            submitted_at=_now() - timedelta(hours=3),
+        )
+
+        client = _authed_client(participant)
+        url = _vote_url(judging_closed_event.slug, submission.id)
+        resp = client.post(url, data={}, format="json")
+
         assert resp.status_code == 422, resp.content
         assert not Vote.objects.filter(
-            event=closed_event,
+            event=judging_closed_event,
             project=submission,
         ).exists()

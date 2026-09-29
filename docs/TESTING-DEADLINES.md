@@ -14,7 +14,7 @@ Boundary conditions on `submissions_close_at`, `judging_open_at`,
 | Judging before open | 403 `deadline_not_open` |
 | Judging after close | 422 `deadline_passed` |
 | Judging exactly at close (now − 1µs) | 422 `deadline_passed` |
-| Voting before submissions_close | 422 (voting opens AT submissions_close) |
+| Voting before `judging_close_at` | 422 (voting opens at `judging_close_at`) |
 | Event.state() — draft | `now < open_at` |
 | Event.state() — registration | `open_at ≤ now < submissions_close_at` |
 | Event.state() — submissions_closed | `submissions_close_at ≤ now < judging_open_at` |

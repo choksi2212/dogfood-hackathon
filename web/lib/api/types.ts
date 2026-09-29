@@ -162,6 +162,22 @@ export type PairwiseRankingResponse = {
   ranking: PairwiseRankingEntry[];
 };
 
+// Matches apps/submissions/serializers.py CommentSerializer — the
+// backend deliberately never serializes author names or emails (PII),
+// only a stable sha256-truncated email hash so the gallery can render
+// a consistent anonymous handle + avatar. `author` is the raw user id
+// (null when the account was deleted), used by the current visitor to
+// recognize their own comments.
+export type Comment = {
+  id: string;
+  submission: string;
+  author: string | null;
+  author_email_hash: string | null;
+  body: string;
+  created_at: string;
+  is_hidden: boolean;
+};
+
 // Matches apps/events/serializers.py EventSerializer.
 export type EventDetail = {
   id: string;
@@ -268,6 +284,32 @@ export type CertificateResponse = {
   signed_payload: Record<string, unknown>;
   signature: string;
   signature_algorithm: string;
+};
+
+// Signed judge participation record (apps/certificates judge record
+// views — GET /api/records/judge/<public_id>). Deliberately has no
+// email field: the single-record endpoint never returns one, and the
+// verify page must never display a judge's email either.
+export type JudgeRecordSignedPayload = {
+  kind: "judge_participation";
+  event: string;
+  judge: string;
+  issued_at: string;
+  event_slug: string;
+  assignments: number;
+  judging_window: { open: string; close: string };
+  scores_submitted: number;
+};
+
+export type JudgeRecordResponse = {
+  public_id: string;
+  event: string;
+  judge: string;
+  issued_at: string;
+  signed_payload: JudgeRecordSignedPayload;
+  signature: string;
+  signature_algorithm: string;
+  verify_url: string;
 };
 
 // Matches apps/widget/views.py widget_gallery response.

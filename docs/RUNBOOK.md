@@ -14,7 +14,7 @@ public votes, and the platform emits signed certificates and a CSV export.
 Runs as two containers in `docker compose` — `web` (Django 5.1 + DRF on
 Gunicorn/runserver) and `db` (PostgreSQL 16) — fronted by whatever reverse
 proxy terminates TLS. For the full pitch and architecture see
-[`README.md`](../README.md) and [`docs/ARCHITECTURE.md`](ARCHITECTURE.md).
+[`README.md`](../README.md) and [`ARCHITECTURE.md`](../ARCHITECTURE.md).
 
 ## 2. Health checks
 
@@ -111,17 +111,20 @@ docker compose up -d --build web
 Do **not** raise the limit without confirming the source IP via the audit
 log first — see **§4**.
 
-### 3.3 "Vote 422 storm" — submissions window closed
+### 3.3 "Vote 422 storm" — judging window has closed
 
 **Symptom:** Sudden spike of HTTP **422** against
 `POST /api/events/<slug>/submissions/<id>/vote`. Clients complain that
 their ballots "stopped going through".
 
-**Cause:** Voting is `@deadline_gated("submissions_close_at")` at
-[`apps/voting/views.py:99`](../../apps/voting/views.py#L99). The voting
-window is tied to the event's `submissions_close_at` field on
-[`apps/events/models.py:20`](../../apps/events/models.py#L20). Once that
-timestamp has passed, the decorator returns 422 for every cast.
+**Cause:** Voting is `@deadline_gated("judging_close_at")` at
+[`apps/voting/views.py`](../../apps/voting/views.py): the community vote
+runs while judges deliberate and **closes** at the event's
+`judging_close_at` field on
+[`apps/events/models.py`](../../apps/events/models.py). Once that
+timestamp has passed, the decorator returns 422 for every cast — votes
+are admitted only while judging is open, and results stay hidden until
+`results_at`.
 
 **Confirm:**
 
@@ -130,11 +133,12 @@ timestamp has passed, the decorator returns 422 for every cast.
 curl -sS http://127.0.0.1:8001/api/events/<slug>/ | python -m json.tool
 ```
 
-Look at `submissions_close_at` in the JSON. If it is in the past and the
-spike is recent, this is expected behavior — point users at the event
-timeline. If `submissions_close_at` is **in the future** and 422s are
-firing, the wall clock on the `web` container is wrong (Django returns
-UTC); fix with `docker compose exec web date -u` and reconcile the host.
+Look at `judging_close_at` in the JSON. If it is **in the past** and the
+spike is recent, this is expected behavior — voting has closed;
+point users at the event timeline. If `judging_close_at` is still in
+the future and 422s are firing, the wall clock on the `web` container
+is wrong (Django returns UTC); fix with `docker compose exec web date -u`
+and reconcile the host.
 
 ### 3.4 "CSV export 500" — usually a malformed score row
 

@@ -12,6 +12,16 @@ from django.utils import timezone
 from .models import Event
 
 
+def _window_label(field_name: str) -> str:
+    """Human name for a gated window — the API message reads
+    "The judging window has closed", not "The judging_close_at window…"."""
+    labels = {
+        "submissions_close_at": "submissions",
+        "judging_close_at": "judging",
+    }
+    return labels.get(field_name, field_name.removesuffix("_at").replace("_", " "))
+
+
 def deadline_gated(field_name: str):
     def decorator(view_func):
         @wraps(view_func)
@@ -38,7 +48,7 @@ def deadline_gated(field_name: str):
                             {
                                 "error": {
                                     "code": "deadline_passed",
-                                    "message": f"The {field_name.replace('_', ' ')} window has closed.",
+                                    "message": f"The {_window_label(field_name)} window has closed.",
                                     "detail": {"deadline": field_name},
                                 }
                             }

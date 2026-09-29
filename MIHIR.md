@@ -80,7 +80,7 @@ That rule has no exceptions, including at hour 70, especially at hour 70.
 checkpoint call. The spec is explicit: *"No fixed API routes. Yours are yours."* We pick
 the names; run.py reads them from this file.
 
-The file declares five route names (the URLs run.py will hit) and four pre-baked session
+The file declares five route names (the URLs run.py will hit) and five pre-baked session
 headers (what run.py attaches to impersonate each role). The checker **never logs in**;
 we hand it the headers and it attaches them.
 
@@ -88,20 +88,21 @@ we hand it the headers and it attaches them.
 
 | Key | What it is | Example |
 |---|---|---|
-| `gallery` | Public project gallery (no auth) | `/projects` |
-| `submit` | Project submission endpoint (participant auth) | `/projects/new` |
+| `gallery` | Public project gallery (no auth) | `/api/gallery` |
+| `submit` | Project submission endpoint (participant auth) | `/api/events/sample-hack-2026/submit` |
 | `judge_scores` | "Scores I gave" — judge reads own work | `/api/judge/scores` |
-| `peer_scores` | "Scores another judge gave" — graded 401/403 cross-judge | `/api/judge/scores?judge=judge_a` |
-| `csv_export` | Organizer's CSV export | `/api/export.csv` |
+| `peer_scores` | "Scores another judge gave" — graded 401/403 cross-judge | `/api/judge/peer-scores?judge=judge_a` |
+| `csv_export` | Organizer's CSV export | `/api/csv_export` |
 
-**The four auth headers:**
+**The five auth headers:**
 
-| Key | Role |
+| Header | Who it authenticates |
 |---|---|
-| `organizer` | Full admin view |
-| `judge_a` | One of the seeded judges |
-| `judge_b` | A different seeded judge |
-| `participant` | A team member |
+| `organizer` | The event organizer (an admin). |
+| `judge_a` | A first seeded judge. |
+| `judge_b` | A second seeded judge. |
+| `judge_c` | A third seeded judge (`priya.nair@example.org`). |
+| `participant` | A participant on a team. |
 
 **Your frontend hits only the URLs declared in `[routes]`.** No special backdoor route,
 no server-side template shortcut, no reading the database directly. This is not

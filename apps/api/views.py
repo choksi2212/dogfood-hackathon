@@ -1,18 +1,27 @@
-"""Webhook + OpenAPI views (T4 surface)."""
+"""Webhook + OpenAPI + bulk import/export views (T4 surface)."""
 
+import io
+import json
 import secrets
+import tempfile
 from functools import lru_cache
 from pathlib import Path
 
 import yaml
-from django.http import JsonResponse
+from django.core.exceptions import RequestDataTooBig
+from django.core.management import call_command
+from django.core.management.base import CommandError
+from django.http import JsonResponse, StreamingHttpResponse
+from rest_framework.exceptions import ParseError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.audit.helpers import log as audit_log
 from apps.events.models import Event, Membership
 from apps.events.permissions import IsOrganizer
 
+from .exporter import build_export, chunked_export_json
 from .models import Webhook
 
 # Single source of truth for the OpenAPI document. The view loads
@@ -113,193 +122,244 @@ class WebhookListCreateView(APIView):
         )
 
 
-class BulkImportView(APIView):
-    """T4 spec: bulk import endpoint for organizers.
+# --- T4: bulk import/export -------------------------------------------------
 
-    POST /api/events/<slug>/bulk/import
-        body: ``{"kind": "judges"|"teams"|"submissions",
-                 "rows": [...]}``
+# 5 MiB. The official fixtures.json is ~46 KB, so this is ~100x headroom
+# while still bounding how much JSON a single request can make the
+# importer parse and how big of a tempfile one request can write.
+MAX_IMPORT_BYTES = 5 * 1024 * 1024
 
-    Each row is a dict matching the shape of the corresponding model.
-    For ``judges``, each row is ``{email, name, role}`` and creates
-    the User + Membership in one transaction. For ``teams``, each row
-    is ``{name, captain_email, member_emails}`` and creates the
-    Team, TeamMember rows, and (if missing) Users for any emails.
-    For ``submissions``, each row is
-    ``{team_name, track_slug, name, tagline, description, tech_tags,
-       repo_url, live_url, demo_video_url, thumbnail_path}``.
 
-    Organizer-only. Best-effort idempotent: re-imports are skipped
-    when the row already exists (judge by email, team by name +
-    event, submission by team + event).
+def _payload_too_large_response(actual_bytes):
+    """The documented 413 for oversized import bodies (see openapi.yaml):
+    never a parse error, never Django's generic 400."""
+    return Response(
+        {
+            "error": {
+                "code": "payload_too_large",
+                "message": (
+                    f"Body is {actual_bytes} bytes; the import limit is {MAX_IMPORT_BYTES} (5 MiB)."
+                ),
+            }
+        },
+        status=413,
+    )
+
+# Top-level sections import_fixtures dereferences unconditionally. The
+# view validates exactly these and no more (deep per-row validation
+# stays the importer's job) so a *truncated* body fails fast with a 422
+# instead of a KeyError-500 from inside the management command.
+_REQUIRED_FIXTURE_SECTIONS = ("event", "tracks", "judges", "teams", "projects")
+_LIST_SECTIONS = ("tracks", "judges", "teams", "projects")
+# The importer dereferences event["name"] and event["submissions_close"]
+# verbatim, so a dict-shaped `event` without these strings would 500.
+_REQUIRED_EVENT_FIELDS = ("name", "submissions_close")
+
+
+class EventImportView(APIView):
+    """POST /api/events/<slug>/import — bulk-import a fixtures.json-shaped
+    body into the event, reusing the battle-tested importer
+    (``import_fixtures``) instead of duplicating its logic. The importer
+    is idempotent + atomic: re-importing the same body is safe, and a
+    failed import leaves the event exactly as it was.
+
+    Role check is INLINE, not ``IsOrganizer``: the importer must also be
+    able to CREATE an event (bootstrap import — a fresh event slug), and
+    nobody can hold a membership in an event that doesn't exist yet. So:
+
+      * event exists  -> requester must be an organizer of THAT event
+                         (or an admin);
+      * event absent -> requester must organize at least one event
+                         (or be an admin) — the bootstrap case.
+
+    The body is written to a tempfile so the importer reads exactly what
+    the organizer sent (its file-parsing path, byte for byte), then the
+    temp directory is removed either way.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, slug):
+        if not self._authorized(request, slug):
+            return Response(
+                {"error": {"code": "forbidden", "message": "Only organizers can import."}},
+                status=403,
+            )
+
+        # Size guard BEFORE parsing: an oversized body is rejected without
+        # even JSON-decoding it. Content-Length is inspected first so a huge
+        # body is refused without reading it at all; RequestDataTooBig
+        # (Django's own DATA_UPLOAD_MAX_MEMORY_SIZE guard, configured above
+        # the import limit in settings) is translated into the documented
+        # 413 instead of Django's generic 400.
+        try:
+            content_length = int(
+                request.META.get("CONTENT_LENGTH")
+                or request.META.get("HTTP_CONTENT_LENGTH")
+                or 0
+            )
+        except (TypeError, ValueError):
+            content_length = 0
+        if content_length > MAX_IMPORT_BYTES:
+            return _payload_too_large_response(content_length)
+        try:
+            raw = request.body
+        except RequestDataTooBig:
+            # A client that understates (or omits) Content-Length still gets
+            # 413 — never a parser crash, never a generic 400.
+            return _payload_too_large_response(MAX_IMPORT_BYTES + 1)
+        if len(raw) > MAX_IMPORT_BYTES:
+            return _payload_too_large_response(len(raw))
+
+        try:
+            data = request.data
+        except ParseError:
+            # Syntactically broken JSON — e.g. a body truncated mid-string.
+            # The endpoint's documented contract is "malformed body => 422,
+            # never a 500" (see openapi.yaml), so the parser error is
+            # reported as a validation failure instead of DRF's default 400
+            # (a status this endpoint does not declare).
+            return self._validation_failed(
+                "Body must be valid JSON shaped like fixtures.json "
+                "(sections: event, tracks, judges, teams, projects, scores)."
+            )
+        if not isinstance(data, dict):
+            return self._validation_failed(
+                "Body must be a JSON object shaped like fixtures.json "
+                "(sections: event, tracks, judges, teams, projects, scores)."
+            )
+
+        missing = [s for s in _REQUIRED_FIXTURE_SECTIONS if s not in data]
+        if missing:
+            return self._validation_failed(
+                f"Truncated fixtures body — missing section(s): {', '.join(missing)}."
+            )
+        bad_types = [s for s in _LIST_SECTIONS if not isinstance(data[s], list)]
+        if not isinstance(data["event"], dict):
+            bad_types.append("event")
+        if bad_types:
+            return self._validation_failed(
+                f"Section(s) with wrong type: {', '.join(sorted(set(bad_types)))} "
+                "(event must be an object; tracks/judges/teams/projects must be lists)."
+            )
+        missing_event_fields = [
+            f for f in _REQUIRED_EVENT_FIELDS if not isinstance(data["event"].get(f), str)
+        ]
+        if missing_event_fields:
+            return self._validation_failed(
+                f"event section is missing required string field(s): "
+                f"{', '.join(missing_event_fields)}."
+            )
+        scores = data.get("scores", [])
+        if not isinstance(scores, list):
+            return self._validation_failed("scores, when present, must be a list.")
+
+        with tempfile.TemporaryDirectory(prefix="dogfood-import-") as tmp_dir:
+            # delete=False + TemporaryDirectory: call_command reopens the
+            # file by path, so it must outlive the NamedTemporaryFile
+            # context; the surrounding TemporaryDirectory removes
+            # everything (file included) on the way out, on both the
+            # success and the failure path.
+            with tempfile.NamedTemporaryFile(
+                "w",
+                suffix=".json",
+                encoding="utf-8",
+                dir=tmp_dir,
+                delete=False,
+            ) as tmp:
+                json.dump(data, tmp)
+                tmp_path = tmp.name
+            try:
+                call_command(
+                    "import_fixtures",
+                    file=tmp_path,
+                    event_slug=slug,
+                    stdout=io.StringIO(),
+                )
+            except (CommandError, KeyError, TypeError, ValueError) as exc:
+                # CommandError -> the importer's own validation. KeyError/
+                # TypeError/ValueError -> a truncated row inside one of the
+                # lists (e.g. a project without "team"). The importer is
+                # atomic, so nothing partial was committed — 422, not 500.
+                return self._validation_failed(f"Import failed: {exc}")
+
+        audit_log(
+            request.user,
+            "bulk.import",
+            Event.objects.filter(slug=slug).first(),
+            payload=self._counts(data, scores),
+            request=request,
+        )
+        return Response({"imported": self._counts(data, scores), "event": slug})
+
+    @staticmethod
+    def _authorized(request, slug) -> bool:
+        is_admin = getattr(request.user, "is_admin_role", False)
+        if is_admin:
+            return True
+        event = Event.objects.filter(slug=slug).first()
+        if event is not None:
+            return Membership.objects.filter(
+                user=request.user, event=event, role="organizer"
+            ).exists()
+        # Bootstrap: the event doesn't exist yet — the import is what
+        # creates it. Any organizer (of any event) may bootstrap.
+        return Membership.objects.filter(user=request.user, role="organizer").exists()
+
+    @staticmethod
+    def _counts(data, scores) -> dict:
+        return {
+            "projects": len(data["projects"]),
+            "judges": len(data["judges"]),
+            "teams": len(data["teams"]),
+            "scores": len(scores),
+        }
+
+    @staticmethod
+    def _validation_failed(message: str):
+        return Response(
+            {"error": {"code": "validation_failed", "message": message}},
+            status=422,
+        )
+
+
+class EventExportView(APIView):
+    """GET /api/events/<slug>/export — organizer-only bulk export: streams
+    the event as fixtures-shaped JSON, byte-for-byte re-importable by
+    ``POST /api/events/<slug>/import`` (and ``import_fixtures``). See
+    apps/api/exporter.py for the determinism rules and the documented
+    round-trip caveats.
+
+    ``[IsAuthenticated, IsOrganizer]`` — the shared permission pair; for a
+    non-existent event non-admins get 403 at the permission layer (house
+    behavior of organizer-gated endpoints), admins get the 404 below.
     """
 
     permission_classes = [IsAuthenticated, IsOrganizer]
 
-    def post(self, request, slug):
-        from apps.audit.helpers import log as audit_log
-        from apps.events.models import Event, Membership
-
-        try:
-            event = Event.objects.get(slug=slug)
-        except Event.DoesNotExist:
+    def get(self, request, slug):
+        event = Event.objects.filter(slug=slug).first()
+        if event is None:
             return Response(
                 {"error": {"code": "not_found", "message": f"Event {slug!r} not found."}},
                 status=404,
             )
 
-        kind = request.data.get("kind")
-        rows = request.data.get("rows", [])
-        if kind not in ("judges", "teams", "submissions"):
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_failed",
-                        "message": "kind must be one of: judges, teams, submissions.",
-                    }
-                },
-                status=422,
-            )
-        if not isinstance(rows, list):
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_failed",
-                        "message": "rows must be a list.",
-                    }
-                },
-                status=422,
-            )
-
-        if kind == "judges":
-            created = self._import_judges(event, rows, request.user)
-        elif kind == "teams":
-            created = self._import_teams(event, rows)
-        else:
-            created = self._import_submissions(event, rows)
-
+        export = build_export(event)
         audit_log(
             request.user,
-            "bulk.import",
-            target=event,
-            payload={"kind": kind, "created": created, "submitted": len(rows)},
+            "bulk.export",
+            event,
+            payload={
+                "projects": len(export["projects"]),
+                "judges": len(export["judges"]),
+                "teams": len(export["teams"]),
+                "scores": len(export["scores"]),
+            },
             request=request,
         )
-        return Response(
-            {"kind": kind, "submitted": len(rows), "created": created},
-            status=201,
+        response = StreamingHttpResponse(
+            chunked_export_json(export), content_type="application/json"
         )
-
-    def _import_judges(self, event, rows, organizer):
-        from apps.accounts.models import User
-        from apps.events.models import Membership
-
-        created = 0
-        for row in rows:
-            email = (row.get("email") or "").strip().lower()
-            if not email:
-                continue
-            name = (row.get("name") or "").strip()
-            role = (row.get("role") or "judge").strip()
-            if role not in ("judge", "organizer", "participant", "admin"):
-                role = "judge"
-            user, user_created = User.objects.get_or_create(
-                email=email,
-                defaults={"username": email, "name": name, "is_active": True},
-            )
-            if user_created:
-                user.set_password("dogfood-dev-password")
-                user.save()
-            _, m_created = Membership.objects.get_or_create(
-                user=user,
-                event=event,
-                defaults={"role": role, "created_by": organizer},
-            )
-            if user_created or m_created:
-                created += 1
-        return created
-
-    def _import_teams(self, event, rows):
-        from apps.accounts.models import User
-        from apps.teams.models import Team, TeamMember
-
-        created = 0
-        for row in rows:
-            name = (row.get("name") or "").strip()
-            captain_email = (row.get("captain_email") or "").strip().lower()
-            member_emails = row.get("member_emails") or []
-            if not name or not captain_email:
-                continue
-            captain, _ = User.objects.get_or_create(
-                email=captain_email,
-                defaults={"username": captain_email, "is_active": True},
-            )
-            team, t_created = Team.objects.get_or_create(
-                event=event,
-                name=name,
-                defaults={"created_by": captain},
-            )
-            if not t_created:
-                continue  # idempotent skip
-            TeamMember.objects.get_or_create(
-                team=team,
-                user=captain,
-                defaults={"role_in_team": "captain"},
-            )
-            for member_email in member_emails:
-                member_email = member_email.strip().lower()
-                if not member_email or member_email == captain_email:
-                    continue
-                member, _ = User.objects.get_or_create(
-                    email=member_email,
-                    defaults={"username": member_email, "is_active": True},
-                )
-                TeamMember.objects.get_or_create(
-                    team=team,
-                    user=member,
-                    defaults={"role_in_team": "member"},
-                )
-            created += 1
-        return created
-
-    def _import_submissions(self, event, rows):
-        from apps.submissions.models import Submission
-
-        created = 0
-        for row in rows:
-            team_name = (row.get("team_name") or "").strip()
-            if not team_name:
-                continue
-            from apps.teams.models import Team
-
-            try:
-                team = Team.objects.get(event=event, name=team_name)
-            except Team.DoesNotExist:
-                continue
-            track_slug = row.get("track_slug")
-            try:
-                track = event.tracks.get(slug=track_slug) if track_slug else event.tracks.first()
-            except Exception:
-                continue
-            if track is None:
-                continue
-            defaults = {
-                "event": event,
-                "track": track,
-                "name": (row.get("name") or f"{team_name} submission").strip()[:80],
-                "tagline": (row.get("tagline") or "").strip()[:140],
-                "description": row.get("description") or "",
-                "thumbnail_path": row.get("thumbnail_path") or "",
-                "demo_video_url": row.get("demo_video_url") or "",
-                "repo_url": row.get("repo_url") or "",
-                "live_url": row.get("live_url") or "",
-                "tech_tags": row.get("tech_tags") or [],
-                "status": row.get("status") or "draft",
-            }
-            _, created_flag = Submission.objects.get_or_create(
-                team=team,
-                defaults=defaults,
-            )
-            if created_flag:
-                created += 1
-        return created
+        response["Content-Disposition"] = f'attachment; filename="fixtures-{event.slug}.json"'
+        return response

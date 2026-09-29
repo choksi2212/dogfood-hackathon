@@ -12,6 +12,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api/client";
+import { CommentsSection } from "./comments";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { ClientDate } from "@/components/client-date";
@@ -200,6 +201,7 @@ export default async function SubmissionDetailPage({
           </Link>
         </aside>
       </div>
+      <CommentsSection submissionId={submission.id} />
     </article>
   );
 }

@@ -365,13 +365,37 @@ by the controls above or by adjacent code.
 
 ### 5.4 Webhook URL takeover
 
-- **Mitigation.** Webhook deliveries carry an HMAC-SHA256 signature;
-  each webhook has its own secret; HTTPS-only on the receiver side.
+- **Mitigation.** Webhook deliveries carry an HMAC-SHA256 signature
+  (`X-Dogfood-Signature: sha256=…`) keyed by a per-subscription
+  server-generated secret; a receiver that verifies the signature rejects
+  payloads forged by whoever now controls the URL. Deliveries are
+  synchronous (3 s timeout, single inline attempt, failures recorded and
+  retried only via the visible `flush_webhooks` command), so a hijacked or
+  slow subscriber cannot stall or spam the portal. Subscription
+  management and the delivery log are organizer-only and audited.
+- **Residual risk.** Subscriptions are trusted-operator input: a malicious
+  organizer can point deliveries at internal addresses (SSRF). In the
+  self-hosted single-operator model this is within the operator's own
+  trust boundary; production deployments behind a shared team should
+  proxy outbound webhooks through an egress allowlist. HTTP receivers are
+  permitted deliberately — the offline demo uses a localhost listener.
 
 ### 5.5 Signed certificate forgery
 
-- **Mitigation.** Certificates are Ed25519-signed; the public key is
-  published; an offline verifier CLI ships in `apps/certificates/`.
+- **Mitigation.** Certificates and judge participation records are
+  HMAC-SHA256-signed over a canonical JSON payload using the server's
+  `SECRET_KEY`; the public record/certificate endpoints verify with
+  `hmac.compare_digest` and reject tampering with a
+  `signature_invalid` 400. Forging one requires the server secret —
+  the same boundary that protects Django sessions. Every issue event is
+  audit-logged with the issuing organizer.
+- **Limitation, stated honestly.** Verification runs through the
+  portal's own verify endpoint (the verifying party must trust the
+  portal), and there is no offline public-key verifier. Ed25519 with a
+  published public key is the natural production upgrade and is noted as
+  such in ARCHITECTURE.md; for the self-hosted trust model — the same
+  operator that runs the event publishes the records — HMAC is
+  proportionate.
 
 ### 5.6 Cookie theft via XSS
 
