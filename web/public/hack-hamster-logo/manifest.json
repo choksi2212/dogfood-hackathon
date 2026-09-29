@@ -1,46 +1,44 @@
 {
   "brand": "Hack Hamster",
-  "wordmark": "hack-hamster.",
+  "wordmark": "hack hamster",
   "palette": {
-    "dark": "#080F13",
-    "light": "#EEF4F6",
-    "teal": "#53D8CF",
-    "deep_teal": "#0B6E78",
-    "ink": "#061012",
-    "surface": "#EEF4F6"
+    "red": "#E2454A",
+    "offwhite": "#F5F5F5",
+    "gray": "#DADADA",
+    "charcoal": "#303030",
+    "white": "#FFFFFF"
   },
   "typeface": "Geist Sans",
   "weight": 500,
   "trackingEm": -0.02,
   "measuredXHeightEm": 0.532,
   "capHeightEm": 0.71,
-  "periodShape": "circle, baseline aligned",
-  "periodHeightX": 1,
-  "horizontalMarkHeightX": 2.4,
-  "stackedMarkWidthWordmark": 0.9,
+  "wordGapEm": 0.25,
+  "horizontalSymbolCanvasHeightX": 2.4,
+  "stackedSymbolCanvasWidthWordmark": 0.62,
+  "inspiration": {
+    "reference": "https://commons.wikimedia.org/wiki/File:XHamster_logo.svg",
+    "cues": "front-facing hamster, visible incisors, red first word and neutral second word",
+    "originalConstruction": true
+  },
   "symbol": {
-    "viewBox": "0 0 8 10",
-    "upper": [
-      3,
-      5
-    ],
-    "lower": [
-      6,
-      3
-    ],
-    "notch": [
+    "viewBox": "0 0 24 24",
+    "visibleBounds": [
       1,
-      1
+      2,
+      23,
+      23
     ],
-    "radius": 0.5,
-    "path": "M 0 0.5 L 0 0.5 A 0.5 0.5 0 0 1 0.5 0 L 2.5 0 A 0.5 0.5 0 0 1 3 0.5 L 3 3.5 A 0.5 0.5 0 0 1 2.5 4 L 2.5 4 A 0.5 0.5 0 0 0 2 4.5 L 2 4.5 A 0.5 0.5 0 0 0 2.5 5 L 5.5 5 A 0.5 0.5 0 0 1 6 5.5 L 6 7.5 A 0.5 0.5 0 0 1 5.5 8 L 0.5 8 A 0.5 0.5 0 0 1 0 7.5 Z",
-    "opticalRefinement": "Original 4x3 / 6x5 bars failed the small-size L silhouette check. Refined master keeps bounding grid, notch, and radius."
+    "path": "M12 4.5 C10.8 4.5 9.7 4.7 8.65 5.1 C8.5 3.4 7.3 2 5.75 2 C3.955 2 2.5 3.567 2.5 5.5 C2.5 6.7 3.03 7.76 3.84 8.39 C2.06 10.01 1 12.08 1 14.5 C1 20.02 5.93 23 12 23 C18.07 23 23 20.02 23 14.5 C23 12.08 21.94 10.01 20.16 8.39 C20.97 7.76 21.5 6.7 21.5 5.5 C21.5 3.567 20.045 2 18.25 2 C16.7 2 15.5 3.4 15.35 5.1 C14.3 4.7 13.2 4.5 12 4.5 Z M8 9.5 A1.5 1.5 0 0 1 9.5 11 V11.5 A1.5 1.5 0 0 1 6.5 11.5 V11 A1.5 1.5 0 0 1 8 9.5 Z M16 9.5 A1.5 1.5 0 0 1 17.5 11 V11.5 A1.5 1.5 0 0 1 14.5 11.5 V11 A1.5 1.5 0 0 1 16 9.5 Z M10 14 H14 L12 16.5 Z M9 18 H11.5 V21 H9.5 C9.224 21 9 20.776 9 20.5 Z M12.5 18 H15 V20.5 C15 20.776 14.776 21 14.5 21 H12.5 Z",
+    "fillRule": "evenodd",
+    "cutouts": "two rounded eyes, triangular nose and two rectangular incisors"
   },
   "certificate": {
-    "markWidthMm": 40,
+    "symbolCanvasWidthMm": 43.63636363636363,
+    "visibleMarkWidthMm": 40,
     "wordmarkPt": 24,
-    "printWidthPt": 240,
-    "printHeightPt": 280
+    "printWidthPt": 280,
+    "printHeightPt": 230
   },
   "files": [
     {
@@ -48,7 +46,7 @@
       "width": 4096,
       "height": 1024,
       "variant": 1,
-      "background": "#080F13",
+      "background": "#303030",
       "transparent": false
     },
     {
@@ -56,15 +54,15 @@
       "width": 4096,
       "height": 1024,
       "variant": 2,
-      "background": "#EEF4F6",
+      "background": "#F5F5F5",
       "transparent": false
     },
     {
       "name": "03-stacked-dark",
       "width": 2048,
-      "height": 2560,
+      "height": 2048,
       "variant": 3,
-      "background": "#080F13",
+      "background": "#303030",
       "transparent": false
     },
     {
@@ -80,7 +78,7 @@
       "width": 2048,
       "height": 2048,
       "variant": null,
-      "background": "#080F13",
+      "background": "#303030",
       "transparent": false
     },
     {
@@ -96,7 +94,7 @@
       "width": 2048,
       "height": 2048,
       "variant": null,
-      "background": "#EEF4F6",
+      "background": "#F5F5F5",
       "transparent": false
     },
     {
@@ -104,7 +102,7 @@
       "width": 4096,
       "height": 1024,
       "variant": 6,
-      "background": "#080F13",
+      "background": "#303030",
       "transparent": false
     },
     {
@@ -112,7 +110,7 @@
       "width": 4096,
       "height": 1024,
       "variant": 7,
-      "background": "#EEF4F6",
+      "background": "#F5F5F5",
       "transparent": false
     },
     {
@@ -128,7 +126,7 @@
       "width": 4096,
       "height": 1024,
       "variant": null,
-      "background": "#EEF4F6",
+      "background": "#FFFFFF",
       "transparent": false
     },
     {
@@ -144,7 +142,7 @@
       "width": 4096,
       "height": 1024,
       "variant": null,
-      "background": "#080F13",
+      "background": "#303030",
       "transparent": false
     },
     {
@@ -164,7 +162,7 @@
       "transparent": true
     },
     {
-      "name": "favicon-light-16",
+      "name": "favicon-reversed-16",
       "width": 16,
       "height": 16,
       "variant": null,
@@ -172,7 +170,7 @@
       "transparent": true
     },
     {
-      "name": "favicon-light-32",
+      "name": "favicon-reversed-32",
       "width": 32,
       "height": 32,
       "variant": null,
@@ -205,7 +203,7 @@
     },
     {
       "name": "widget-header-dark",
-      "width": 112,
+      "width": 152,
       "height": 24,
       "variant": null,
       "background": null,
@@ -213,7 +211,7 @@
     },
     {
       "name": "widget-header-light",
-      "width": 112,
+      "width": 152,
       "height": 24,
       "variant": null,
       "background": null,
@@ -221,7 +219,7 @@
     },
     {
       "name": "widget-header-dark-4x",
-      "width": 448,
+      "width": 608,
       "height": 96,
       "variant": null,
       "background": null,
@@ -229,8 +227,8 @@
     },
     {
       "name": "certificate-header",
-      "width": 2400,
-      "height": 2800,
+      "width": 2800,
+      "height": 2300,
       "variant": null,
       "background": null,
       "transparent": true
@@ -240,23 +238,15 @@
       "width": 1280,
       "height": 640,
       "variant": null,
-      "background": "#080F13",
+      "background": "#303030",
       "transparent": false
     },
     {
       "name": "hack-hamster-family",
       "width": 1920,
-      "height": 3100,
+      "height": 2800,
       "variant": null,
-      "background": "mixed petrol and ice panels",
-      "transparent": false
-    },
-    {
-      "name": "construction",
-      "width": 1920,
-      "height": 1760,
-      "variant": null,
-      "background": "#080F13",
+      "background": "mixed charcoal and offwhite panels",
       "transparent": false
     },
     {
@@ -264,7 +254,7 @@
       "width": 1920,
       "height": 1600,
       "variant": null,
-      "background": "#080F13",
+      "background": "#303030",
       "transparent": false
     }
   ]
