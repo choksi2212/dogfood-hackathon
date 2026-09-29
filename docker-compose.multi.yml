@@ -131,6 +131,11 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
+      # web/Dockerfile is multi-stage; `development` keeps this compose
+      # workflow on the dev server (volume-mounted sources, HMR). The
+      # last stage is `production` — the default for bare
+      # `docker build web/` and PaaS deploys.
+      target: development
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-development}
