@@ -10,10 +10,9 @@ import { cn } from "@/lib/cn";
  * - The lockup picks the dark or light horizontal variant based on the
  *   resolved theme; the symbol picks dark or light mark accordingly.
  *
- * Uses the SVG files under /public/hack-hamster-logo/. Mark = `#53D8CF` (teal)
- * on dark surfaces, `#0B6E78` (deep teal) on light — chosen by GPT-6 to
- * harmonize with the existing After-Hours Indigo design system without
- * competing with the violet accents.
+ * Uses the SVG files under /public/hack-hamster-logo/. Mark = `#E2454A` (red)
+ * on both dark and light surfaces; the lockup pairs it with `#F5F5F5`
+ * (offwhite) or `#303030` (charcoal) — the Hack Hamster brand palette.
  */
 export function Brand({
   compact = false,
@@ -33,7 +32,7 @@ export function Brand({
     >
       {compact ? (
         <span className="inline-flex">
-          {/* light=light-bg mark (deep teal), dark=dark-bg mark (teal). */}
+          {/* light=light-bg variant, dark=dark-bg variant (both use the red mark). */}
           <LogoMark />
         </span>
       ) : (
@@ -51,17 +50,17 @@ function LogoLockup() {
   return (
     <>
       <Image
-        src="/hack-hamster-logo/01-horizontal-dark.svg"
+        src="/hack-hamster-logo/logo.svg"
         alt="Hack Hamster"
-        width={120}
+        width={202}
         height={30}
         className="hidden h-7 w-auto dark:block"
         priority
       />
       <Image
-        src="/hack-hamster-logo/02-horizontal-light.svg"
+        src="/hack-hamster-logo/logo-light.svg"
         alt="Hack Hamster"
-        width={120}
+        width={202}
         height={30}
         className="block h-7 w-auto dark:hidden"
         priority

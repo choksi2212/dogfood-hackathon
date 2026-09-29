@@ -445,21 +445,21 @@ export function LandingPage() {
           </div>
         </div>
       </section>
-      <section className="relative overflow-hidden border-y border-cyan-300/20 bg-[#0b2a34] text-white">
+      <section className="relative overflow-hidden border-y border-[#e2454a]/25 bg-[#303030] text-white">
         <div
           aria-hidden="true"
           className="mesh-grid moving-grid absolute inset-0 opacity-[.05]"
         />
         <div className="container-shell relative flex flex-wrap items-center justify-between gap-8 py-20 lg:py-24">
           <div data-reveal>
-            <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-caps text-cyan-200">
+            <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-caps text-[#f08c90]">
               <Check className="size-4" />
               Your next chapter starts here
             </p>
             <h2 className="text-4xl font-medium tracking-display sm:text-6xl">
               Ready to ship?
             </h2>
-            <p className="mt-4 text-sm text-cyan-100/75">
+            <p className="mt-4 text-sm text-[#f5f5f5]/75">
               Bring the idea. We’ll make room for it.
             </p>
           </div>
@@ -468,7 +468,7 @@ export function LandingPage() {
               href="/submit"
               className={cn(
                 buttonVariants({ size: "lg" }),
-                "bg-cyan-200 text-slate-950 hover:bg-cyan-100 hover:shadow-sm",
+                "bg-[#e2454a] text-white hover:bg-[#c93a3f] hover:shadow-sm",
               )}
             >
               Submit your project
