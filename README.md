@@ -93,49 +93,67 @@ If we can't point at all three, we don't claim it.
 
 ## System architecture
 
-Hack Hamster is a layered system: nginx in front, Next.js for the browser, Django REST Framework for the API, PostgreSQL 16 for state, and a single supervisor process holding it all together inside one container.
+Hack Hamster is a layered system — nginx in front, Next.js for the browser, Django REST Framework for the API, PostgreSQL 16 for state, and a single supervisor process holding it all together inside one container. The diagram below reads left-to-right: traffic enters from the browser on the left, passes through nginx, fans into Django and Next.js, and lands on Postgres.
 
 ```mermaid
-flowchart TB
-    subgraph Browser["🌐 Browser (judge, organizer, participant, public)"]
-        B1[Next.js 15 App Router<br/>Server Components fetch Django<br/>directly over the compose network]
-    end
-
-    subgraph Container["🐳 Single container — hack-hamster-portal:latest"]
+flowchart LR
+    subgraph Edge["🌐 Browser"]
         direction TB
-        N[nginx :8000<br/>public entry, TLS-ready]
-        subgraph Sup["supervisord (PID 1)"]
-            DJ["Django 5.1 + DRF 3.15<br/>runserver 127.0.0.1:8001"]
-            NX[Next.js<br/>next start 127.0.0.1:3000]
-        end
-        subgraph App["apps/* — Django domain"]
-            A1[accounts]
-            A2[events]
-            A3[teams]
-            A4[submissions]
-            A5[voting]
-            A6[judging]
-            A7[normalization]
-            A8[pairwise]
-            A9[certificates]
-            A10[webhooks]
-            A11[audit]
-            A12[api]
-        end
-        PG[(PostgreSQL 16<br/>127.0.0.1:5432)]
+        U1[👤 Judge]
+        U2[🧑‍💼 Organizer]
+        U3[🧑 Participant]
+        U4[👥 Public visitor]
     end
 
-    N -->|/api/*, /healthz| DJ
-    N -->|/| NX
-    DJ --> App
-    App --> PG
-    B1 --> N
-    NX --> N
+    subgraph Edge2["🚪 Public edge"]
+        NG["nginx :8000<br/>TLS-ready · Host $host ·<br/>X-Forwarded-For/Proto"]
+    end
 
-    style Container fill:#F1FAEE,stroke:#E63946,stroke-width:2px
-    style Sup fill:#2B2D42,stroke:#2B2D42,color:#F1FAEE
-    style Browser fill:#F1FAEE,stroke:#2B2D42
-    style PG fill:#E63946,stroke:#E63946,color:#F1FAEE
+    subgraph App["🐳 Single container — hack-hamster-portal:latest"]
+        direction TB
+        subgraph Sup["🧭 supervisord (PID 1)"]
+            direction LR
+            DJ["🐍 Django 5.1 + DRF 3.15<br/>runserver :8001"]
+            NX["⚛️ Next.js 15<br/>next start :3000"]
+        end
+
+        subgraph Domain["📦 Django domain (apps/*)"]
+            direction LR
+            ACC[accounts]
+            EVT[events]
+            SUB[submissions]
+            JUD[judging]
+            NRM[normalization]
+            PAI[pairwise]
+            VOT[voting]
+            CRT[certificates]
+            WHK[webhooks]
+            AUD[audit]
+        end
+
+        PG[("🗄️ PostgreSQL 16<br/>127.0.0.1:5432")]
+    end
+
+    U1 --> NG
+    U2 --> NG
+    U3 --> NG
+    U4 --> NG
+
+    NG -->|"/api/*, /healthz"| DJ
+    NG -->|"/"| NX
+
+    DJ --> Domain
+    Domain --> PG
+
+    style Edge fill:#FDF6E3,stroke:#E9C46A,stroke-width:1px
+    style Edge2 fill:#FFE8D6,stroke:#F4A261,stroke-width:1px
+    style App fill:#F1FAEE,stroke:#E63946,stroke-width:2px
+    style Sup fill:#E8F4F8,stroke:#457B9D,stroke-width:1px
+    style Domain fill:#EDE7F6,stroke:#6C567B,stroke-width:1px
+    style PG fill:#A8DADC,stroke:#2A9D8F,stroke-width:2px,color:#1D3557
+    style NG fill:#F4A261,stroke:#E76F51,color:#1D3557
+    style DJ fill:#FFE8D6,stroke:#E76F51,color:#1D3557
+    style NX fill:#EDE7F6,stroke:#6C567B,color:#1D3557
 ```
 
 ### Why one container?
@@ -146,6 +164,7 @@ flowchart TB
 
 The trade-off (no per-service restartability, no per-service scaling) is acknowledged in [Honest limitations](#-honest-limitations).
 
+---
 
 ## Control flow architecture — what happens when a request lands
 
@@ -154,28 +173,33 @@ Every request follows the same path through six layers. The point of this diagra
 ```mermaid
 sequenceDiagram
     autonumber
-    participant B as Browser
-    participant N as nginx :8000
-    participant D as Django runserver :8001
-    participant MW as Middleware stack
-    participant V as DRF View
-    participant S as Service / ORM
-    participant DB as Postgres :5432
-    participant A as Audit helper
+    participant B as 🌐 Browser
+    participant N as 🚪 nginx :8000
+    participant D as 🐍 Django :8001
+    participant MW as 🧱 Middleware
+    participant V as ⚖️ DRF View
+    participant S as 📦 ORM
+    participant DB as 🗄️ Postgres
+    participant A as 📜 audit_log
 
     B->>N: GET /api/judge/scores
-    N->>N: Host $host (so Django's ALLOWED_HOSTS passes)
-    N->>D: proxy_pass with X-Forwarded-{For,Proto}
-    D->>MW: SecurityMiddleware<br/>CommonMiddleware<br/>SessionMiddleware<br/>AuthenticationMiddleware
+    N->>N: set Host $host (Django ALLOWED_HOSTS passes)
+    N->>D: proxy_pass + X-Forwarded headers
+    D->>MW: Security → Common → Session → Authentication
     MW->>V: dispatch(request)
-    V->>V: IsAuthenticated permission
-    V->>V: IsOwnJudge permission<br/>(scoped to request.user)
-    V->>S: Score.objects.filter(judge=request.user).select_related("criterion")
+    V->>V: IsAuthenticated ✓
+    V->>V: IsOwnJudge ✓ (scoped to request.user)
+    V->>S: Score.objects.filter(judge=user).select_related("criterion")
     S->>DB: SELECT ... WHERE judge_id = $1
     DB-->>S: rows
     S-->>V: queryset
     V-->>B: 200 JSON {scores: [...]}
-    Note over V,A: Only mutating views<br/>call audit_log(action, ...)
+
+    Note over V,A: 🔖 Only mutating views call audit_log()
+
+    rect rgb(241, 250, 238)
+    Note over B,DB: ⏱ Total ~5 ms — gate before view before ORM
+    end
 ```
 
 ### The six layers
@@ -202,18 +226,21 @@ Four flows carry almost all the traffic. Once you understand these, the rest of 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant V as Visitor
-    participant N as nginx
-    participant Vw as GalleryView
-    participant DB as Postgres
+    participant V as 👥 Visitor
+    participant N as 🚪 nginx
+    participant Vw as ⚖️ GalleryView
+    participant DB as 🗄️ Postgres
 
     V->>N: GET /api/gallery?q=test&sort=random
     N->>Vw: proxy (cache-control: public, max-age=60)
-    Vw->>DB: SELECT ... WHERE name ILIKE '%test%'<br/>OR tagline ILIKE '%test%'<br/>OR 'test' = ANY(tech_tags)<br/>ORDER BY random()
+    Vw->>DB: SELECT ... WHERE<br/>name/tagline/desc/tech_tags ILIKE '%test%'<br/>ORDER BY random()
     DB-->>Vw: rows
-    Vw->>Vw: SubmissionSummarySerializer<br/>(drops images, drops repo_url — gallery surface)
+    Vw->>Vw: SubmissionSummarySerializer<br/>strips images + repo_url (gallery surface)
     Vw-->>V: 200 {items: [...]}
-    Note over Vw: Cached at nginx microcache<br/>for 60 s on the public surface
+
+    rect rgb(232, 244, 248)
+    Note over Vw: 🗃 nginx microcache 60 s on public surface
+    end
 ```
 
 **Notes:**
@@ -226,45 +253,53 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     autonumber
-    participant J as Judge (browser)
-    participant D as ScoreSubmitView
-    participant DB as Postgres
-    participant A as audit_log
-    participant W as webhooks.notify
+    participant J as 👤 Judge
+    participant D as ⚖️ ScoreSubmitView
+    participant DB as 🗄️ Postgres
+    participant A as 📜 audit_log
+    participant W as 📡 webhooks.notify
 
     J->>D: POST /api/events/<slug>/me/batch/<id>/submit
-    D->>D: deadline_gated decorator<br/>(refuses after judging_close_at)
-    D->>D: IsAssignedJudge permission
-    D->>DB: Review.objects.get_or_create(assignment=...)<br/>UPDATE submitted_at = now()
-    D->>A: log(actor, "score.submit", target=assignment, request=request)
+    D->>D: ⏰ deadline_gated (refuses after judging_close_at)
+    D->>D: 🔒 IsAssignedJudge
+    D->>DB: Review.get_or_create(assignment=...)<br/>UPDATE submitted_at = now()
+    D->>A: log(actor, "score.submit", target=assignment)
     A->>DB: INSERT INTO audit_events ...
-    A->>W: notify(event, "score.created", {assignment, scores})
-    W->>W: synchronous POST to each subscriber<br/>3 s timeout, HMAC-signed, never raises
+    A->>W: notify(event, "score.created", payload)
+    W->>W: sync POST × subscribers<br/>3 s timeout · HMAC-signed · never raises
     D-->>J: 200 {submitted_at: "..."}
+
+    rect rgb(253, 246, 227)
+    Note over W: ⏱ Retries via `manage.py flush_webhooks`
+    end
 ```
 
-**The submit is two writes plus a webhook fan-out.** No transactions across the audit + webhook boundary — webhook delivery is best-effort, fire-and-forget. Retries are a batch job (`manage.py flush_webhooks`), not a hidden thread.
-
+**The submit is two writes plus a webhook fan-out.** No transactions across the audit + webhook boundary — webhook delivery is best-effort, fire-and-forget. Retries are a batch job, not a hidden thread.
 
 ### 3. Certificate issuance + public verify
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant O as Organizer
-    participant C as CertificatesIssueView
-    participant DB as Postgres
-    participant V as Visitor (curl, browser)
-    participant E as /api/certificates/<id>
+    participant O as 🧑‍💼 Organizer
+    participant C as ⚖️ CertificatesIssueView
+    participant DB as 🗄️ Postgres
+    participant V as 👥 Visitor
+    participant E as 🔍 /api/certificates/&lt;id&gt;
 
     O->>C: POST /api/events/<slug>/certificates/issue<br/>{"all": true}
-    C->>DB: For each accepted Submission:<br/>Certificate.objects.update_or_create(<br/>  submission=..., defaults={signed_payload, signature})
-    Note over C: signature = HMAC-SHA256(secret, canonical_json(payload))
+    C->>DB: for each accepted Submission:<br/>Certificate.update_or_create(... signed_payload, signature)
+    Note over C: 🔏 signature = HMAC-SHA256(secret, canonical_json(payload))
     C-->>O: 201 {issued: [...]}
+
     V->>E: GET /api/certificates/<public_id>
     E->>DB: SELECT ... WHERE public_id = $1
     E->>E: verify(payload, signature)
-    E-->>V: 200 {signed_payload, signature, signature_algorithm: HMAC-SHA256}<br/>OR 400 signature_invalid if tampered
+    alt signature valid
+        E-->>V: 200 {signed_payload, signature, signature_algorithm: HMAC-SHA256}
+    else signature invalid (tampered)
+        E-->>V: 400 signature_invalid
+    end
 ```
 
 **The certificate is a URL.** Anyone with the URL can verify. Tampering breaks the signature. There is no "trust the operator" path — the receiver verifies with `python -c "import hmac; ..."` and the answer is yes or no.
@@ -274,23 +309,28 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     autonumber
-    participant O as Organizer
-    participant E as ExporterView
-    participant I as BulkImportView
-    participant DB as Postgres
+    participant O as 🧑‍💼 Organizer
+    participant E as ⚖️ ExporterView
+    participant I as ⚖️ BulkImportView
+    participant DB as 🗄️ Postgres
 
     O->>E: GET /api/events/<slug>/export
     E->>DB: serialize event + tracks + judges + teams + projects + scores
     E-->>O: 200 fixtures-shaped JSON
-    Note over O: SHA-256 of the body
-    O->>I: POST /api/events/<slug>/import<br/>{"kind": "judges|teams|submissions", "rows": [...]}
-    I->>I: parse + validate (5 MiB cap → 413, malformed → 422)
+    Note over O: 🔐 SHA-256(body₁) captured
+
+    O->>I: POST /api/events/<slug>/import<br/>{kind: judges\|teams\|submissions, rows: [...]}
+    I->>I: parse + validate<br/>(5 MiB cap → 413 · malformed → 422)
     I->>DB: get_or_create per row (idempotent)
     I-->>O: 201 {kind, submitted, created}
-    O->>E: GET .../export
+
+    O->>E: GET /api/events/<slug>/export
     E-->>O: 200 fixtures-shaped JSON
-    Note over O: Same SHA-256
-    Note over O,E: export → import → export = byte-identical<br/>(test: tests/bulk/test_import_export.py)
+    Note over O: 🔐 SHA-256(body₂) = SHA-256(body₁) ✓
+
+    rect rgb(241, 250, 238)
+    Note over O,E: ✅ export → import → export = byte-identical<br/>(test: tests/bulk/test_import_export.py)
+    end
 ```
 
 This is the operationally important guarantee: **the export is the import shape, and the round-trip is lossless**. If you fork this portal and want to seed your own event, you download an export, edit it, upload it.
@@ -301,10 +341,10 @@ This is the operationally important guarantee: **the export is the import shape,
 
 ```mermaid
 erDiagram
-    User ||--o{ Membership : has
-    User ||--o{ TeamMember : joins
-    User ||--o{ Submission : authors
-    User ||--o{ Vote : casts
+    User ||--o{ Membership : "is member of"
+    User ||--o{ TeamMember : "joins"
+    User ||--o{ Submission : "authors via team"
+    User ||--o{ Vote : "casts"
     User ||--o{ JudgeRecord : "is judged by"
 
     Event ||--o{ Track : "has"
@@ -315,13 +355,13 @@ erDiagram
     Event ||--o{ JudgeRecord : "has"
     Event ||--o{ Webhook : "subscribes"
 
-    Track ||--o{ Submission : groups
+    Track ||--o{ Submission : "groups"
     Track ||--o{ PairwiseBallot : "ranks"
 
     Team ||--o{ TeamMember : "has"
     Team ||--|| Submission : "authors"
 
-    Submission ||--o{ SubmissionImage : "has gallery"
+    Submission ||--o{ SubmissionImage : "gallery"
     Submission ||--o{ SubmissionAnswer : "answers"
     Submission ||--o{ Comment : "receives"
     Submission ||--o{ Vote : "receives"
@@ -331,8 +371,6 @@ erDiagram
     JudgeBatch ||--o{ JudgeAssignment : "contains"
     JudgeAssignment ||--|| Review : "may have"
     JudgeAssignment ||--o{ Score : "collects"
-    Review }o--|| JudgeAssignment : "of"
-
     Rubric ||--o{ RubricCriterion : "has"
     JudgeAssignment }o--|| RubricCriterion : "scores against"
 
@@ -341,13 +379,14 @@ erDiagram
 
 **Design choices:**
 - **UUID primary keys everywhere.** URLs are unguessable and DB-mergeable.
-- **No `UniqueConstraint` on `(user, event)` for `Membership` alone** — `(user, event)` is unique, but it's also the FK target for `Vote.user`. Composite keys (`UniqueConstraint(fields=["user", "event"], name="...")`) are explicit so migrations are stable.
+- **`(user, event)` is unique on `Membership`** — explicit `UniqueConstraint(fields=["user", "event"], name=...)` so migrations are stable.
 - **`SubmissionImage` and `SubmissionAnswer` are owned rows** — wholesale-replaced on PUT (frontend always sends the full ordered list).
 - **Audit rows are append-only** — no UPDATE/DELETE permission; only INSERT.
 - **Webhook delivery rows are queryable** — operators see success rates per event type via `WebhookDelivery.objects.filter(success=False)`.
 
 The full schema, with cascades and `db_table` overrides, lives in [DATA-MODEL.md](DATA-MODEL.md).
 
+---
 
 ## Run it in three commands
 
@@ -394,27 +433,29 @@ Password for all demo accounts: `hack-hamster-dev-password`. **Zero copy-paste a
 
 ## Single-container deployment
 
-The default `docker compose up` runs **one** container — Postgres + Django + Next.js + nginx under `supervisord`:
+The default `docker compose up` runs **one** container — Postgres + Django + Next.js + nginx under `supervisord`. The diagram below shows what one image holds:
 
 ```mermaid
 flowchart LR
-    subgraph Container["hack-hamster-portal:latest"]
-        SUP[supervisord<br/>PID 1]
-        PG[postgres 17<br/>127.0.0.1:5432]
-        DJ[django runserver<br/>127.0.0.1:8001]
-        NX[next start<br/>127.0.0.1:3000]
-        NG[nginx :8000]
-        SUP --> PG
-        SUP --> DJ
-        SUP --> NX
-        SUP --> NG
+    subgraph SUP["🧭 supervisord (PID 1)"]
+        direction TB
+        PG[("🗄️ postgres 17<br/>:5432")]
+        DJ["🐍 django runserver<br/>:8001"]
+        NX["⚛️ next start<br/>:3000"]
+        NG["🚪 nginx<br/>:8000"]
     end
-    Browser((Browser)) -->|:8000| NG
-    NG -->|/api, /healthz| DJ
-    NG -->|/| NX
 
-    style Container fill:#F1FAEE,stroke:#E63946,stroke-width:2px
-    style SUP fill:#2B2D42,color:#F1FAEE
+    B((🌐 Browser)) -->|":8000"| NG
+    NG -->|"/api, /healthz"| DJ
+    NG -->|"/"| NX
+    DJ --> PG
+    NX --> DJ
+
+    style SUP fill:#F1FAEE,stroke:#E63946,stroke-width:2px
+    style PG fill:#A8DADC,stroke:#2A9D8F,color:#1D3557
+    style DJ fill:#FFE8D6,stroke:#F4A261,color:#1D3557
+    style NX fill:#EDE7F6,stroke:#6C567B,color:#1D3557
+    style NG fill:#FDF6E3,stroke:#E9C46A,color:#1D3557
 ```
 
 **Why `supervisord`?** Three daemons need to coexist (postgres, django, next) plus nginx for the public port. A shell script that `&`s them in the background loses to a SIGHUP, doesn't reap zombies, and can't restart a crashed process. `supervisord` does both.
@@ -423,6 +464,7 @@ flowchart LR
 
 For isolated development (per-service restartability + the observability stack), the legacy 7-service compose lives at [docker-compose.multi.yml](docker-compose.multi.yml). The default is single-container.
 
+---
 
 ## The four bonuses, defended
 
@@ -448,18 +490,37 @@ When the rubric is too rigid, organizers want **head-to-head**. Two projects, wh
 
 ```mermaid
 flowchart LR
-    A[Organizer: pairwise/ballots] -->|POST| V1[BallotsView]
-    V1 --> DB1[(Postgres<br/>pairwise_ballot)]
-    V1 -->|return 201| O
-    O2[Organizer: ranking] -->|POST /ranking| V2[RankingView]
-    V2 --> DB2[(cached rankings)]
-    V2 -->|Bradley-Terry MM| R[Top-K by score]
-    V2 -->|return 200| O2
+    subgraph IN["🧑‍💼 Organizer"]
+        direction TB
+        A1[📥 pairwise/ballots<br/>POST]
+        A2[📊 ranking<br/>POST]
+    end
 
-    style A fill:#F1FAEE,stroke:#2B2D42
-    style O2 fill:#F1FAEE,stroke:#2B2D42
-    style DB1 fill:#E63946,color:#F1FAEE
-    style DB2 fill:#E63946,color:#F1FAEE
+    subgraph BE["🐍 Django backend"]
+        direction TB
+        V1["⚖️ BallotsView"]
+        V2["⚖️ RankingView"]
+    end
+
+    subgraph DB["🗄️ Postgres"]
+        direction TB
+        DB1[(pairwise_ballot)]
+        DB2[(cached rankings)]
+    end
+
+    A1 -->|HTTP POST| V1
+    V1 -->|INSERT| DB1
+    V1 -->|201| A1
+    A2 -->|HTTP POST| V2
+    V2 -->|SELECT| DB1
+    V2 -->|"Bradley-Terry MM<br/>+ phantom prior 0.5"| R["🏆 Top-K ranking"]
+    V2 -->|INSERT| DB2
+    V2 -->|200 ranking| A2
+
+    style IN fill:#FDF6E3,stroke:#E9C46A
+    style BE fill:#FFE8D6,stroke:#F4A261
+    style DB fill:#A8DADC,stroke:#2A9D8F
+    style R fill:#F4A261,stroke:#E76F51,color:#1D3557
 ```
 
 The recovered-ranking test ([`tests/pairwise/test_recovery.py`](tests/pairwise/)) generates synthetic ballots from a known ranking, runs BT, and asserts the recovered ranking matches within tolerance.
@@ -504,26 +565,25 @@ Honesty about what didn't work the first time:
 
 **5. T3 not machine-verified.** The seven acceptance checks cover T1 and T2 only. We can't claim T3 is "verified" by the checker — we can only claim it's tested, defended, and graded by humans reading this repo. We did not claim T4 either, even though we built it.
 
-
 ---
 
 ## Test pyramid
 
 ```mermaid
-flowchart TB
-    A[Acceptance suite<br/>7 checks · run.py]
-    C[Conformance<br/>openapi.yaml ↔ URLconf<br/>10 checks]
-    P[Property / unit<br/>548 tests in pytest]
-    G[Golden<br/>known-good algorithm outputs<br/>normalization, BT, role-isolation]
+flowchart LR
+    A["🥇 Acceptance<br/>7 checks · run.py"]
+    C["🥈 Conformance<br/>openapi.yaml ↔ URLconf<br/>10 checks"]
+    P["🥉 Pytest<br/>548 tests · 20 categories"]
+    G["🏅 Golden<br/>known-good outputs<br/>(normalize, BT, role-isolation)"]
 
-    A -->|runner| P
-    C -->|URLconf path coverage| P
-    P -->|fixtures, ORM, views| G
+    A -->|runs against| P
+    C -->|runs against| P
+    P -->|references| G
 
-    style A fill:#E63946,color:#F1FAEE
-    style C fill:#2B2D42,color:#F1FAEE
-    style P fill:#F1FAEE,stroke:#2B2D42
-    style G fill:#F1FAEE,stroke:#2B2D42
+    style A fill:#F4A261,stroke:#E76F51,color:#1D3557
+    style C fill:#E9C46A,stroke:#F4A261,color:#1D3557
+    style P fill:#A8DADC,stroke:#2A9D8F,color:#1D3557
+    style G fill:#EDE7F6,stroke:#6C567B,color:#1D3557
 ```
 
 | Layer | What it catches | Where it lives |
