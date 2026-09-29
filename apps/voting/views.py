@@ -4,7 +4,9 @@ Endpoints (under /api/):
 
   POST   /api/events/<slug>/submissions/<id>/vote   cast or update a ballot
   DELETE /api/events/<slug>/submissions/<id>/vote   retract a ballot
-  GET    /api/events/<slug>/votes/results           organizer-only tally
+  GET    /api/events/<slug>/votes/results           live tally — organizers
+                                                      always, any session once
+                                                      results_at has passed
 
 Both are deadline-gated by ``judging_close_at``: community voting runs
 alongside judge review — ballots land on final, submitted work — and
@@ -37,8 +39,7 @@ from rest_framework.views import APIView
 
 from apps.audit.helpers import log as audit_log
 from apps.events.decorators import deadline_gated
-from apps.events.models import Event
-from apps.events.permissions import IsOrganizer
+from apps.events.models import Event, Membership
 from apps.submissions.models import Submission
 from apps.webhooks.delivery import notify
 
@@ -343,18 +344,20 @@ class VoteView(APIView):
 
 
 class VoteResultsView(APIView):
-    """GET /api/events/<slug>/votes/results — organizer-only tally of
-    live votes per project.
+    """GET /api/events/<slug>/votes/results — live vote tally per
+    project.
 
-    Retracted ballots contribute zero (see Vote.effective_votes); a
-    project with only retracted votes still appears with vote_count 0
-    rather than being omitted, so the organizer can see the full
-    submission set. `results_visible` mirrors whether the event's
-    results window has opened yet — the frontend uses it to decide
-    whether to show tallies to anyone other than the organizer (who
-    can always see them, same as every other role-isolation cell)."""
+    Organizers (and admins) always get the tally. Any other signed-in
+    session gets it once the results window has opened — ``now >=
+    results_at`` (FR-230/FR-231 in docs/PRD.md §3.3: before
+    ``results_at`` non-organizers receive 403, after it any session
+    receives 200). Retracted ballots contribute zero (see
+    Vote.effective_votes); a project with only retracted votes still
+    appears with vote_count 0 rather than being omitted, so the full
+    submission set stays visible. ``results_visible`` mirrors the
+    same state so the frontend can decide whether tallies are final."""
 
-    permission_classes = [IsAuthenticated, IsOrganizer]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, slug):
         try:
@@ -369,6 +372,22 @@ class VoteResultsView(APIView):
                 },
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        results_visible = event.results_at is None or timezone.now() >= event.results_at
+        if not results_visible:
+            is_organizer = getattr(request.user, "is_admin_role", False) or (
+                Membership.objects.filter(user=request.user, event=event, role="organizer").exists()
+            )
+            if not is_organizer:
+                return Response(
+                    {
+                        "error": {
+                            "code": "forbidden",
+                            "message": "Results are not published yet — tallies open at the event's results time.",
+                        }
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         projects = Submission.objects.filter(event=event, status="submitted")
         tally = {
@@ -399,10 +418,7 @@ class VoteResultsView(APIView):
             {
                 "event_slug": event.slug,
                 "voting_mode": event.voting_mode,
-                "results_visible": (
-                    event.results_at is None
-                    or timezone.now() >= event.results_at
-                ),
+                "results_visible": results_visible,
                 "results": results,
             }
         )
