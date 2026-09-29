@@ -504,6 +504,19 @@ paths:
                   format: email
                 password:
                   type: string
+          application/x-www-form-urlencoded:
+            description: >
+              Also accepted (issue #19) so standard form posts work:
+              curl -d, fetch with URLSearchParams, an HTML form
+              fallback. JSON remains the primary format.
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
       responses:
         '200':
           description: Authenticated; session cookie set
@@ -512,7 +525,7 @@ paths:
         '429':
           description: Rate limited
         '415':
-          description: "Unsupported media type \u2014 request body must be JSON"
+          description: "Unsupported media type \u2014 body must be JSON or form-urlencoded"
   /api/logout:
     post:
       summary: End the current session
