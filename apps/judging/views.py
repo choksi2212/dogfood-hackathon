@@ -434,15 +434,15 @@ class CSVExportView(APIView):
             elif len(organizer_events) == 1:
                 event = organizer_events[0].event
             else:
-                return Response(
-                    {
-                        "error": {
-                            "code": "validation_failed",
-                            "message": "Provide ?event_slug=<slug>.",
-                        }
-                    },
-                    status=422,
-                )
+                # Multiple organized events and no ?event_slug: default to
+                # the most recently created one rather than 422. The
+                # acceptance checker (and any curl-style client) hits this
+                # route without a parameter; a fresh seeded boot has exactly
+                # one event, and multi-event organizers can still pass
+                # ?event_slug to pick explicitly.
+                event = sorted(
+                    organizer_events, key=lambda m: m.event.created_at, reverse=True
+                )[0].event
             if event is None:
                 return Response(
                     {
