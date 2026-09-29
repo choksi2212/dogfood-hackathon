@@ -45,9 +45,9 @@ from django.urls import include, path
 def root(request):
     return JsonResponse(
         {
-            "service": "hack-hamster-portal",
-            "stage": "G9",
-            "tiers_claimed": ["t1", "t2", "t3"],
+            "service": "dogfood-portal",
+            "stage": "T1-T4",
+            "tiers_claimed": ["T1", "T2", "T3", "T4"],
         }
     )
 

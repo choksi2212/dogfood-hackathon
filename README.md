@@ -56,7 +56,7 @@ Nine base items, plus all four bonuses (+16). Everything below lives on `main` a
 | 6 | `ARCHITECTURE.md` — system shape, why | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | 7 | `DATA-MODEL.md` — schema, import and export paths | [DATA-MODEL.md](DATA-MODEL.md) |
 | 8 | `JUDGING.md` — assignment, scoring, normalization, defended | [JUDGING.md](JUDGING.md) |
-| 9 | Demo video — one full event lifecycle, 2:27 | [demo/hack-hamster-demo-2026.mp4](demo/hack-hamster-demo-2026.mp4) |
+| 9 | Demo video — one full event lifecycle, 2:27 | [demo/dogfood-demo-2026.mp4](demo/dogfood-demo-2026.mp4) |
 
 **Bonuses claimed (+16):**
 
@@ -393,7 +393,7 @@ The full schema, with cascades and `db_table` overrides, lives in [DATA-MODEL.md
 ```bash
 # 1. Clone
 git clone https://github.com/choksi2212/dogfood-hackathon
-cd hack-hamster-hackathon
+cd dogfood-hackathon
 
 # 2. Build + boot (one container, ~60 s to /healthz 200)
 docker compose up --build -d

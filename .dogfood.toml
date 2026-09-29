@@ -1,4 +1,4 @@
-# .hack-hamster.toml — HACK HAMSTER 2026 acceptance config
+# .dogfood.toml — DOGFOOD 2026 acceptance config
 #
 # Schema matches the official run.py exactly:
 #   [portal]   base_url of the running portal
@@ -15,7 +15,7 @@
 #   [routes]   the five route names run.py hits.
 #
 # If you did change the secret, regenerate with:
-#   docker compose exec web python manage.py import_fixtures
+#   docker compose exec portal python manage.py import_fixtures
 
 [portal]
 base_url = "http://localhost:8000"

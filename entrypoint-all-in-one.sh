@@ -29,9 +29,12 @@ fi
 # migrations can connect. supervisord will keep it alive afterwards.
 echo "[all-in-one] starting postgres..."
 su postgres -c "/usr/lib/postgresql/*/bin/pg_ctl -D $PGDATA -l /tmp/pg.log start"
-# Create the role + database if missing.
+# Create the role + database if missing. The role password honours
+# POSTGRES_PASSWORD (falling back to the username, matching the
+# DATABASES default in config/settings.py).
+PGPASS="${POSTGRES_PASSWORD:-$PGUSER}"
 su postgres -c "psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='$PGUSER'\"" | grep -q 1 \
-    || su postgres -c "psql -c \"CREATE ROLE $PGUSER LOGIN PASSWORD '$PGUSER' SUPERUSER\""
+    || su postgres -c "psql -c \"CREATE ROLE $PGUSER LOGIN PASSWORD '$PGPASS' SUPERUSER\""
 su postgres -c "psql -tAc \"SELECT 1 FROM pg_database WHERE datname='$PGDB'\"" | grep -q 1 \
     || su postgres -c "psql -c \"CREATE DATABASE $PGDB OWNER $PGUSER\""
 

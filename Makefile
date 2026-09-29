@@ -19,19 +19,19 @@ logs:
 	$(COMPOSE) logs -f
 
 shell:
-	$(COMPOSE) exec web bash
+	$(COMPOSE) exec portal bash
 
 web-shell:
-	$(COMPOSE) exec web python manage.py shell
+	$(COMPOSE) exec portal python manage.py shell
 
 db-shell:
-	$(COMPOSE) exec db psql -U dogfood -d dogfood
+	$(COMPOSE) exec portal psql -U hack_hamster -d hack_hamster
 
 migrate:
-	$(COMPOSE) exec web python manage.py migrate
+	$(COMPOSE) exec portal python manage.py migrate
 
 seed:
-	$(COMPOSE) exec -T web python manage.py import_fixtures
+	$(COMPOSE) exec -T portal python manage.py import_fixtures
 
 reset:
 	$(COMPOSE) down -v
@@ -43,12 +43,12 @@ build:
 # Run the seven-check acceptance suite. Writes acceptance-report.txt and
 # pipes it to stdout so you see the result immediately.
 accept:
-	$(COMPOSE) exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
+	$(COMPOSE) exec -T portal python run.py .dogfood.toml | tee acceptance-report.txt
 
 # Like accept, but also re-seeds first so the report reflects a known
 # fresh state. Useful right before a submission.
 accept-fresh: seed
-	$(COMPOSE) exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
+	$(COMPOSE) exec -T portal python run.py .dogfood.toml | tee acceptance-report.txt
 
 # Test suite — 15 categories, each with its own subdirectory + docs.
 # conftest.py + pytest.ini are shared (read-only).
@@ -77,10 +77,10 @@ types:
 accept-ci:
 	@if [ -n "$$DOGFOOD_CONFIG" ]; then \
 		echo "Running acceptance against $$DOGFOOD_CONFIG"; \
-		python acceptance.py "$$DOGFOOD_CONFIG"; \
+		python run.py "$$DOGFOOD_CONFIG"; \
 	else \
 		echo "Running acceptance against .dogfood.toml"; \
-		python acceptance.py .dogfood.toml; \
+		python run.py .dogfood.toml; \
 	fi
 
 # `make ci` is what a developer runs locally to mirror the GitHub
