@@ -2,6 +2,7 @@
 
 T1 (G2):
   GET  /api/gallery                       → public list of submitted projects
+  GET  /api/events/<slug>/gallery         → same, scoped to one event (issue #17)
   POST /api/events/<slug>/submit          → participant, deadline-gated
 
 T3 surfaces (later):
@@ -77,6 +78,13 @@ def _decode_cursor(cursor: str) -> tuple[int, str, list]:
 class GalleryView(APIView):
     """Public gallery. Used by acceptance checks 1 and 2.
 
+    Serves two routes: the cross-event ``GET /api/gallery`` and the
+    per-event ``GET /api/events/<slug>/gallery`` (issue #17 — the
+    route documented in ARCHITECTURE.md §15.3 but never wired). Both
+    share this view: the per-event form receives the ``slug`` kwarg,
+    scopes the queryset to that event, and 404s on an unknown slug.
+    Same envelope, sorting, and pagination either way.
+
     Returns submitted-only submissions in track order. The check expects
     at least one known fixture title — we seed fixtures with a known
     title so this is always true after `manage.py seed_fixtures`.
@@ -109,11 +117,19 @@ class GalleryView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []  # public — no session lookup needed
 
-    def get(self, request):
+    def get(self, request, slug=None):
         from django.core.cache import cache
         from django.utils.cache import patch_cache_control
 
-        cache_key = "gallery:" + "&".join(f"{k}={v}" for k, v in sorted(request.query_params.items()))
+        # Issue #17: this view also serves GET /api/events/<slug>/gallery.
+        # ``slug`` is None on the cross-event /api/gallery. It joins the
+        # cache key so one event's cached page is never served for
+        # another's (or for the cross-event gallery).
+        cache_key = (
+            "gallery:"
+            + (f"{slug}:" if slug is not None else "")
+            + "&".join(f"{k}={v}" for k, v in sorted(request.query_params.items()))
+        )
         cached = cache.get(cache_key)
         if cached is not None:
             resp = Response(cached)
@@ -122,6 +138,24 @@ class GalleryView(APIView):
             return resp
 
         qs = Submission.objects.filter(status="submitted").select_related("team", "track")
+
+        if slug is not None:
+            # Event-scoped gallery: resolve the event up-front. An unknown
+            # slug 404s — an empty 200 would be indistinguishable from
+            # "event exists but nothing has been submitted yet".
+            try:
+                event = Event.objects.get(slug=slug)
+            except Event.DoesNotExist:
+                return Response(
+                    {
+                        "error": {
+                            "code": "not_found",
+                            "message": f"Event {slug!r} not found.",
+                        }
+                    },
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            qs = qs.filter(event=event)
 
         track = request.query_params.get("track")
         if track:

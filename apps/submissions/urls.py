@@ -4,6 +4,14 @@ from . import views
 
 urlpatterns = [
     path("gallery", views.GalleryView.as_view(), name="gallery"),
+    # Issue #17: the per-event gallery documented in ARCHITECTURE.md
+    # §15.3 / JUDGING.md (200 for every role). Same view as /api/gallery
+    # — the <slug:slug> kwarg scopes the queryset to one event.
+    path(
+        "events/<slug:slug>/gallery",
+        views.GalleryView.as_view(),
+        name="event_gallery",
+    ),
     path("submissions/<uuid:id>", views.SubmissionDetailView.as_view(), name="submission_detail"),
     path(
         "events/<slug:slug>/submit",
