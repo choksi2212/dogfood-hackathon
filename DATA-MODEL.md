@@ -1,6 +1,6 @@
-# DOGFOOD 2026 — Data Model
+# HACK HAMSTER 2026 — Data Model
 
-**Event:** dogfoodhack.com · Hackathon Raptors · "Build the platform that will judge you"
+**Event:** hackhamster.com · Hackathon Raptors · "Build the platform that will judge you"
 **Window:** Sep 26 18:00 UTC → Sep 29 18:00 UTC, 2026 (72h)
 **Stack:** Django 5 + DRF + PostgreSQL 16
 
@@ -170,10 +170,10 @@ make seed
 `import_fixtures` loads the official `fixtures.json` into the real schema and
 seeds five demo sessions (organizer, judge_a, judge_b, judge_c, participant).
 Their `Cookie: session=<token>` headers are **deterministic** — each token is
-`HMAC-SHA256(DJANGO_SECRET_KEY, "dogfood-2026-demo-session:{label}:{email}")`,
+`HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`,
 derived from the role label and the seeded user's email, never from a database
 primary key. All five (including `judge_c`) are already committed in
-`.dogfood.toml` under `[auth]`; they match every fresh boot and every fresh
+`.hack-hamster.toml` under `[auth]`; they match every fresh boot and every fresh
 database volume, so there is no copy-paste step. They change only if
 `DJANGO_SECRET_KEY` changes — re-run `make seed` to print the new values.
 
@@ -249,7 +249,7 @@ decorator on the submit view reads `event.submissions_close_at` and returns
 `422 deadline_passed` when `now() > deadline`.
 
 **Do not** edit the fixture's `submissions_close_at` to a future date without
-also updating `.dogfood.toml`'s `[routes.submit]` to point at a submission
+also updating `.hack-hamster.toml`'s `[routes.submit]` to point at a submission
 whose status is `draft` — and even then, the check is designed around the
 deadline being in the past.
 
@@ -271,7 +271,7 @@ healthcheck; `web` waits for it via `depends_on.condition: service_healthy`.
 A second boot against the same volume is also safe: migrations are
 forward-only-no-op (no schema changes), `import_fixtures` is idempotent,
 and the demo session tokens are **deterministic** (§3.1) — they do not
-change on re-seed. The five pre-baked session headers in `.dogfood.toml`
+change on re-seed. The five pre-baked session headers in `.hack-hamster.toml`
 keep working across `make clean` (which removes the volume); they change
 only if `DJANGO_SECRET_KEY` changes.
 
@@ -338,14 +338,14 @@ The maintainer extracts a full logical backup with `pg_dump` from inside the
 `db` container:
 
 ```bash
-docker compose exec db pg_dump -U dogfood -d dogfood -Fc -f /tmp/backup.dump
+docker compose exec db pg_dump -U hack-hamster -d hack-hamster -Fc -f /tmp/backup.dump
 docker compose cp db:/tmp/backup.dump ./backups/$(date +%F).dump
 ```
 
 To restore onto a fresh database (for example, on a new host):
 
 ```bash
-docker compose exec -T db pg_restore -U dogfood -d dogfood --clean --if-exists \
+docker compose exec -T db pg_restore -U hack-hamster -d hack-hamster --clean --if-exists \
   < backups/2026-09-29.dump
 ```
 
@@ -353,12 +353,12 @@ docker compose exec -T db pg_restore -U dogfood -d dogfood --clean --if-exists \
 plain-text SQL form (`pg_dump ... --no-owner`), pipe stdout directly:
 
 ```bash
-docker compose exec -T db pg_dump -U dogfood -d dogfood --no-owner \
+docker compose exec -T db pg_dump -U hack-hamster -d hack-hamster --no-owner \
   > backups/$(date +%F).sql
 ```
 
 Permissions needed: shell access on the host running `docker compose`. The
-`dogfood` Postgres user inside the container is the dump source. There is no
+`hack-hamster` Postgres user inside the container is the dump source. There is no
 separate read-only role; the application user can read every table, but cannot
 UPDATE or DELETE `audit_auditevent` (DB-level grants — see Part 7).
 
@@ -536,7 +536,7 @@ column requires a data migration plus a coordinated fixtures update.
 ### 6.4 The audit immutability migration
 
 `apps/audit/migrations/0002_immutable.py` runs `REVOKE UPDATE, DELETE ON
-audit_auditevent FROM dogfood;` against the database. This is a
+audit_auditevent FROM hack-hamster;` against the database. This is a
 **schema-effecting data migration**: it tightens grants and applies on
 every fresh database. Once applied, the application user cannot UPDATE or
 DELETE audit rows, even via raw SQL — the grants are enforced at the
@@ -709,7 +709,7 @@ clock and the four deadlines — no stored state column.
 **Rationale.** State is computed, not stored, so changing a deadline
 shifts the lifecycle without an explicit transition. The slug is the
 public URL; uniqueness is enforced at the DB level. Fixtures use the
-slug `sample-hack-2026` because that's what the `.dogfood.toml` routes
+slug `sample-hack-2026` because that's what the `.hack-hamster.toml` routes
 point at.
 
 #### `events_track`
@@ -1310,7 +1310,7 @@ Index: `(run_id, project_id)` UNIQUE.
 
 **Rationale.** The secret is stored in plaintext — hashing it is
 explicitly future work (ARCHITECTURE.md §17.11). Every delivery is
-signed `X-Dogfood-Signature: sha256=<HMAC-SHA256 of the body>`.
+signed `X-Hack-Hamster-Signature: sha256=<HMAC-SHA256 of the body>`.
 
 #### `webhooks_webhookdelivery`
 

@@ -1,6 +1,6 @@
 # Load tests
 
-k6 load tests for the DOGFOOD 2026 hackathon portal. Goal: prove the
+k6 load tests for the HACK HAMSTER 2026 hackathon portal. Goal: prove the
 platform holds up at ~10x the expected demo-day traffic so the
 submission window doesn't fall over when a few hundred participants
 land on the gallery at once.
@@ -14,7 +14,7 @@ land on the gallery at once.
 | `write_load.js`   | 20 VUs (ramp 30s + hold 1m), submit + vote.                 |
 | `csv_export.js`   | 5 VUs × 30s, organizer CSV stream.                         |
 | `seed.js`         | One-shot helper that registers a test user.                |
-| `lib/toml.js`     | Tiny TOML parser for `../.dogfood.toml`.                   |
+| `lib/toml.js`     | Tiny TOML parser for `../.hack-hamster.toml`.                   |
 | `lib/ip.js`       | Per-VU synthetic `X-Forwarded-For` to dodge the rate limit.|
 
 ## Install k6
@@ -31,7 +31,7 @@ ESM local-imports). Verify with `k6 version`.
 
 ## Run
 
-From the repo root (`N:\dogfood-hackathon`), with the portal live on
+From the repo root (`N:\hack-hamster-hackathon`), with the portal live on
 `http://localhost:8000` and the demo event seeded:
 
 ```bash
@@ -58,8 +58,8 @@ cd load-tests
 k6 run smoke.js
 ```
 
-Both layouts work — `lib/toml.js` tries `../.dogfood.toml` first then
-`./.dogfood.toml`.
+Both layouts work — `lib/toml.js` tries `../.hack-hamster.toml` first then
+`./.hack-hamster.toml`.
 
 ## Env vars
 
@@ -70,7 +70,7 @@ Both layouts work — `lib/toml.js` tries `../.dogfood.toml` first then
 | `K6_NO_IP_SPOOF`  | unset                    | Set to `1` to disable per-VU IP spoofing   |
 
 `read_load.js`, `write_load.js`, and `csv_export.js` all read their
-session cookies from `[auth]` in `../.dogfood.toml` at init. Run
+session cookies from `[auth]` in `../.hack-hamster.toml` at init. Run
 `make seed` if the `[auth]` block is missing or stale.
 
 ## Thresholds
@@ -154,7 +154,7 @@ then `k6 report results.json` if the dashboard binary is installed.)
 
 Keep the rules:
 
-- Read cookies from `../.dogfood.toml` via `lib/toml.js`. Don't
+- Read cookies from `../.hack-hamster.toml` via `lib/toml.js`. Don't
   hardcode tokens.
 - Use `lib/ip.js` so the rate limiter doesn't bite.
 - One file, one scenario. Don't combine smoke + load in one script.

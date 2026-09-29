@@ -20,6 +20,6 @@ export default async function SubmitPage() {
     );
   }
   return (
-    <SubmitForm draftKey={`ledger:${EVENT_SLUG}:${user.id}:project-draft`} />
+    <SubmitForm draftKey={`hack-hamster:${EVENT_SLUG}:${user.id}:project-draft`} />
   );
 }

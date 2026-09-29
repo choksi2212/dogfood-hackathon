@@ -341,7 +341,7 @@
     },
     {
       "id": "tm_07",
-      "name": "CopperLedger",
+      "name": "CopperHack Hamster",
       "members": [
         "sana7@example.org",
         "member7_1@example.org",
@@ -360,7 +360,7 @@
     },
     {
       "id": "tm_09",
-      "name": "IronLedger",
+      "name": "IronHack Hamster",
       "members": [
         "leila9@example.org",
         "member9_1@example.org",
@@ -526,7 +526,7 @@
     },
     {
       "id": "tm_29",
-      "name": "SmallLedger",
+      "name": "SmallHack Hamster",
       "members": [
         "iva29@example.org",
         "member29_1@example.org"
@@ -599,7 +599,7 @@
     },
     {
       "id": "tm_38",
-      "name": "GreenLedger",
+      "name": "GreenHack Hamster",
       "members": [
         "kwame38@example.org",
         "member38_1@example.org",
@@ -717,7 +717,7 @@
       "id": "prj_11",
       "team": "tm_11",
       "track": "trk_02",
-      "title": "Salt Ledger",
+      "title": "Salt Hack Hamster",
       "summary": "One line of what it does.",
       "repo_url": "https://example.org/repo/11",
       "submitted_at": "2026-02-28T13:14:00Z"
@@ -906,7 +906,7 @@
       "id": "prj_32",
       "team": "tm_32",
       "track": "trk_01",
-      "title": "Loud Ledger",
+      "title": "Loud Hack Hamster",
       "summary": "One line of what it does.",
       "repo_url": "https://example.org/repo/32",
       "submitted_at": "2026-03-01T14:58:00Z"

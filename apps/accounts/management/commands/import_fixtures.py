@@ -1,4 +1,4 @@
-"""Import the official DOGFOOD 2026 `fixtures.json` into the real schema.
+"""Import the official HACK HAMSTER 2026 `fixtures.json` into the real schema.
 
 Run from inside the web container:
   python manage.py import_fixtures
@@ -8,7 +8,7 @@ suite's "project from fixtures shown" check greps the gallery response
 for the first three project titles in the *official* fixtures.json
 (shared by every team so judges compare software, not test data).
 `seed_fixtures` invents its own synthetic projects instead, so that
-check — and therefore every tier claimed in `.dogfood.toml` — fails
+check — and therefore every tier claimed in `.hack-hamster.toml` — fails
 against the real file. This command loads the real one.
 
 Mapping fixtures.json -> our schema:
@@ -63,7 +63,7 @@ CRITERIA = [
     ("innovation", "Innovation", Decimal("0.333")),
 ]
 
-DEMO_PASSWORD = "dogfood-dev-password"
+DEMO_PASSWORD = "hack-hamster-dev-password"
 
 # Bind the acceptance suite's stable session labels to the first three
 # real fixture judges instead of inventing synthetic ones, so judge_a
@@ -136,7 +136,7 @@ class Command(BaseCommand):
                            f"{len(fixture['teams'])} teams, {len(fixture.get('scores', []))} scores")
         self.stdout.write(f"# event_slug = {event.slug}")
         self.stdout.write(f"# known_fixture_title = {fixture['projects'][0]['title']}")
-        self.stdout.write("# Stable demo session cookies (deterministic — they match the committed .dogfood.toml):")
+        self.stdout.write("# Stable demo session cookies (deterministic — they match the committed .hack-hamster.toml):")
         self.stdout.write("")
         for label in ("organizer", "judge_a", "judge_b", "judge_c", "participant"):
             self.stdout.write(f'{label} = "Cookie: session={headers[label]}"')
@@ -150,7 +150,7 @@ class Command(BaseCommand):
             slug=slug,
             defaults=dict(
                 name=fixture_event["name"],
-                description="Official DOGFOOD 2026 fixtures.json, imported verbatim.",
+                description="Official HACK HAMSTER 2026 fixtures.json, imported verbatim.",
                 open_at=close - timezone.timedelta(days=14),
                 submissions_close_at=close,
                 # Judging window anchored off "now" (not the fixture's

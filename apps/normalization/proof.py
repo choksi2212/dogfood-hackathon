@@ -7,7 +7,7 @@ canonical artifact.
 
 Format (per JUDGING.md §3.7):
 
-    DOGFOOD normalization proof
+    HACK HAMSTER normalization proof
     event: <slug>
     method: two-way additive, alternating means
     created_at: <ISO-8601 UTC>
@@ -60,7 +60,7 @@ def generate_proof(run: NormalizationRun, result: FitResult) -> str:
     `run.proof_text`."""
 
     lines: list[str] = []
-    lines.append("DOGFOOD normalization proof")
+    lines.append("HACK HAMSTER normalization proof")
     lines.append(f"event: {run.event.slug}")
     lines.append("method: two-way additive, alternating means")
     lines.append(f"created_at: {run.created_at.isoformat()}")

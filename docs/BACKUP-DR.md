@@ -1,4 +1,4 @@
-# DOGFOOD Portal — Backup & Disaster Recovery
+# HACK HAMSTER Portal — Backup & Disaster Recovery
 
 **Audience:** Whoever wakes up to "the database is gone" or has to
 prove that last night's dump is restorable.
@@ -44,15 +44,15 @@ compressed, custom-format dump and ships it to S3 with a dated key:
 
 ```bash
 docker compose exec -T db pg_dump \
-    -U dogfood \
-    -d dogfood \
+    -U hack-hamster \
+    -d hack-hamster \
     -Fc \
     --no-owner \
     --no-privileges \
-    > "/tmp/dogfood-$(date -u +%Y%m%dT%H%M%SZ).pgdump"
+    > "/tmp/hack-hamster-$(date -u +%Y%m%dT%H%M%SZ).pgdump"
 
-aws s3 cp "/tmp/dogfood-$(date -u +%Y%m%dT%H%M%SZ).pgdump" \
-    "s3://<your-bucket>/dogfood/daily/"
+aws s3 cp "/tmp/hack-hamster-$(date -u +%Y%m%dT%H%M%SZ).pgdump" \
+    "s3://<your-bucket>/hack-hamster/daily/"
 ```
 
 `-Fc` is the custom compressed format (`pg_dump -Fc`); restore with
@@ -67,7 +67,7 @@ On Linux:
 
 ```cron
 # m   h   dom mon dow   command
-  0   3   *   *   *     /usr/local/bin/dogfood-backup.sh >> /var/log/dogfood-backup.log 2>&1
+  0   3   *   *   *     /usr/local/bin/hack-hamster-backup.sh >> /var/log/hack-hamster-backup.log 2>&1
 ```
 
 The wrapper script contains the `docker compose exec ... pg_dump` and
@@ -82,10 +82,10 @@ consecutive misses.
 
 ### 2.4 Retention
 
-- **30 days** of daily dumps in `s3://<bucket>/dogfood/daily/`.
+- **30 days** of daily dumps in `s3://<bucket>/hack-hamster/daily/`.
 - **12 months** of monthly snapshots, kept by a separate lifecycle
   rule that copies the first-of-the-month dump to
-  `s3://<bucket>/dogfood/monthly/`.
+  `s3://<bucket>/hack-hamster/monthly/`.
 - An S3 lifecycle rule expires the `daily/` prefix after 30 days and
   moves `monthly/` to Glacier after 90 days.
 
@@ -104,16 +104,16 @@ schema drift between the dump and the current code.
 Use this for the weekly drill in §5:
 
 ```bash
-docker compose exec -T db createdb -U dogfood dogfood_restore
+docker compose exec -T db createdb -U hack-hamster hack-hamster_restore
 docker compose exec -T db pg_restore \
-    -U dogfood \
-    -d dogfood_restore \
+    -U hack-hamster \
+    -d hack-hamster_restore \
     --no-owner \
     --no-privileges \
     --clean --if-exists \
-    /tmp/dogfood-20260101T030000Z.pgdump
+    /tmp/hack-hamster-20260101T030000Z.pgdump
 
-docker compose exec -T db psql -U dogfood -d dogfood_restore \
+docker compose exec -T db psql -U hack-hamster -d hack-hamster_restore \
     -c "SELECT COUNT(*) FROM audit_auditevent;"
 ```
 
@@ -126,24 +126,24 @@ This is the destructive path. **Stop `web` first** so no request
 hits a half-restored DB:
 
 ```bash
-cd /n/dogfood-hackathon
+cd /n/hack-hamster-hackathon
 
 # 1. Stop the web tier so it stops writing
 docker compose stop web
 
 # 2. Drop and recreate the live database
-docker compose exec -T db psql -U dogfood -d postgres \
-    -c "DROP DATABASE dogfood;"
-docker compose exec -T db createdb -U dogfood -d dogfood
+docker compose exec -T db psql -U hack-hamster -d postgres \
+    -c "DROP DATABASE hack-hamster;"
+docker compose exec -T db createdb -U hack-hamster -d hack-hamster
 
 # 3. Restore from the chosen dump
 docker compose exec -T db pg_restore \
-    -U dogfood \
-    -d dogfood \
+    -U hack-hamster \
+    -d hack-hamster \
     --no-owner \
     --no-privileges \
     --clean --if-exists \
-    /path/to/dogfood-20260101T030000Z.pgdump
+    /path/to/hack-hamster-20260101T030000Z.pgdump
 
 # 4. Bring web back up; the entrypoint re-runs migrations
 docker compose up -d web
@@ -172,10 +172,10 @@ Same as §3.2 but with these extra steps:
 
 | Scenario | Detection | Recovery | Time estimate |
 |---|---|---|---|
-| **DB disk full** | Postgres logs `ERROR: could not extend file ... No space left on device`. `/healthz` flips to 503 with `checks.db: down`. | `docker compose exec db df -h /var/lib/postgresql/data` to confirm. Free space on the host volume; if the named `pgdata` volume lives on a full partition, attach a larger disk, stop `db`, copy `/var/lib/postgresql/data` to the new mount, restart. If just temp/WAL bloat, `docker compose exec db psql -U dogfood -c "VACUUM FULL;"` and `docker compose restart db`. | 30–60 min |
-| **Accidental `DROP TABLE`** | `audit_auditevent` queries start failing or returning empty when they shouldn't. A team-member Slack message ("hey I ran a query..."). | **Do not panic-write to the DB** — every write risks overwriting the deleted rows' TOAST tuples. Stop `web`, identify the latest clean `pg_dump`, run §3.2 restore into `dogfood_restore`, diff the missing table, copy the rows back with `INSERT ... SELECT`. Then bring `web` back up on the original DB. | 1–2 h |
+| **DB disk full** | Postgres logs `ERROR: could not extend file ... No space left on device`. `/healthz` flips to 503 with `checks.db: down`. | `docker compose exec db df -h /var/lib/postgresql/data` to confirm. Free space on the host volume; if the named `pgdata` volume lives on a full partition, attach a larger disk, stop `db`, copy `/var/lib/postgresql/data` to the new mount, restart. If just temp/WAL bloat, `docker compose exec db psql -U hack-hamster -c "VACUUM FULL;"` and `docker compose restart db`. | 30–60 min |
+| **Accidental `DROP TABLE`** | `audit_auditevent` queries start failing or returning empty when they shouldn't. A team-member Slack message ("hey I ran a query..."). | **Do not panic-write to the DB** — every write risks overwriting the deleted rows' TOAST tuples. Stop `web`, identify the latest clean `pg_dump`, run §3.2 restore into `hack-hamster_restore`, diff the missing table, copy the rows back with `INSERT ... SELECT`. Then bring `web` back up on the original DB. | 1–2 h |
 | **Whole-region outage** (host dead, data center gone) | Host unreachable; no SSH, no Docker, no healthcheck. Pager fires from the proxy / uptime check. | Spin up a fresh host in a different region. Clone the repo. Pull the most recent `.pgdump` from S3. Run §3.3 from step 1. Update DNS A record + re-issue TLS at the new proxy. | 2–4 h (matches RTO) |
-| **Compromised admin cookie** | `audit_auditevent` shows unexpected `result='success'` actions from an organizer account outside business hours, or a user reports a session from an unfamiliar IP. | Rotate the affected user's session: `docker compose exec db psql -U dogfood -d dogfood -c "UPDATE accounts_session SET expires_at = NOW() - INTERVAL '1 day' WHERE user_id = '<uuid>';"`. Force a re-login. If the compromise is broader (admin role compromise), rotate `DJANGO_SECRET_KEY` in `.env`, `docker compose up -d --build web`, and accept that every existing session is invalidated. Audit-log all actions during the compromise window; `audit_auditevent` is immutable so nothing there is lost. | 15–30 min for a single user; 1 h for a full secret rotation |
+| **Compromised admin cookie** | `audit_auditevent` shows unexpected `result='success'` actions from an organizer account outside business hours, or a user reports a session from an unfamiliar IP. | Rotate the affected user's session: `docker compose exec db psql -U hack-hamster -d hack-hamster -c "UPDATE accounts_session SET expires_at = NOW() - INTERVAL '1 day' WHERE user_id = '<uuid>';"`. Force a re-login. If the compromise is broader (admin role compromise), rotate `DJANGO_SECRET_KEY` in `.env`, `docker compose up -d --build web`, and accept that every existing session is invalidated. Audit-log all actions during the compromise window; `audit_auditevent` is immutable so nothing there is lost. | 15–30 min for a single user; 1 h for a full secret rotation |
 
 ## 5. Verification — weekly restore drill
 
@@ -184,18 +184,18 @@ A backup you have never restored is a backup you do not have. Every
 
 ```bash
 # 1. Pick yesterday's dump
-DUMP=$(ls -t /tmp/dogfood-*.pgdump 2>/dev/null | head -1)
+DUMP=$(ls -t /tmp/hack-hamster-*.pgdump 2>/dev/null | head -1)
 [ -z "$DUMP" ] && { echo "no dump found, skipping drill"; exit 0; }
 
 # 2. Drop any prior scratch DB
-docker compose exec -T db psql -U dogfood -d postgres \
-    -c "DROP DATABASE IF EXISTS dogfood_drill;"
+docker compose exec -T db psql -U hack-hamster -d postgres \
+    -c "DROP DATABASE IF EXISTS hack-hamster_drill;"
 
 # 3. Restore
-docker compose exec -T db createdb -U dogfood dogfood_drill
+docker compose exec -T db createdb -U hack-hamster hack-hamster_drill
 docker compose exec -T db pg_restore \
-    -U dogfood \
-    -d dogfood_drill \
+    -U hack-hamster \
+    -d hack-hamster_drill \
     --no-owner \
     --no-privileges \
     --clean --if-exists \
@@ -203,12 +203,12 @@ docker compose exec -T db pg_restore \
 
 # 4. Run the test suite against the restored DB
 docker compose exec -T \
-    -e DATABASE_URL="postgres://dogfood:dogfood@db:5432/dogfood_drill" \
+    -e DATABASE_URL="postgres://hack-hamster:hack-hamster@db:5432/hack-hamster_drill" \
     web pytest tests/ -v
 
 # 5. Drop the scratch DB
-docker compose exec -T db psql -U dogfood -d postgres \
-    -c "DROP DATABASE dogfood_drill;"
+docker compose exec -T db psql -U hack-hamster -d postgres \
+    -c "DROP DATABASE hack-hamster_drill;"
 ```
 
 The pytest line is a stand-in for the production smoke test; the
@@ -220,7 +220,7 @@ Schedule the drill as a weekly cron:
 
 ```cron
 # m   h   dom mon dow   command
-  0  10   *   *   1     /usr/local/bin/dogfood-restore-drill.sh >> /var/log/dogfood-drill.log 2>&1
+  0  10   *   *   1     /usr/local/bin/hack-hamster-restore-drill.sh >> /var/log/hack-hamster-drill.log 2>&1
 ```
 
 Successful drills are logged; three consecutive failures is a

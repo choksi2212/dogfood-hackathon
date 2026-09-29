@@ -638,7 +638,7 @@ def test_local_pk_columns_are_uuid():
 
     assert uuid_rows, "No `id` column with data_type=uuid found on local tables — " "UUID PKs didn't land"
     # Allow exactly one local table (VoteBudget) to skip the UUID PK.
-    # That model exists for the quadratic-vote credit ledger and uses
+    # That model exists for the quadratic-vote credit hack-hamster and uses
     # Django's default BigAutoField. If anything else drops out of
     # the UUID PK, fail loudly — the docs promise UUIDs everywhere.
     assert not non_uuid_pk, (

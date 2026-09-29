@@ -9,7 +9,7 @@ Embeddable widget: `/widget.js` (JS shim) and `/api/widget/gallery`
 
 | Test | Asserts |
 |---|---|
-| /widget.js returns JS | 200, application/javascript, contains `DOGFOOD_WIDGET` |
+| /widget.js returns JS | 200, application/javascript, contains `HACK HAMSTER_WIDGET` |
 | /widget.js CORS | `Access-Control-Allow-Origin: *` |
 | /widget.js no auth required | Anonymous GET → 200 |
 | /api/widget/gallery returns JSON | 200, application/json |

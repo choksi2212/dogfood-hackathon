@@ -91,7 +91,7 @@ def regenerate_role_isolation_golden():
 
     text = matrix_path.read_text()
     # Header lines:
-    #   DOGFOOD role-isolation matrix
+    #   HACK HAMSTER role-isolation matrix
     #   =============================
     #   Generated against <base>
     #   Config: <cfg>

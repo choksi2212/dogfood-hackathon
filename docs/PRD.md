@@ -1,10 +1,10 @@
-# DOGFOOD 2026 — Product Requirements Document
+# HACK HAMSTER 2026 — Product Requirements Document
 
-**Event:** dogfoodhack.com · Hackathon Raptors · "Build the platform that will judge you"
+**Event:** hackhamster.com · Hackathon Raptors · "Build the platform that will judge you"
 **Window:** Sep 26 18:00 UTC → Sep 29 18:00 UTC, 2026 (72h)
 **Team:** Manas (`choksi2212`) + Mihir (`Mihir-Rabari`)
 **Repo:** `https://github.com/choksi2212/dogfood-hackathon`
-**Spec:** live Sep 23, 2026 — `https://dogfoodhack.com/spec`
+**Spec:** live Sep 23, 2026 — `https://hackhamster.com/spec`
 **Stack:** Django 5 + Django REST Framework + PostgreSQL 16 + Next.js 15, all in one `docker compose up`
 
 > This is the PRD — the *what* and the *why*. The TRD says *how*. The architecture says
@@ -106,7 +106,7 @@ A submission that nails T2 and skips T4 outranks one that half-builds T4.
 | Threat model names the four attacks | +3 Threat Model (tiebreak) | §3.6, `THREAT-MODEL.md` |
 | Every UI action is a documented API endpoint | +3 API First (tiebreak) | §4.5, §3.4, `openapi.yaml` |
 
-**No tier or bonus is claimed in `.dogfood.toml` unless it is complete and verifiable.**
+**No tier or bonus is claimed in `.hack-hamster.toml` unless it is complete and verifiable.**
 This is the discipline. A bonus at 90% is not claimed at 90% — it is finished or it is
 not in the file. See §5.3.
 
@@ -134,7 +134,7 @@ treat every gate-hour thereafter as monotonic progress.
 | Postgres cold-start to ready | ≤ 10 seconds | healthcheck latency |
 | Frontend initial paint (gallery) | ≤ 1.5 seconds on localhost | Lighthouse, manual |
 | Role isolation matrix | 30/30 cells verified by real HTTP | committed `role-isolation-matrix.txt` |
-| `.dogfood.toml` claimed tiers | exactly what the report verifies | diff script, run on the final commit |
+| `.hack-hamster.toml` claimed tiers | exactly what the report verifies | diff script, run on the final commit |
 | Bonuses claimed | all four, each with its artefact present | ls of the deliverable list |
 
 
@@ -162,11 +162,11 @@ The brief uses some words loosely. We pin them down here so the docs do not drif
 | **Normalization** | The process of removing judge-level bias from raw scores before ranking. We use a two-way additive model — see §3.2.4. |
 | **Pairwise comparison** | A judge's pick of which of two projects is better. Input to the Bradley-Terry model. |
 | **CSV export** | Organizer-facing dump of all data at any pipeline stage: assignments, raw scores, normalized scores, final ranking. |
-| **Acceptance mechanism** | `run.py` reading `.dogfood.toml` and making seven HTTP calls against our portal. The output is `acceptance-report.txt`. |
-| **`.dogfood.toml`** | Repo-root config: portal URL, tier claims, five pre-baked session headers, five route names. Both the contract and the honesty file. |
+| **Acceptance mechanism** | `run.py` reading `.hack-hamster.toml` and making seven HTTP calls against our portal. The output is `acceptance-report.txt`. |
+| **`.hack-hamster.toml`** | Repo-root config: portal URL, tier claims, five pre-baked session headers, five route names. Both the contract and the honesty file. |
 | **Audit event** | An append-only record of every consequential action: who did what, when, from where, with what payload. The readable audit trail is a T3 requirement and a threat-model primitive. |
 | **Public API** | The HTTP surface documented in `openapi.yaml`. Every UI action provably reaches the database only through this surface. The API First bonus is demonstrated, not asserted. |
-| **DOGFOOD window** | Sep 26 18:00 UTC → Sep 29 18:00 UTC, 2026. The 72 hours during which code is written and committed to the competition repo. |
+| **HACK HAMSTER window** | Sep 26 18:00 UTC → Sep 29 18:00 UTC, 2026. The 72 hours during which code is written and committed to the competition repo. |
 
 ### 1.7 What this PRD does *not* do
 
@@ -449,7 +449,7 @@ Session       id (uuid), user_id (fk), token_hash (unique, sha256),
 
 **Acceptance criteria.**
 - The acceptance mechanism verifies: the five pre-baked session headers in
-  `.dogfood.toml` (`organizer`, `judge_a`, `judge_b`, `judge_c`,
+  `.hack-hamster.toml` (`organizer`, `judge_a`, `judge_b`, `judge_c`,
   `participant`) produce distinct, non-privileged sessions that
   authenticate as the right role against the right endpoints.
 - The seed script prints these five headers on portal boot (spec §03 `[auth]`).
@@ -1794,7 +1794,7 @@ sites (e.g. an organizers main website). The bundle has no external dependencies
 **Functional requirements.**
 - FR-340 — The widget is a single JS file (~10 KB minified), no dependencies, no
   external network calls.
-- FR-341 — The widget renders into a `<div data-dogfood-gallery="event-slug"></div>`.
+- FR-341 — The widget renders into a `<div data-hack-hamster-gallery="event-slug"></div>`.
 - FR-342 — The widget fetches the gallery JSON from the portal (the portal must be
   reachable from the embedding site).
 - FR-343 — The widget styles are scoped (no global CSS pollution).
@@ -2074,12 +2074,12 @@ The acceptance mechanism is `run.py`, a 30-line Python script that runs seven HT
 checks against our portal. The output is `acceptance-report.txt`, which we commit.
 
 ```bash
-python3 run.py .dogfood.toml > acceptance-report.txt
+python3 run.py .hack-hamster.toml > acceptance-report.txt
 git add acceptance-report.txt
 git commit -m "docs: publish acceptance-report.txt for <gate>"
 ```
 
-The script is standard library only. It reads `.dogfood.toml`, attaches the four auth
+The script is standard library only. It reads `.hack-hamster.toml`, attaches the four auth
 headers, and makes seven GET/POST requests. Each request is logged with the URL, the
 auth used, and the response. A PASS line is emitted per check; a FAIL line includes
 enough detail to fix without guessing.
@@ -2098,21 +2098,21 @@ enough detail to fix without guessing.
 
 ### 5.3 Honest tier claim discipline
 
-The `.dogfood.toml` `claimed` list is what we assert. The `acceptance-report.txt` is
+The `.hack-hamster.toml` `claimed` list is what we assert. The `acceptance-report.txt` is
 what the machine says. The gap between them is the only thing that costs points.
 
 Rules:
 - A tier is claimed if and only if the corresponding acceptance checks pass (for T1
   and T2) and the corresponding docs and video exist (for T3, T4, and bonuses).
 - A bonus is claimed if and only if its artifact is present and defensible.
-- The final `.dogfood.toml` is committed at H+71. Before that, intermediate `.toml`
+- The final `.hack-hamster.toml` is committed at H+71. Before that, intermediate `.toml`
   files may overclaim; the final commit is canonical.
 - A claim that cannot be backed by an artifact is removed, not softened.
 
 The format spec §06:
 
 ```
-DOGFOOD 2026 acceptance report
+HACK HAMSTER 2026 acceptance report
 portal: http://localhost:8080
 claimed: T1 T2 T3 T4
 fixtures: fixtures.json
@@ -2207,7 +2207,7 @@ If this were a 6-month project:
 | The acceptance mechanism is misinterpreted | Low | High | Read run.py verbatim from the spec; do not guess |
 | Role isolation breaks on a curl we did not test | Medium | High | Generate `role-isolation-matrix.txt` from real HTTP calls; commit it |
 | Image uploads fail on Windows path encoding | Medium | Medium | Use UUID-prefixed file names; avoid `os.path` quirks |
-| The Next.js frontend and Django backend drift out of sync | High | Medium | The five-route contract in `.dogfood.toml` is the only contract; mock adapter behind same interface |
+| The Next.js frontend and Django backend drift out of sync | High | Medium | The five-route contract in `.hack-hamster.toml` is the only contract; mock adapter behind same interface |
 | The fixtures have an unannounced edge case | Medium | Medium | The three announced edge cases are handled; the spec says "include awkward cases on purpose" — we test more |
 | The audit log fills up Postgres | Low | Low | Append-only, no delete; volume is bounded by event activity |
 
@@ -2243,7 +2243,7 @@ We will:
 - Run the role-isolation matrix from real HTTP calls.
 - Pre-pull base images.
 - Rehearse cold-start before kickoff.
-- Rehearse writing `.dogfood.toml` before kickoff.
+- Rehearse writing `.hack-hamster.toml` before kickoff.
 - Lock the demo video script at H+48.
 - Generate the demo video at H+68.
 
@@ -2274,7 +2274,7 @@ We will not:
 1. Pull `fixtures.json` and `run.py`.
 2. Read `run.py` (30 lines).
 3. Run it against an empty portal — expect 7 FAILs with `connection refused`.
-4. Confirm the four auth headers from the seed script match `.dogfood.toml`.
+4. Confirm the four auth headers from the seed script match `.hack-hamster.toml`.
 5. `LICENSE` + `README.md` on `main`. Then G1.
 
 ### 8.3 The 72 hours
@@ -2283,7 +2283,7 @@ We will not:
 |---|---|---|
 | H+3 | G1 | docker compose up green |
 | H+8 | — | make accept wired |
-| H+20 | G2 | T1 green, first acceptance report, .dogfood.toml to Mihir |
+| H+20 | G2 | T1 green, first acceptance report, .hack-hamster.toml to Mihir |
 | H+34 | G3 | T2 green, role isolation provable |
 | H+40 | G4 | Normalization on fixtures |
 | H+48 | G5 | T3 green, video script locked |
@@ -2292,7 +2292,7 @@ We will not:
 | H+66 | G8 | All four bonus docs finished |
 | H+68 | — | Demo video recorded |
 | H+70 | G9 | Clean-machine run |
-| H+71 | — | .dogfood.toml final, last commit |
+| H+71 | — | .hack-hamster.toml final, last commit |
 
 ### 8.4 Post-freeze
 
@@ -2724,13 +2724,13 @@ The portal is delivered as a `docker compose` project. To deploy:
 
 ```bash
 git clone https://github.com/choksi2212/dogfood-hackathon
-cd dogfood-hackathon
+cd hack-hamster-hackathon
 docker compose up
 # entrypoint waits for postgres, migrates, then runs import_fixtures,
 # which seeds five demo sessions with DETERMINISTIC cookies
 # (HMAC-SHA256 of DJANGO_SECRET_KEY + label + email). The committed
-# .dogfood.toml [auth] values are already correct — no copy-paste step.
-python3 acceptance.py .dogfood.toml > acceptance-report.txt
+# .hack-hamster.toml [auth] values are already correct — no copy-paste step.
+python3 acceptance.py .hack-hamster.toml > acceptance-report.txt
 # inspect the report; if PASS, the portal is verified
 ```
 
@@ -2756,8 +2756,8 @@ For the eventual Raptors deployment (post-freeze):
 
 ### 11.4 Backup and restore
 
-- Postgres dump: `docker compose exec db pg_dump -U dogfood dogfood > dump.sql`.
-- Postgres restore: `cat dump.sql | docker compose exec -T db psql -U dogfood dogfood`.
+- Postgres dump: `docker compose exec db pg_dump -U hack-hamster hack-hamster > dump.sql`.
+- Postgres restore: `cat dump.sql | docker compose exec -T db psql -U hack-hamster hack-hamster`.
 - Full dump (admin only): `GET /api/admin/dump` returns a JSON dump with signature.
 - Restore from JSON dump: `POST /api/admin/restore` (admin only).
 
@@ -2773,8 +2773,8 @@ For the eventual Raptors deployment (post-freeze):
 
 - [ ] `docker compose down -v && docker compose up` works cold.
 - [ ] Network is off; the portal is reachable at `localhost`.
-- [ ] `.dogfood.toml` is filled in with the four auth headers from the seed script.
-- [ ] `python3 run.py .dogfood.toml` passes all seven checks.
+- [ ] `.hack-hamster.toml` is filled in with the four auth headers from the seed script.
+- [ ] `python3 run.py .hack-hamster.toml` passes all seven checks.
 - [ ] `role-isolation-matrix.txt` shows 30/30.
 - [ ] `normalization-proof.txt` exists with FIG. 03 shape.
 - [ ] `THREAT-MODEL.md` has a residual-risk section.
@@ -2786,7 +2786,7 @@ For the eventual Raptors deployment (post-freeze):
 
 ### 11.7 Final-commit discipline
 
-- `.dogfood.toml` matches `acceptance-report.txt` exactly.
+- `.hack-hamster.toml` matches `acceptance-report.txt` exactly.
 - Every bonus claimed has its artifact in the repo.
 - No new files committed after H+71.
 - The final commit message: `freeze: H+71, ready for judging`.
@@ -2820,7 +2820,7 @@ This is the screen that scores 40% of the score. The wireframe shows the layout:
 
 ```
 +-------------------------------------------------------------+
-|  DOGFOOD · Sample Hack 2026                  Logout (judge_a) |
+|  HACK HAMSTER · Sample Hack 2026                  Logout (judge_a) |
 +-------------------------------------------------------------+
 |  Progress: 2 of 4 done     Time remaining: 3h 47m           |
 |  [===>-----------]                                          |
@@ -2885,7 +2885,7 @@ the batch is queued.
 
 ```
 +-------------------------------------------------------------+
-|  DOGFOOD · Sample Hack 2026                  Logout (org)   |
+|  HACK HAMSTER · Sample Hack 2026                  Logout (org)   |
 +-------------------------------------------------------------+
 |  [Overview] [Judging] [Voting] [Normalize] [Export] [Audit] |
 +-------------------------------------------------------------+
@@ -2926,7 +2926,7 @@ activity; "very red" after 4 hours.
 
 ```
 +-------------------------------------------------------------+
-|  DOGFOOD · Sample Hack 2026         Logout (captain)        |
+|  HACK HAMSTER · Sample Hack 2026         Logout (captain)        |
 +-------------------------------------------------------------+
 |  My team's submission                                        |
 |  Status: Draft    Deadline: 2026-03-01 18:00 UTC (in 2d 3h) |
@@ -3001,7 +3001,7 @@ submit: form is locked, the team sees "Submitted at HH:MM:SS UTC".
 
 ```
 +-------------------------------------------------------------+
-|  DOGFOOD · Sample Hack 2026         Logout (judge_a)         |
+|  HACK HAMSTER · Sample Hack 2026         Logout (judge_a)         |
 +-------------------------------------------------------------+
 |  Pairwise mode — pick the better project                     |
 |  Remaining: 27 pairs                                         |
@@ -3085,7 +3085,7 @@ event are forbidden (the fixtures have to keep loading).
 - We never modify the fixtures. They are the spec's data; we adapt to them.
 - We never delete an `AuditEvent` row.
 - We never relax a permission class to make a check pass.
-- We never edit `.dogfood.toml` after H+71 to claim something the report does not
+- We never edit `.hack-hamster.toml` after H+71 to claim something the report does not
   verify.
 
 ---
@@ -3160,12 +3160,12 @@ view of the ownership split in §7 (PRD), with timing.
 - Verify migrations apply cleanly.
 - Seed fixtures + the demo users via `import_fixtures`.
 - The demo session headers are deterministic (HMAC of `DJANGO_SECRET_KEY` +
-  label + email) and are committed into `.dogfood.toml` — the committed
+  label + email) and are committed into `.hack-hamster.toml` — the committed
   values work on every boot and every fresh volume, no paste step.
 - `make accept` runs against an empty backend → expect 7 FAILs.
 
 **Hours H+3 to H+8:**
-- Wire `make accept` to `python3 run.py .dogfood.toml > acceptance-report.txt`.
+- Wire `make accept` to `python3 run.py .hack-hamster.toml > acceptance-report.txt`.
 - Run after every change.
 - Get the auth flow (User model, Session, login, logout, me) working end-to-end.
 
@@ -3175,7 +3175,7 @@ view of the ownership split in §7 (PRD), with timing.
 - T1 submissions: Submission + SubmissionImage + CustomQuestion + CustomAnswer.
 - T1 deadline enforcement: `@deadline_gated` decorator.
 - T1 gallery: GalleryView with search, filter, sort, pagination.
-- **Publish `.dogfood.toml` to Mihir at H+20.** Five routes + four auth headers.
+- **Publish `.hack-hamster.toml` to Mihir at H+20.** Five routes + four auth headers.
 - First `acceptance-report.txt` committed.
 
 **Hours H+20 to H+34 (G3):**
@@ -3219,7 +3219,7 @@ view of the ownership split in §7 (PRD), with timing.
 **Hours H+68 to H+71:**
 - Clean-machine run: `docker compose down -v && up`.
 - Regenerate `acceptance-report.txt`.
-- Final `.dogfood.toml` matches the report.
+- Final `.hack-hamster.toml` matches the report.
 
 - Final commit.
 
@@ -3231,7 +3231,7 @@ view of the ownership split in §7 (PRD), with timing.
 - Build the component inventory (button, field, card, table, modal, toast, empty state, skeleton).
 
 **Hours H+3 to H+20:**
-- API client layer written against the five routes + `.dogfood.toml`.
+- API client layer written against the five routes + `.hack-hamster.toml`.
 - Mock adapter for H+0 → H+20 (then flip to real).
 - Public gallery, project detail, login, register, tracks.
 - Draft THREAT-MODEL.md (paper work, before kickoff).
@@ -3277,7 +3277,7 @@ view of the ownership split in §7 (PRD), with timing.
 
 | Hour | From | To | What |
 |---|---|---|---|
-| H+20 | Manas | Mihir | `.dogfood.toml` published |
+| H+20 | Manas | Mihir | `.hack-hamster.toml` published |
 | H+34 | Manas | Mihir | T2 backend ready; first merge to `main` |
 | H+40 | Manas | Mihir | `normalization-proof.txt` ready |
 | H+48 | Manas | Mihir | T3 backend ready; second merge |
@@ -3313,7 +3313,7 @@ Each gate G1-G9 has a 10-minute checkpoint call on voice:
 
 | Gate | Time | Agenda |
 |---|---|---|
-| G1 | H+3 | Is docker compose up green? Are the four auth headers in `.dogfood.toml`? |
+| G1 | H+3 | Is docker compose up green? Are the four auth headers in `.hack-hamster.toml`? |
 | G2 | H+20 | Is `make accept` green? Are all 5 routes + 4 headers in place? |
 | G3 | H+34 | Is the role-isolation matrix 30/30? |
 | G4 | H+40 | Is the proof file FIG. 03 shape? |
@@ -3375,7 +3375,7 @@ build goes faster when fluency is high.
 ### 18.1 Manas's checklist
 
 - [ ] Rehearse `docker compose up` cold (target: 3 minutes from `git clone`).
-- [ ] Rehearse writing `.dogfood.toml` from memory (target: 60 seconds).
+- [ ] Rehearse writing `.hack-hamster.toml` from memory (target: 60 seconds).
 - [ ] Rehearse the five pre-baked session headers via the seed script.
 - [ ] Rehearse the assignment algorithm on paper (no IDE).
 - [ ] Rehearse the normalization fit on paper.
@@ -3491,7 +3491,7 @@ is the system shape. The backend impl is the code.
 
 ## Part 21 — Closing
 
-This PRD is the product specification for the DOGFOOD 2026 portal. It is written
+This PRD is the product specification for the HACK HAMSTER 2026 portal. It is written
 for two builders and 36 judges. It is exhaustive where it matters (the seven
 acceptance checks, the role-isolation matrix, the four bonuses) and concise where
 it doesn't (out-of-scope, deployment topology, error envelope).
@@ -3654,7 +3654,7 @@ implementation by asking: does this scenario work?
 3. A participant submits a project.
 4. The view calls `deliver_webhook()`:
    - HMAC-SHA256 signs the payload with the secret.
-   - POSTs to the URL with `X-Dogfood-Signature` header.
+   - POSTs to the URL with `X-Hack-Hamster-Signature` header.
 5. The receiver:
    - Reads the signature header.
    - Recomputes the HMAC with the stored secret.
@@ -3690,7 +3690,7 @@ implementation by asking: does this scenario work?
 
 1. Manas opens a fresh terminal.
 2. `git clone https://github.com/choksi2212/dogfood-hackathon` (or pulls if already cloned).
-3. `cd dogfood-hackathon`.
+3. `cd hack-hamster-hackathon`.
 4. `cp .env.example .env`. Edit the passwords.
 5. `docker compose down -v` (in case anything is running).
 6. `docker compose up -d`.
@@ -3778,7 +3778,7 @@ When reality diverges from the plan:
 
 ### 23.4 What we do at the end
 
-At H+71, we submit. The acceptance report is the receipt. The `.dogfood.toml` is
+At H+71, we submit. The acceptance report is the receipt. The `.hack-hamster.toml` is
 the claim. The code is the proof. The bonus artifacts are the bonus.
 
 The plan served its purpose. We built it. We executed it. We submitted.
@@ -3861,7 +3861,7 @@ For navigation:
 
 ## Part 26 — The Final Acceptance Criteria
 
-This part is the single, definitive acceptance criteria for the DOGFOOD 2026
+This part is the single, definitive acceptance criteria for the HACK HAMSTER 2026
 portal. Every criterion here is verifiable; every criterion is owned; every
 criterion maps to a graded artifact.
 
@@ -3918,7 +3918,7 @@ For full marks, the repo root contains:
 - `acceptance-report.txt`
 - `role-isolation-matrix.txt`
 - `normalization-proof.txt`
-- `.dogfood.toml`
+- `.hack-hamster.toml`
 - `docker-compose.yml`
 - `src/` (the implementation)
 - `tests/` (our tests)
@@ -3928,7 +3928,7 @@ For full marks, the repo root contains:
 
 - [ ] No commit before Sep 26 18:00 UTC.
 
-- [ ] No `.dogfood.toml` edit after H+71.
+- [ ] No `.hack-hamster.toml` edit after H+71.
 - [ ] No new feature after H+62.
 - [ ] All commits use explicit paths (no `git add .`).
 - [ ] No suppressed warnings (`# noqa`, `# type: ignore` in shipped code).
@@ -4002,7 +4002,7 @@ This PRD:
 | MIHIR.md | ~1100 | Per-person build doc (Mihir) |
 | SETUP-MIHIR.md | ~250 | Machine setup for Mihir |
 | README.md | ~30 | Repo README (links to the docs) |
-| dogfood/text.txt | ~1500 | Raw text scrape of dogfoodhack.com |
+| hack-hamster/text.txt | ~1500 | Raw text scrape of hackhamster.com |
 
 Total: ~16,500 lines of planning documentation.
 

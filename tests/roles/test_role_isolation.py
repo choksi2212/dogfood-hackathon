@@ -257,7 +257,7 @@ def role_ready_event(db, sample_event):
                 "is_active": True,
             },
         )
-        captain.set_password("dogfood-dev-password")
+        captain.set_password("hack-hamster-dev-password")
         captain.save()
         Membership.objects.get_or_create(
             user=captain,

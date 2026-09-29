@@ -486,7 +486,7 @@ def test_concurrent_logins_create_n_sessions(participant):
     from apps.accounts.models import User as _User  # noqa: F401
 
     email = participant.email
-    password = "dogfood-dev-password"
+    password = "hack-hamster-dev-password"
 
     def do_login():
         c = Client()

@@ -13,7 +13,7 @@ These tests cover the operational and security-relevant surface of
 
   * Full delivery (in-test HTTP receiver on an ephemeral port):
       - the POST reaches the receiver with a JSON Content-Type, the
-        `X-Dogfood-Event` header, and an `X-Dogfood-Signature` that
+        `X-Hack-Hamster-Event` header, and an `X-Hack-Hamster-Signature` that
         verifies against the *captured body* with the hook secret
       - a `WebhookDelivery` row exists with status delivered
       - a 500-ing subscriber gets a failed row (status, response_status,
@@ -38,7 +38,7 @@ These tests cover the operational and security-relevant surface of
 
 Run from the repo root:
 
-    /opt/data/dogfood-venv/bin/python -m pytest tests/webhooks -q
+    /opt/data/hack-hamster-venv/bin/python -m pytest tests/webhooks -q
 """
 
 from __future__ import annotations
@@ -246,10 +246,10 @@ class TestDelivery:
         request = receiver.requests[0]
         assert request["path"] == "/hook"
         assert request["headers"]["content-type"] == "application/json"
-        assert request["headers"]["x-dogfood-event"] == "submission.created"
+        assert request["headers"]["x-hack-hamster-event"] == "submission.created"
 
         # The signature must verify against the bytes the receiver got.
-        signature = request["headers"]["x-dogfood-signature"]
+        signature = request["headers"]["x-hack-hamster-signature"]
         assert signature.startswith("sha256=")
         assert sign_body(hook.secret, request["body"]) == signature.removeprefix("sha256=")
 
@@ -327,7 +327,7 @@ class TestTypeFiltering:
             notify(sample_event, payload_type, {"n": 1})
 
         assert len(receiver.requests) == len(EVENT_TYPES)
-        assert {r["headers"]["x-dogfood-event"] for r in receiver.requests} == set(EVENT_TYPES)
+        assert {r["headers"]["x-hack-hamster-event"] for r in receiver.requests} == set(EVENT_TYPES)
         rows = WebhookDelivery.objects.filter(webhook=hook)
         assert rows.count() == len(EVENT_TYPES)
         assert set(rows.values_list("payload_type", flat=True)) == set(EVENT_TYPES)

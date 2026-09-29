@@ -1,4 +1,4 @@
-# DOGFOOD test suite — master index
+# HACK HAMSTER test suite — master index
 
 17 categories, ~340 tests, run with `make test`.
 

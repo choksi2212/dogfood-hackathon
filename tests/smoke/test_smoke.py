@@ -65,12 +65,12 @@ def test_healthz_reports_db_ok(db, client):
 
 
 def test_root_returns_service_name(db, client):
-    """GET / → 200 with service: dogfood-portal. The accept suite
+    """GET / → 200 with service: hack-hamster-portal. The accept suite
     pings this before any tier check."""
     resp = client.get("/", HTTP_HOST=HTTP_HOST)
     assert resp.status_code == 200
     body = resp.json()
-    assert body["service"] == "dogfood-portal"
+    assert body["service"] == "hack-hamster-portal"
 
 
 # --- Five spec routes --------------------------------------------------------

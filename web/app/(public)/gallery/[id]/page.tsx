@@ -87,7 +87,7 @@ export default async function SubmissionDetailPage({
         </div>
         <div className="relative max-w-3xl">
           <div className="mb-6 flex flex-wrap items-center gap-3">
-            <p className="eyebrow">LEDGER / PROJECT SPOTLIGHT</p>
+            <p className="eyebrow">HACK HAMSTER / PROJECT SPOTLIGHT</p>
             <Badge
               variant="outline"
               className="h-7 border-accent/25 bg-accent-dim px-3 text-accent"

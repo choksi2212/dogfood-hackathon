@@ -23,7 +23,7 @@ export function AuthShell({
         <div>
           <Brand className="text-xl text-text-primary" />
           <p className="mt-10 font-mono text-xs tracking-caps text-accent">
-            LEDGER 2026 · BUILT FOR BUILDERS
+            HACK HAMSTER 2026 · BUILT FOR BUILDERS
           </p>
           <h2 className="mt-4 max-w-sm font-display text-3xl leading-tight font-medium tracking-display sm:text-4xl">
             {mode === "login" ? (

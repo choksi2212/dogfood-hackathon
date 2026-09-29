@@ -1,4 +1,4 @@
-Ledger 2026 acceptance report
+Hack Hamster 2026 acceptance report
 portal: http://localhost:8000
 claimed: T1 T2 T3 T4
 fixtures: fixtures.json

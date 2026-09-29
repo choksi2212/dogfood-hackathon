@@ -12,11 +12,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Ledger — Great ideas deserve a fair shot.",
-    template: "%s · Ledger",
+    default: "Hack Hamster — Great ideas deserve a fair shot.",
+    template: "%s · Hack Hamster",
   },
   description:
-    "The home of Ledger 2026. Discover what shipped, score with confidence, and celebrate the builders.",
+    "The home of Hack Hamster 2026. Discover what shipped, score with confidence, and celebrate the builders.",
 };
 
 export default function RootLayout({

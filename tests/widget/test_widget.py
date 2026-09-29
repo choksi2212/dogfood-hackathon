@@ -176,12 +176,12 @@ def _make_submission(event, track, organizer, name: str, *, status: str = "submi
 
 def test_widget_js_returns_javascript(client):
     """/widget.js is served as application/javascript and contains the
-    DOGFOOD_WIDGET global the embedder is expected to read."""
+    HACK HAMSTER_WIDGET global the embedder is expected to read."""
     response = client.get("/widget.js")
     assert response.status_code == 200
     assert response["Content-Type"].startswith("application/javascript")
     body = response.content.decode("utf-8")
-    assert "DOGFOOD_WIDGET" in body
+    assert "HACK HAMSTER_WIDGET" in body
     # It's a self-contained IIFE — must be valid script (starts with
     # `(function()` or similar) and references our gallery endpoint.
     assert "function" in body

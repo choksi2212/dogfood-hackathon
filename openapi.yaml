@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: DOGFOOD Hackathon Portal API
+  title: HACK HAMSTER Hackathon Portal API
   version: 1.0.0
-  description: 'Submission and judging portal for the DOGFOOD 2026 hackathon. Five
+  description: 'Submission and judging portal for the HACK HAMSTER 2026 hackathon. Five
     spec
 
     routes drive acceptance: gallery, submit, judge_scores, peer_scores,
@@ -95,7 +95,7 @@ components:
         One recorded delivery attempt to a webhook subscriber, as shown in
         the organizer's delivery log (GET /api/webhooks/{webhook_id}/deliveries).
         The exact signed bytes POSTed to the subscriber are reproducible from
-        payload_type + payload; `X-Dogfood-Signature` is HMAC-SHA256 over
+        payload_type + payload; `X-Hack-Hamster-Signature` is HMAC-SHA256 over
         those bytes keyed by the subscription secret.
       properties:
         id:
@@ -1758,8 +1758,8 @@ paths:
         the 201 response — store it immediately; it is never shown again.
 
         Every delivery is a POST with a JSON envelope `{type, sent_at, data}`
-        and three headers: `Content-Type: application/json`, `X-Dogfood-Event`
-        (the payload type), and `X-Dogfood-Signature: sha256=<HMAC-SHA256 of
+        and three headers: `Content-Type: application/json`, `X-Hack-Hamster-Event`
+        (the payload type), and `X-Hack-Hamster-Signature: sha256=<HMAC-SHA256 of
         the exact request body, keyed by the subscription secret>`. Receivers
         MUST verify the signature over the raw received bytes before trusting
         a delivery.

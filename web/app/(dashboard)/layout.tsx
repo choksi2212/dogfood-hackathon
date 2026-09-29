@@ -113,7 +113,7 @@ export default async function DashboardLayout({
           </div>
           <div className="flex items-center gap-4">
             <span className="hidden font-mono text-xs tracking-caps text-text-muted sm:inline">
-              LEDGER / 2026
+              HACK HAMSTER / 2026
             </span>
             <ThemeToggle />
           </div>

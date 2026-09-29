@@ -9,7 +9,7 @@ from apps.events.models import Event
 from apps.submissions.models import Submission
 
 WIDGET_JS = """(function() {
-  var cfg = window.DOGFOOD_WIDGET || {};
+  var cfg = window.HACK HAMSTER_WIDGET || {};
   var api = cfg.api || '/api/widget/gallery';
   var eventSlug = cfg.event || '';
   var target = cfg.target || document.currentScript.parentNode;
@@ -29,7 +29,7 @@ WIDGET_JS = """(function() {
   fetch(url, { credentials: 'omit' })
     .then(function(r) { return r.json(); })
     .then(function(d) { render(d.items || []); })
-    .catch(function(e) { console.error('DOGFOOD widget error:', e); });
+    .catch(function(e) { console.error('HACK HAMSTER widget error:', e); });
 })();
 """
 

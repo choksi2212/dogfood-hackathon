@@ -1,10 +1,10 @@
-# DOGFOOD 2026 — Backend & DB Implementation
+# HACK HAMSTER 2026 — Backend & DB Implementation
 
-**Event:** dogfoodhack.com · Hackathon Raptors · "Build the platform that will judge you"
+**Event:** hackhamster.com · Hackathon Raptors · "Build the platform that will judge you"
 **Window:** Sep 26 18:00 UTC → Sep 29 18:00 UTC, 2026 (72h)
 **Team:** Manas (`choksi2212`) + Mihir (`Mihir-Rabari`)
 **Repo:** `https://github.com/choksi2212/dogfood-hackathon`
-**Spec:** `https://dogfoodhack.com/spec`
+**Spec:** `https://hackhamster.com/spec`
 **Stack:** Django 5 + DRF + PostgreSQL 16 + Next.js 15, all in `docker compose up`
 **Companion docs:** [PRD](PRD.md), [TRD](TRD.md), [Architecture](../ARCHITECTURE.md)
 
@@ -18,12 +18,12 @@
 ### 1.1 Repository layout
 
 ```
-dogfood-hackathon/
+hack-hamster-hackathon/
 ├── README.md
 ├── LICENSE                  MIT or Apache-2.0
 ├── .gitignore
 ├── .gitattributes           * text=auto eol=lf
-├── .dogfood.toml
+├── .hack-hamster.toml
 ├── acceptance-report.txt
 ├── docker-compose.yml
 ├── Dockerfile.backend
@@ -117,7 +117,7 @@ djangorestframework-stubs==3.15.2
 
 ```json
 {
-  "name": "dogfood-web",
+  "name": "hack-hamster-web",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -140,7 +140,7 @@ djangorestframework-stubs==3.15.2
 # Condensed from the real Makefile (COMPOSE ?= docker compose).
 up:          $(COMPOSE) up --build
 seed:        $(COMPOSE) exec -T web python manage.py import_fixtures
-accept:      $(COMPOSE) exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
+accept:      $(COMPOSE) exec -T web python acceptance.py .hack-hamster.toml | tee acceptance-report.txt
 test:        $(COMPOSE) exec -T web pytest tests/ -v
 lint:        ruff check .
              ruff format --check .
@@ -165,13 +165,13 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: dogfood
+      POSTGRES_USER: hack-hamster
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: dogfood
+      POSTGRES_DB: hack-hamster
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dogfood -d dogfood"]
+      test: ["CMD-SHELL", "pg_isready -U hack-hamster -d hack-hamster"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -181,7 +181,7 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     environment:
-      DATABASE_URL: postgres://dogfood:${DB_PASSWORD}@db:5432/dogfood
+      DATABASE_URL: postgres://hack-hamster:${DB_PASSWORD}@db:5432/hack-hamster
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       DJANGO_DEBUG: "false"
       DJANGO_ALLOWED_HOSTS: localhost,backend
@@ -342,8 +342,8 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'dogfood',
-        'USER': 'dogfood',
+        'NAME': 'hack-hamster',
+        'USER': 'hack-hamster',
         'PASSWORD': os.environ['DB_PASSWORD'],
         'HOST': 'db',
         'PORT': '5432',
@@ -382,7 +382,7 @@ REST_FRAMEWORK = {
 
 # Spectacular
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'DOGFOOD API',
+    'TITLE': 'HACK HAMSTER API',
     'DESCRIPTION': 'Hackathon submission and judging portal',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
@@ -862,7 +862,7 @@ class Command(BaseCommand):
         for label, user in self._demo_users(event, judges):
             token = hmac.new(
                 settings.SECRET_KEY.encode(),
-                f"dogfood-2026-demo-session:{label}:{user.email}".encode(),
+                f"hack-hamster-2026-demo-session:{label}:{user.email}".encode(),
                 hashlib.sha256,
             ).hexdigest()
             self._upsert_session(user, token)   # user-agent: import_fixtures/1.0
@@ -872,9 +872,9 @@ class Command(BaseCommand):
 The five demo sessions are bound to the first three **fixture** judges —
 `judge_a` → `tomas.varga@example.org`, `judge_b` → `wei.lindqvist@example.org`,
 `judge_c` → `priya.nair@example.org` — plus the organizer and participant
-accounts, all with the dev password `dogfood-dev-password`. Because each
-token is `HMAC-SHA256(DJANGO_SECRET_KEY, "dogfood-2026-demo-session:{label}:{email}")`,
-the five committed `.dogfood.toml` `[auth]` headers are valid on every fresh
+accounts, all with the dev password `hack-hamster-dev-password`. Because each
+token is `HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`,
+the five committed `.hack-hamster.toml` `[auth]` headers are valid on every fresh
 volume; they change only if `DJANGO_SECRET_KEY` changes (re-run `make seed` to
 print the new values). The command is idempotent, and `entrypoint.sh` runs it
 automatically after `migrate`. There is no separate user-seeder command; a
@@ -2544,7 +2544,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
     dependencies = [('audit', '0001_initial')]
     operations = [
-        migrations.RunSQL("REVOKE UPDATE, DELETE ON audit_auditevent FROM dogfood;"),
+        migrations.RunSQL("REVOKE UPDATE, DELETE ON audit_auditevent FROM hack-hamster;"),
     ]
 ```
 
@@ -2741,7 +2741,7 @@ from .models import NormalizationRun
 def generate_proof(run: NormalizationRun, result) -> str:
     """Generate the FIG. 03 proof file."""
     lines = []
-    lines.append('DOGFOOD normalization proof')
+    lines.append('HACK HAMSTER normalization proof')
     lines.append(f'event: {run.event.slug}')
     lines.append(f'method: {run.method}')
     lines.append(f'created_at: {run.created_at.isoformat()}')
@@ -3377,7 +3377,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 
-class DogfoodError(Exception):
+class Hack HamsterError(Exception):
     code = 'error'
     message = 'An error occurred.'
     status_code = 400
@@ -3388,25 +3388,25 @@ class DogfoodError(Exception):
         self.detail = detail
 
 
-class ForbiddenRole(DogfoodError):
+class ForbiddenRole(Hack HamsterError):
     code = 'forbidden_role'
     message = 'You do not have permission to do that.'
     status_code = 403
 
 
-class DeadlinePassed(DogfoodError):
+class DeadlinePassed(Hack HamsterError):
     code = 'deadline_passed'
     message = 'The deadline has passed.'
     status_code = 422
 
 
-class ValidationFailed(DogfoodError):
+class ValidationFailed(Hack HamsterError):
     code = 'validation_failed'
     message = 'Validation failed.'
     status_code = 422
 
 
-class RateLimited(DogfoodError):
+class RateLimited(Hack HamsterError):
     code = 'rate_limited'
     message = 'Too many requests.'
     status_code = 429
@@ -3416,7 +3416,7 @@ class RateLimited(DogfoodError):
 
 
 def custom_exception_handler(exc, context):
-    if isinstance(exc, DogfoodError):
+    if isinstance(exc, Hack HamsterError):
         body = {'error': {'code': exc.code, 'message': exc.message, 'detail': exc.detail}}
         response = Response(body, status=exc.status_code)
         if isinstance(exc, RateLimited):
@@ -3920,7 +3920,7 @@ def seed_data(db):
             email=email,
             defaults={'is_active': True, 'name': name},
         )
-        user.set_password('dogfood123')
+        user.set_password('hack-hamster123')
         user.save()
         
         Membership.objects.get_or_create(
@@ -3965,7 +3965,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         event = Event.objects.get(slug='sample-hack-2026')
         lines = [
-            'DOGFOOD role-isolation matrix',
+            'HACK HAMSTER role-isolation matrix',
             f'event: {event.slug}',
             'method: real HTTP calls via Django test client',
             '',
@@ -3995,7 +3995,7 @@ class Command(BaseCommand):
 
 ---
 
-## Part 15 — The .dogfood.toml
+## Part 15 — The .hack-hamster.toml
 
 ### 15.1 The file
 
@@ -4030,9 +4030,9 @@ csv_export   = "/api/csv_export"
 
 It is not a manual step. `import_fixtures` seeds the demo sessions with
 DETERMINISTIC tokens — `HMAC-SHA256(DJANGO_SECRET_KEY,
-"dogfood-2026-demo-session:{label}:{email}")`, derived from the role label and
+"hack-hamster-2026-demo-session:{label}:{email}")`, derived from the role label and
 the seeded user's email (never a database PK, which fresh volumes would
-change) — so the committed `.dogfood.toml` is valid after any
+change) — so the committed `.hack-hamster.toml` is valid after any
 `docker compose up` and on any fresh database volume:
 
 ```bash
@@ -4040,19 +4040,19 @@ change) — so the committed `.dogfood.toml` is valid after any
 docker compose up
 
 # 2. Run the checker — the committed [auth] values just work
-python3 acceptance.py .dogfood.toml        # or the official run.py
+python3 acceptance.py .hack-hamster.toml        # or the official run.py
 ```
 
 `import_fixtures` still prints the headers ("Stable demo session cookies
-(deterministic — they match the committed .dogfood.toml)") for the one case
+(deterministic — they match the committed .hack-hamster.toml)") for the one case
 that needs them: if you changed `DJANGO_SECRET_KEY`, copy the newly printed
-values into `.dogfood.toml`.
+values into `.hack-hamster.toml`.
 
 ### 15.3 The run.py script (provided by spec)
 
 The spec provides `run.py`. We do not modify it. It:
 
-1. Parses `.dogfood.toml`.
+1. Parses `.hack-hamster.toml`.
 2. Makes the 7 HTTP calls.
 3. Asserts the responses.
 4. Prints PASS/FAIL with detail.

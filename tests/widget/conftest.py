@@ -20,8 +20,8 @@ the existing behavior is preserved.
 
 We also isolate this directory's test database to `test_widget_isolated`
 so we don't collide with other agents running the same test suite
-concurrently against `test_dogfood`. Multiple agents hitting the
-shared `test_dogfood` DB at the same time has produced `pg_type`
+concurrently against `test_hack-hamster`. Multiple agents hitting the
+shared `test_hack-hamster` DB at the same time has produced `pg_type`
 duplicate-key errors and missing-relation errors during migration.
 
 This conftest.py is local to tests/widget/ — it only affects test

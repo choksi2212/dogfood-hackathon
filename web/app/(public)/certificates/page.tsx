@@ -16,7 +16,7 @@ export default function CertificateLookupPage() {
             An authentic record.
           </h1>
           <p className="mt-5 max-w-md text-sm leading-relaxed text-text-secondary">
-            Every Ledger certificate carries a signed record. Enter its public
+            Every Hack Hamster certificate carries a signed record. Enter its public
             ID to confirm it’s authentic and see what it recognizes.
           </p>
           <div className="mt-9">

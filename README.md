@@ -1,8 +1,8 @@
-# DOGFOOD 2026
+# HACK HAMSTER 2026
 
 **Build the platform that will judge you.** Hackathon Raptors, Sep 26–29, 2026.
 
-This repo is the competition submission for the [DOGFOOD Hackathon](https://dogfoodhack.com).
+This repo is the competition submission for the [HACK HAMSTER Hackathon](https://hackhamster.com).
 The portal we build here is a hackathon submission-and-judging platform; the winner gets
 forked, self-hosted, and used for real Raptors events.
 
@@ -11,7 +11,7 @@ forked, self-hosted, and used for real Raptors events.
 - **Window:** Sep 26 18:00 UTC → Sep 29 18:00 UTC, 2026 (72h)
 - **Team:** Manas (`choksi2212`) + Mihir (`Mihir-Rabari`)
 - **Stack:** Django 5 + Django REST Framework + PostgreSQL 16 + Next.js 15, all in `docker compose up`
-- **Spec:** https://dogfoodhack.com/spec (live Sep 23, 2026)
+- **Spec:** https://hackhamster.com/spec (live Sep 23, 2026)
 
 ## What this repo contains
 
@@ -25,7 +25,7 @@ forked, self-hosted, and used for real Raptors events.
 | `apps/` + `config/` | Django 5 backend — all Python code lives here (this repo's `src/`) |
 | `web/` | Next.js 15 frontend |
 | `tests/` | Our own pytest suite — 20 categories, beyond the seven acceptance checks |
-| [demo/dogfood-demo-2026.mp4](demo/dogfood-demo-2026.mp4) | Demo video — one full event lifecycle (create → submit → judge → publish), 2:27, 720p |
+| [demo/hack-hamster-demo-2026.mp4](demo/hack-hamster-demo-2026.mp4) | Demo video — one full event lifecycle (create → submit → judge → publish), 2:27, 720p |
 | `docs/` | Design docs: [PLAN](docs/PLAN.md) · [PRD](docs/PRD.md) · [TRD](docs/TRD.md) · [BACKEND-IMPL](docs/BACKEND-IMPL.md) · [RUNBOOK](docs/RUNBOOK.md) · [TESTING](docs/TESTING.md) |
 
 ## The portal in six screenshots
@@ -44,7 +44,7 @@ Public gallery with search/filter · community voting (simple + quadratic, rando
 
 ```bash
 git clone https://github.com/choksi2212/dogfood-hackathon
-cd dogfood-hackathon
+cd hack-hamster-hackathon
 docker compose up          # wait for the web container's "Booting development server"
 ```
 
@@ -60,9 +60,9 @@ Then run the acceptance checker (the spec's official `run.py`, vendored
 byte-for-byte as [acceptance.py](acceptance.py)):
 
 ```bash
-make accept                # docker compose exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
+make accept                # docker compose exec -T web python acceptance.py .hack-hamster.toml | tee acceptance-report.txt
 # or, outside docker, against a running portal:
-python3 acceptance.py .dogfood.toml > acceptance-report.txt
+python3 acceptance.py .hack-hamster.toml > acceptance-report.txt
 ```
 
 Expected: **7/7 PASS** — `claimed T1 T2 T3 T4, verified T1 T2`. The committed
@@ -70,8 +70,8 @@ Expected: **7/7 PASS** — `claimed T1 T2 T3 T4, verified T1 T2`. The committed
 
 **Zero manual steps, even on a fresh volume.** The five demo session cookies
 are deterministic —
-`HMAC-SHA256(DJANGO_SECRET_KEY, "dogfood-2026-demo-session:{label}:{email}")`
-— so the `[auth]` values committed in [.dogfood.toml](.dogfood.toml) are valid
+`HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`
+— so the `[auth]` values committed in [.hack-hamster.toml](.hack-hamster.toml) are valid
 after any `docker compose up` and after any `docker compose down -v && up`.
 There is no copy-paste step after reseeding; the cookies only change if you
 change `DJANGO_SECRET_KEY` (re-run `make seed` to print the new values).
@@ -79,7 +79,7 @@ change `DJANGO_SECRET_KEY` (re-run `make seed` to print the new values).
 ## Demo accounts
 
 Seeded on every boot by `manage.py import_fixtures` (five sessions; all share
-the password `dogfood-dev-password`):
+the password `hack-hamster-dev-password`):
 
 | Label | Login | Who |
 |---|---|---|
@@ -92,7 +92,7 @@ the password `dogfood-dev-password`):
 `judge_a`/`judge_b`/`judge_c` are bound to the first three *fixture* judges,
 not synthetic users, so the T2 peer-isolation check runs against genuinely
 different real assignments. All five headers (`organizer`, `judge_a`,
-`judge_b`, `judge_c`, `participant`) are the committed `.dogfood.toml`
+`judge_b`, `judge_c`, `participant`) are the committed `.hack-hamster.toml`
 `[auth]` values — the checker attaches the four its seven checks need.
 
 ## What we ship
@@ -102,7 +102,7 @@ Nine base items, plus all four bonuses (+16). Everything below lives on
 
 1. **Public GitHub repo, OSI licence** — MIT or Apache-2.0 preferred.
 2. **`docker compose up`** — To a seeded, working portal, network off.
-3. **`.dogfood.toml` at the repo root** — Honest tier claims.
+3. **`.hack-hamster.toml` at the repo root** — Honest tier claims.
 4. **`acceptance-report.txt` committed** — Whatever it says.
 5. **README.md** — What it does, how to run it, honest limits.
 6. **`ARCHITECTURE.md`** — The shape of the system and why.
@@ -129,7 +129,7 @@ Nine base items, plus all four bonuses (+16). Everything below lives on
 
 ## Tiers claimed, and where the code lives
 
-[.dogfood.toml](.dogfood.toml) claims **T1, T2, T3, T4**.
+[.hack-hamster.toml](.hack-hamster.toml) claims **T1, T2, T3, T4**.
 
 | Tier | What | Code | Tests |
 |---|---|---|---|
@@ -142,7 +142,7 @@ Detail for the claimed tiers beyond the machine-verified T1/T2 surface (no
 acceptance checks exist for these; they are covered by tests instead):
 
 - **Webhooks (T4)** — organizer subscriptions at `/api/webhooks`; every
-  delivery HMAC-signed (`X-Dogfood-Signature: sha256=…`), synchronous single
+  delivery HMAC-signed (`X-Hack-Hamster-Signature: sha256=…`), synchronous single
   attempt (3-second timeout, never raises into the request), per-webhook
   delivery log at `GET /api/webhooks/<uuid>/deliveries`, in-place retry via
   `manage.py flush_webhooks`.
@@ -169,16 +169,16 @@ acceptance checks exist for these; they are covered by tests instead):
 
 The spec's acceptance checker (`run.py`, provided by the organisers) makes
 seven HTTP checks against the portal at `base_url` from
-[.dogfood.toml](.dogfood.toml). We vendor the checker byte-for-byte as
+[.hack-hamster.toml](.hack-hamster.toml). We vendor the checker byte-for-byte as
 [acceptance.py](acceptance.py) (verified identical to the spec's Appendix A —
 only the filename differs). The output is
 [acceptance-report.txt](acceptance-report.txt), which we commit. All seven
 must pass for the 40% Tier Completion criterion.
 
 ```bash
-make accept                # docker compose exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
+make accept                # docker compose exec -T web python acceptance.py .hack-hamster.toml | tee acceptance-report.txt
 # or, outside docker, against a running portal:
-python3 acceptance.py .dogfood.toml > acceptance-report.txt
+python3 acceptance.py .hack-hamster.toml > acceptance-report.txt
 ```
 
 The seven checks only cover T1 and T2, so the committed report honestly reads
@@ -240,20 +240,20 @@ docker compose -f docker-compose.multi.yml up --build -d
 | G6 (H+56) | Sep 29 02:00 UTC | **PASS** — Bradley-Terry MM with phantom prior 0.5; ranking recovered from synthetic ballots |
 | G7 (H+62) | Sep 29 08:00 UTC | **PASS** — certificates, widget.js, webhooks, OpenAPI 3 spec published |
 | G8 (H+66) | Sep 29 12:00 UTC | **PASS** — THREAT-MODEL.md shipped; all 4 bonuses defended (+16) |
-| G9 (H+70) | Sep 29 16:00 UTC | **PASS** — `down -v && up` from clean state; seed prints *stable* demo cookies (deterministic — they match the committed `.dogfood.toml`); `make accept` = 7 PASS / 0 FAIL |
+| G9 (H+70) | Sep 29 16:00 UTC | **PASS** — `down -v && up` from clean state; seed prints *stable* demo cookies (deterministic — they match the committed `.hack-hamster.toml`); `make accept` = 7 PASS / 0 FAIL |
 
 ### G1 verification log
 
 ```
 $ docker compose up --build -d
-... Container dogfood-portal-db-1   Healthy
-... Container dogfood-portal-web-1 Started
+... Container hack-hamster-portal-db-1   Healthy
+... Container hack-hamster-portal-web-1 Started
 
 $ curl -sS http://127.0.0.1:8001/healthz
 {"status":"ok","checks":{"app":"ok","db":"ok"},"db_ms":5}
 
 $ curl -sS http://127.0.0.1:8001/
-{"service":"dogfood-portal","stage":"G1","tiers_claimed":[]}
+{"service":"hack-hamster-portal","stage":"G1","tiers_claimed":[]}
 
 $ docker compose exec web python manage.py showmigrations
 auth          [X] 0001_initial ... [X] 0012_alter_user_first_name_max_length
@@ -322,7 +322,7 @@ Pytest config in [pytest.ini](pytest.ini) (read-only).
   attacker with rotating IPs can still Sybil it; mitigations and residual
   risk are in [THREAT-MODEL.md](THREAT-MODEL.md).
 - **The deterministic demo cookies are tied to the dev secret key.** The
-  committed `.dogfood.toml` values match the compose-default
+  committed `.hack-hamster.toml` values match the compose-default
   `DJANGO_SECRET_KEY`. Change the key and the demo cookies change with it —
   re-run `make seed` to print the new values. Real user sessions are
   unaffected: they always draw random tokens and rotate on login and password

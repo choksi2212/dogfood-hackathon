@@ -25,7 +25,7 @@ import { RouteLoading } from "@/components/route-loading";
 // drawn once per browser session and kept in sessionStorage, and a
 // deterministic PRNG turns that seed into the same shuffle on every
 // render of that session. A new session draws a new seed → new order.
-const BALLOT_SEED_KEY = "dogfood:ballot-seed";
+const BALLOT_SEED_KEY = "hack-hamster:ballot-seed";
 
 function ballotSeed(): number {
   let stored: string | null = null;

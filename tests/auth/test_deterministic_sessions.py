@@ -2,10 +2,10 @@
 
 ``Session.create(..., deterministic=True)`` (apps/accounts/models.py,
 ARCHITECTURE.md §5.9) mints the pre-baked demo sessions whose tokens are
-committed in ``.dogfood.toml`` so the official checker needs no copy-paste
+committed in ``.hack-hamster.toml`` so the official checker needs no copy-paste
 step on a fresh ``docker compose up``:
 
-  - token == HMAC-SHA256(SECRET_KEY, "dogfood-2026-demo-session:{label}:{email}")
+  - token == HMAC-SHA256(SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")
     in hex — identical on every boot and across fresh database volumes
   - idempotent: re-creating the same (user, label) returns the same token,
     refreshes the existing row's expiry, and never inserts a duplicate
@@ -76,7 +76,7 @@ def _clear_rate_limit_buckets() -> None:
 
 def _client_with_cookie(token: str) -> Client:
     """Test client carrying ``Cookie: session=<token>`` — the exact request
-    shape the acceptance checker attaches from ``.dogfood.toml``."""
+    shape the acceptance checker attaches from ``.hack-hamster.toml``."""
     c = Client()
     c.cookies["session"] = token
     return c
@@ -84,7 +84,7 @@ def _client_with_cookie(token: str) -> Client:
 
 def _expected_deterministic_token(label: str, email: str) -> str:
     """The documented §5.9 recipe, computed independently of the model."""
-    payload = f"dogfood-2026-demo-session:{label}:{email}".encode()
+    payload = f"hack-hamster-2026-demo-session:{label}:{email}".encode()
     return hmac.new(settings.SECRET_KEY.encode(), payload, hashlib.sha256).hexdigest()
 
 
@@ -95,8 +95,8 @@ def _expected_deterministic_token(label: str, email: str) -> str:
 
 @pytest.mark.django_db
 def test_deterministic_token_matches_documented_hmac_formula(participant):
-    """The token is HMAC-SHA256(SECRET_KEY, "dogfood-2026-demo-session:{label}:{email}")
-    in hex — the exact recipe ARCHITECTURE.md §5.9 documents and .dogfood.toml
+    """The token is HMAC-SHA256(SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")
+    in hex — the exact recipe ARCHITECTURE.md §5.9 documents and .hack-hamster.toml
     commits, so boot-to-boot stability is a hard contract."""
     _, token = Session.create(participant, label="participant", deterministic=True)
 
@@ -108,7 +108,7 @@ def test_deterministic_token_matches_documented_hmac_formula(participant):
 @pytest.mark.django_db
 def test_same_user_and_label_yield_the_same_token(participant):
     """Two deterministic creates for the same (user, label) return the same
-    token — the property that makes the committed .dogfood.toml headers
+    token — the property that makes the committed .hack-hamster.toml headers
     valid on every boot."""
     _, first = Session.create(participant, label="judge_a", deterministic=True)
     _, second = Session.create(participant, label="judge_a", deterministic=True)

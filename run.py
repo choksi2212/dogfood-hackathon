@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Ledger 2026 acceptance checker.
+"""Hack Hamster 2026 acceptance checker.
 
-Usage:  python3 run.py .dogfood.toml > acceptance-report.txt
+Usage:  python3 run.py .hack-hamster.toml > acceptance-report.txt
 
 Any Python 3. Standard library only, nothing to install.
 """
@@ -21,7 +21,7 @@ except ModuleNotFoundError:
 
 
 def parse_toml(text):
-    """Enough TOML for .dogfood.toml, so older Pythons work too.
+    """Enough TOML for .hack-hamster.toml, so older Pythons work too.
 
     Handles [section] headers, key = "string", and key = ["a", "b"].
     """
@@ -130,7 +130,7 @@ def build_checks(cfg, fixture):
         url("submit"),
         header=auth.get("participant"),
         method="POST",
-        body={"title": "dogfood-late-submission-probe", "summary": "probe"},
+        body={"title": "hack-hamster-late-submission-probe", "summary": "probe"},
     )
     c.ok = 400 <= status < 500
     if not c.ok:
@@ -212,8 +212,8 @@ def load_fixture(explicit, config_path):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="DOGFOOD 2026 acceptance checker")
-    ap.add_argument("config", help="path to .dogfood.toml")
+    ap = argparse.ArgumentParser(description="HACK HAMSTER 2026 acceptance checker")
+    ap.add_argument("config", help="path to .hack-hamster.toml")
     ap.add_argument("--fixtures", default=None,
                     help="path to fixtures.json (searched for if omitted)")
     args = ap.parse_args()
@@ -223,7 +223,7 @@ def main():
     fixture, fixture_path = load_fixture(args.fixtures, args.config)
     claimed = [t for t in cfg.get("tiers", {}).get("claimed", []) if t in TIERS]
 
-    print("Ledger 2026 acceptance report")
+    print("Hack Hamster 2026 acceptance report")
     print(f"portal: {cfg['portal']['base_url']}")
     print(f"claimed: {' '.join(claimed) or 'nothing'}")
     if fixture is None:

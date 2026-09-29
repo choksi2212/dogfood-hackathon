@@ -1,4 +1,4 @@
-"""Seed fixtures for DOGFOOD.
+"""Seed fixtures for HACK HAMSTER.
 
 Run from inside the web container:
   python manage.py seed_fixtures
@@ -18,9 +18,9 @@ What it does:
      so at least one is recognizable to the acceptance suite's "known
      fixture title" check.
   7. Creates 4 Sessions (one per pre-baked user) and prints 4 header lines
-     in a .dogfood.toml-friendly format.
+     in a .hack-hamster.toml-friendly format.
 
-Output: prints a HEADER block to stdout. Capture it into .dogfood.toml's
+Output: prints a HEADER block to stdout. Capture it into .hack-hamster.toml's
 [auth] block.
 """
 
@@ -48,7 +48,7 @@ DEMO_USERS = [
     ("participant@test.local", "Pranav Participant", "participant", "participant"),
 ]
 
-DEMO_PASSWORD = "dogfood-dev-password"
+DEMO_PASSWORD = "hack-hamster-dev-password"
 
 
 # Submissions-close deadline goes in the past (1 hour ago) so the
@@ -105,7 +105,7 @@ class Command(BaseCommand):
             defaults=dict(
                 name="Sample Hack 2026",
                 description=(
-                    "Demo event for the DOGFOOD acceptance suite. Submissions "
+                    "Demo event for the HACK HAMSTER acceptance suite. Submissions "
                     "closed an hour ago so check 3 (post-deadline submit) fires."
                 ),
                 **_event_windows(now),
@@ -255,10 +255,10 @@ class Command(BaseCommand):
                     Review.objects.get_or_create(assignment=assignment)
 
         # Final output
-        self.stdout.write("# DOGFOOD seed_fixtures output")
+        self.stdout.write("# HACK HAMSTER seed_fixtures output")
         self.stdout.write(f"# event_slug = {event_slug}")
         self.stdout.write(f"# known_title = {known_title}")
-        self.stdout.write("# Paste the lines below into the [auth] block of .dogfood.toml:")
+        self.stdout.write("# Paste the lines below into the [auth] block of .hack-hamster.toml:")
         self.stdout.write("")
         for label in ("organizer", "judge_a", "judge_b", "judge_c", "participant"):
             self.stdout.write(f'{label.upper()}_HEADER = "Cookie: session={headers[label]}"')

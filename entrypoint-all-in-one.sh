@@ -15,8 +15,8 @@ export POSTGRES_HOST="${POSTGRES_HOST:-127.0.0.1}"
 export POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 
 PGDATA="/var/lib/postgresql/data"
-PGUSER="${POSTGRES_USER:-dogfood}"
-PGDB="${POSTGRES_DB:-dogfood}"
+PGUSER="${POSTGRES_USER:-hack_hamster}"
+PGDB="${POSTGRES_DB:-hack_hamster}"
 
 if [ ! -s "$PGDATA/PG_VERSION" ]; then
     echo "[all-in-one] initializing postgres data directory at $PGDATA"

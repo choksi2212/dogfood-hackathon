@@ -43,7 +43,7 @@ from django.urls import include, path
 def root(request):
     return JsonResponse(
         {
-            "service": "dogfood-portal",
+            "service": "hack-hamster-portal",
             "stage": "G9",
             "tiers_claimed": ["t1", "t2", "t3"],
         }

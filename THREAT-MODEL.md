@@ -366,7 +366,7 @@ by the controls above or by adjacent code.
 ### 5.4 Webhook URL takeover
 
 - **Mitigation.** Webhook deliveries carry an HMAC-SHA256 signature
-  (`X-Dogfood-Signature: sha256=…`) keyed by a per-subscription
+  (`X-Hack-Hamster-Signature: sha256=…`) keyed by a per-subscription
   server-generated secret; a receiver that verifies the signature rejects
   payloads forged by whoever now controls the URL. Deliveries are
   synchronous (3 s timeout, single inline attempt, failures recorded and

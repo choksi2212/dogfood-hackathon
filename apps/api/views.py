@@ -254,7 +254,7 @@ class EventImportView(APIView):
         if not isinstance(scores, list):
             return self._validation_failed("scores, when present, must be a list.")
 
-        with tempfile.TemporaryDirectory(prefix="dogfood-import-") as tmp_dir:
+        with tempfile.TemporaryDirectory(prefix="hack-hamster-import-") as tmp_dir:
             # delete=False + TemporaryDirectory: call_command reopens the
             # file by path, so it must outlive the NamedTemporaryFile
             # context; the surrounding TemporaryDirectory removes

@@ -1,14 +1,14 @@
-# DOGFOOD Portal — On-Call Runbook
+# HACK HAMSTER Portal — On-Call Runbook
 
-**Audience:** Anyone paged at 2 a.m. for the portal in `N:\dogfood-hackathon`.
-**Assumptions:** Docker Desktop is running on the host, the `dogfood-portal`
+**Audience:** Anyone paged at 2 a.m. for the portal in `N:\hack-hamster-hackathon`.
+**Assumptions:** Docker Desktop is running on the host, the `hack-hamster-portal`
 compose project is up, and you can open Git Bash on `N:`.
 
 ---
 
 ## 1. Service overview
 
-The DOGFOOD Portal is a hackathon submission-and-judging platform: organizers
+The HACK HAMSTER Portal is a hackathon submission-and-judging platform: organizers
 create events, teams submit projects under deadline, judges score them, the
 public votes, and the platform emits signed certificates and a CSV export.
 Runs as two containers in `docker compose` — `web` (Django 5.1 + DRF on
@@ -52,7 +52,7 @@ is `Restarting` or `Unhealthy`. `docker compose logs web` shows
 **Recovery:**
 
 ```bash
-cd /n/dogfood-hackathon
+cd /n/hack-hamster-hackathon
 docker compose restart db
 docker compose restart web
 ```
@@ -62,8 +62,8 @@ the restart cycle repeats and `/healthz` is still 503, confirm the DB
 container actually came up and the database still exists:
 
 ```bash
-docker compose exec db pg_isready -U dogfood -d dogfood
-docker compose exec db psql -U dogfood -c '\l'
+docker compose exec db pg_isready -U hack-hamster -d hack-hamster
+docker compose exec db psql -U hack-hamster -c '\l'
 ```
 
 If `pg_isready` says `no response`, the Postgres process inside `db` died —
@@ -104,7 +104,7 @@ bump the limit in `LIMITS` and redeploy:
 
 ```bash
 # edit apps/accounts/middleware.py -> LIMITS["write"] = (60, 60)
-cd /n/dogfood-hackathon
+cd /n/hack-hamster-hackathon
 docker compose up -d --build web
 ```
 
@@ -162,7 +162,7 @@ The traceback will name the `project_id` (UUID) and the field. Pull that
 row out:
 
 ```bash
-docker compose exec db psql -U dogfood -d dogfood \
+docker compose exec db psql -U hack-hamster -d hack-hamster \
   -c "SELECT * FROM judging_score WHERE project_id='<uuid>';"
 ```
 
@@ -179,7 +179,7 @@ In rough order of usefulness:
    `--tail=200` to scroll back. `LOG_LEVEL=DEBUG` in `.env` will turn on
    Django's request log; flip it back to `INFO` after the incident.
 2. **Postgres shell** — `make db-shell` (i.e.
-   `docker compose exec db psql -U dogfood -d dogfood`). The schema lives
+   `docker compose exec db psql -U hack-hamster -d hack-hamster`). The schema lives
    in `public`; tables are named `<app>_<model>` (e.g.
    `judging_score`, `voting_vote`, `events_event`).
 3. **Django shell** — `make web-shell` for ad-hoc ORM queries when the

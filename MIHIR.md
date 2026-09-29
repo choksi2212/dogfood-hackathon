@@ -1,15 +1,15 @@
-# DOGFOOD 2026 — MIHIR: FRONTEND, PUBLIC SURFACE, THREAT MODEL
+# HACK HAMSTER 2026 — MIHIR: FRONTEND, PUBLIC SURFACE, THREAT MODEL
 
 **Owner:** Mihir (`Mihir-Rabari`)
 **Partner:** Manas (`choksi2212`) — backend, data, judging maths
-**Plan:** `DOGFOOD-PLAN.md` · **Partner's doc:** `DOGFOOD-MANAS.md` · **Machine setup:** `DOGFOOD-SETUP-MIHIR.md`
+**Plan:** `HACK HAMSTER-PLAN.md` · **Partner's doc:** `HACK HAMSTER-MANAS.md` · **Machine setup:** `HACK HAMSTER-SETUP-MIHIR.md`
 **Scope:** T1 + T2 + T3 + T4, all four bonuses. Nothing cut.
 
-**Read this whole file before Sep 26 (kickoff day).** Do your machine setup from `DOGFOOD-SETUP-MIHIR.md`
+**Read this whole file before Sep 26 (kickoff day).** Do your machine setup from `HACK HAMSTER-SETUP-MIHIR.md`
 this week, not on kickoff day.
 
 > **SPEC IS LIVE (Sep 23, a day early).** This doc has been rewritten against the real
-> spec — the biggest change is that `.dogfood.toml` is the seam, not `openapi.yaml`.
+> spec — the biggest change is that `.hack-hamster.toml` is the seam, not `openapi.yaml`.
 > The acceptance mechanism is `run.py`, seven HTTP checks. T3 and T4 have zero checks
 > in run.py; they are scored on docs + demo video only. Anything that conflicts with
 > the spec is wrong by definition — the spec is what runs.
@@ -54,7 +54,7 @@ apps/normalization/**       the estimator
 apps/pairwise/**            Bradley-Terry
 docker-compose.yml  Dockerfile*  Makefile
 openapi.yaml
-ARCHITECTURE.md  DATA-MODEL.md  JUDGING.md  README.md  .dogfood.toml
+ARCHITECTURE.md  DATA-MODEL.md  JUDGING.md  README.md  .hack-hamster.toml
 ```
 
 **If you need a change in a file he owns, you ask. You never edit it "just quickly".**
@@ -69,13 +69,13 @@ That rule has no exceptions, including at hour 70, especially at hour 70.
 3. **Never force-push a shared branch.**
 4. **Never commit on `main` directly.** You work on `mihir`, Manas works on `manas`.
 5. **Pull before you push, every time.**
-6. **Nothing is pushed to `dogfood-hackathon` before Sep 26 18:00 UTC.** Rule 04 of the hackathon:
+6. **Nothing is pushed to `hack-hamster-hackathon` before Sep 26 18:00 UTC.** Rule 04 of the hackathon:
    any project code committed before kickoff is **disqualification**, not a penalty. Practice
    work lives in a separate throwaway repo that never gets pushed there.
 
-## 1.4 The frozen contract — `.dogfood.toml`, not `openapi.yaml`
+## 1.4 The frozen contract — `.hack-hamster.toml`, not `openapi.yaml`
 
-`.dogfood.toml` is the seam between us. It is a ~15-line config file at the repo root,
+`.hack-hamster.toml` is the seam between us. It is a ~15-line config file at the repo root,
 **published by Manas at H+20** and frozen after that except by explicit agreement in a
 checkpoint call. The spec is explicit: *"No fixed API routes. Yours are yours."* We pick
 the names; run.py reads them from this file.
@@ -314,7 +314,7 @@ You are blocked on the API until H+20. That gap is deliberate and you use it wel
 
 - Next.js app in `web/`, routing, layout, design tokens
 - Component inventory built and working
-- API client layer written against the **five route names** that will appear in `.dogfood.toml`'s `[routes]` block — with a mock adapter behind the same interface
+- API client layer written against the **five route names** that will appear in `.hack-hamster.toml`'s `[routes]` block — with a mock adapter behind the same interface
 - Every screen scaffolded with loading, empty, and error states
 
 The five route keys are: `gallery`, `submit`, `judge_scores`, `peer_scores`, `csv_export`.
@@ -374,7 +374,7 @@ that — it is the most interesting thing we built.
 | When | Gate | What you do |
 |---|---|---|
 | H+3 | G1 | Confirm the repo runs on your machine |
-| **H+20** | **G2** | **`.dogfood.toml` handover — switch off mocks against the five real routes. First real merge to `main`.** |
+| **H+20** | **G2** | **`.hack-hamster.toml` handover — switch off mocks against the five real routes. First real merge to `main`.** |
 | H+34 | G3 | Merge `manas` → `mihir` → `main`. Suite green on `main`. |
 | H+40 | G4 | Same. |
 | H+48 | G5 | Same. Video script locked. |

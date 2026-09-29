@@ -1,13 +1,13 @@
-# DOGFOOD 2026 — MANAS: BACKEND, DATA, MATHS
+# HACK HAMSTER 2026 — MANAS: BACKEND, DATA, MATHS
 
 **Owner:** Manas (`choksi2212`)
 **Partner:** Mihir (`Mihir-Rabari`) — frontend, public surface, threat model
-**Plan:** `DOGFOOD-PLAN.md` · **Partner's doc:** `DOGFOOD-MIHIR.md`
+**Plan:** `HACK HAMSTER-PLAN.md` · **Partner's doc:** `HACK HAMSTER-MIHIR.md`
 **Scope:** T1 + T2 + T3 + T4, all four bonuses. Nothing cut.
 
 > **SPEC IS LIVE (Sep 23, a day early).** This doc has been rewritten against the real
 > spec. The biggest change is that the acceptance mechanism is `run.py` (seven HTTP
-> checks), and `.dogfood.toml` is the seam — a small config file declaring five route
+> checks), and `.hack-hamster.toml` is the seam — a small config file declaring five route
 > names and five pre-baked session headers. Role isolation is graded on **one cell**:
 > `peer_scores` as `judge_b` returns 401/403. T3 and T4 have **zero** checks in run.py.
 > Anything that conflicts with the spec is wrong by definition — the spec is what runs.
@@ -53,7 +53,7 @@ and it is where the Normalization Proof bonus is won or lost. In the last event 
 ## 3. Pre-kickoff paper work (Sep 13 → Sep 24)
 
 Legal: designing, deriving, reading, sketching. Illegal: committing project code.
-**Everything in this section is paper work or local practice you never push to `dogfood-hackathon`.**
+**Everything in this section is paper work or local practice you never push to `hack-hamster-hackathon`.**
 
 ### 3.1 The schema, on paper
 
@@ -197,7 +197,7 @@ this at H+20, so the design must already exist in your head. Freeze the error en
 
 ### 3.6 Fluency, in local practice
 
-Local practice — never pushed to `dogfood-hackathon`, never copied in.
+Local practice — never pushed to `hack-hamster-hackathon`, never copied in.
 Rehearse until each is boring: DRF permission classes, `drf-spectacular` output, a
 Postgres+Django `docker-compose.yml` that comes up cold, `pytest` + factory fixtures.
 At kickoff you retype it from memory. Fluency crosses the line; files do not.
@@ -249,7 +249,7 @@ Rules for the compose file:
 - Publish only what a human must open, and make those ports **configurable**:
   `${WEB_PORT:-8000}:8000`. Document the override in one README line.
 - When you need a shell on the database, go through the container:
-  `docker compose exec db psql -U dogfood dogfood`. Host `psql` is a convenience, never a
+  `docker compose exec db psql -U hack-hamster hack-hamster`. Host `psql` is a convenience, never a
   dependency.
 - Test this properly: **leave your local Postgres running** while you test `docker compose up`.
   If it works with 5432 occupied, it works on a judge's machine. That is a free simulation of
@@ -261,9 +261,9 @@ Auth + sessions · 5 roles per event · event creation with configurable dates/t
 team formation by invite link · draft-and-edit submissions · deadline enforcement · public
 gallery with search and filter · all submission fields including organizer custom questions.
 
-- Wire `make accept` to `python3 run.py .dogfood.toml > acceptance-report.txt` as soon as
+- Wire `make accept` to `python3 run.py .hack-hamster.toml > acceptance-report.txt` as soon as
   the spec lands. Run it after every change that touches the five routes.
-- **Publish `.dogfood.toml` to Mihir the moment the five routes exist.** He is blocked on
+- **Publish `.hack-hamster.toml` to Mihir the moment the five routes exist.** He is blocked on
   this — it is the seam. `openapi.yaml` is still useful for the API First bonus but no
   longer the H+20 critical path.
 - First `acceptance-report.txt` committed.
@@ -329,17 +329,17 @@ published key) stays labeled future work (THREAT-MODEL.md §5.5).
 
 `JUDGING.md` (assignment · weighted scoring · normalization derivation · why not z-scores ·
 connectivity · pairwise · what it does not handle), `ARCHITECTURE.md`, `DATA-MODEL.md`,
-`README.md` **with a Limitations section**, `.dogfood.toml`.
+`README.md` **with a Limitations section**, `.hack-hamster.toml`.
 
 ### G9 — H+66 → H+71 · Close
 
 Mihir records the video at H+68. You do the clean-machine run: `docker compose down -v`,
 fresh clone, **network off**, `make up`, `make accept`, regenerate `acceptance-report.txt`,
-final `.dogfood.toml` matching the report **exactly**, final commit.
+final `.hack-hamster.toml` matching the report **exactly**, final commit.
 
 ---
 
-## 5. `.dogfood.toml` — the seam AND the honesty file
+## 5. `.hack-hamster.toml` — the seam AND the honesty file
 
 **This file does two jobs**, both load-bearing:
 
@@ -460,7 +460,7 @@ is never a window where the repo is public and unlicensed.
 ## 7. Definition of done
 
 - [ ] `docker compose up` from a clean clone, network off, no account, no key → working seeded portal
-- [ ] Acceptance suite green on every claimed tier; **`acceptance-report.txt` committed in the repo root, regenerated on the final clean-machine run, matches `.dogfood.toml` exactly** (it is a published deliverable, not a debug artifact)
+- [ ] Acceptance suite green on every claimed tier; **`acceptance-report.txt` committed in the repo root, regenerated on the final clean-machine run, matches `.hack-hamster.toml` exactly** (it is a published deliverable, not a debug artifact)
 - [ ] All 30 isolation cells verified by real HTTP calls, output committed
 - [ ] Normalization runs on fixtures; proof shows raw σ → normalized σ + rank movement; all three edge cases visibly handled
 - [ ] Pairwise recovers a known ranking from synthetic comparisons, correlation reported
@@ -469,7 +469,7 @@ is never a window where the repo is public and unlicensed.
 - [ ] `README.md` has a Limitations section naming real gaps
 - [ ] Zero warnings anywhere in the build
 
-- [ ] `.dogfood.toml` claims exactly what the report proves
+- [ ] `.hack-hamster.toml` claims exactly what the report proves
 
 ---
 
@@ -480,7 +480,7 @@ Short, fixed, non-negotiable. 10 minutes each, on voice.
 | When | Gate | What happens |
 |---|---|---|
 | H+3 | G1 | `docker compose up` green. `main` has LICENSE + README. Mihir has the repo and it runs on his machine. |
-| **H+20** | **G2** | **`.dogfood.toml` handover** — he stops mocking. **First real integration to `main`.** T1 green, first `acceptance-report.txt`. |
+| **H+20** | **G2** | **`.hack-hamster.toml` handover** — he stops mocking. **First real integration to `main`.** T1 green, first `acceptance-report.txt`. |
 | H+34 | G3 | T2 green, role isolation provable by curl (peer_scores as judge_b → 401/403). Merge to `main`, suite run on `main`. |
 | H+40 | G4 | Normalization proof. Merge to `main`. |
 | H+48 | G5 | T3 green. Merge to `main`. Video script locked. |

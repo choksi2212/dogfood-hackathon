@@ -22,7 +22,7 @@ const groups = [
   {
     title: "The event",
     links: [
-      ["About Ledger", "/#about"],
+      ["About Hack Hamster", "/#about"],
       ["Judging principles", "/#judging"],
       ["Get started", "/register"],
     ],
@@ -42,7 +42,7 @@ export function SiteFooter() {
             </p>
             <span className="mt-5 inline-flex items-center gap-2 font-mono text-xs text-text-muted">
               <span className="size-1.5 rounded-full bg-success" />
-              LEDGER 2026
+              HACK HAMSTER 2026
             </span>
           </div>
           {groups.map((group) => (
@@ -66,7 +66,7 @@ export function SiteFooter() {
           ))}
         </div>
         <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t pt-6 text-xs text-text-muted">
-          <span>© 2026 Ledger Hackathon. Built for builders.</span>
+          <span>© 2026 Hack Hamster Hackathon. Built for builders.</span>
           <a
             href="https://github.com/choksi2212/dogfood-hackathon"
             target="_blank"

@@ -1,4 +1,4 @@
-"""Security probes for the DOGFOOD portal.
+"""Security probes for the HACK HAMSTER portal.
 
 These tests are *attack-surface* assertions, not functional tests. Every
 probe is named after the attack it defends against and the assertion is
@@ -660,7 +660,7 @@ def test_post_without_csrf_token_to_login_succeeds(db, participant):
     c = Client()
     resp = c.post(
         "/api/login",
-        data={"email": "participant@test.local", "password": "dogfood-dev-password"},
+        data={"email": "participant@test.local", "password": "hack-hamster-dev-password"},
         content_type="application/json",
     )
     assert resp.status_code == 200, resp.content
@@ -675,7 +675,7 @@ def test_post_without_csrf_token_passes_under_enforced_csrf(db, participant):
     c = Client(enforce_csrf_checks=True)
     resp = c.post(
         "/api/login",
-        data={"email": "participant@test.local", "password": "dogfood-dev-password"},
+        data={"email": "participant@test.local", "password": "hack-hamster-dev-password"},
         content_type="application/json",
     )
     assert resp.status_code == 200, (
@@ -697,7 +697,7 @@ def test_login_cookie_has_secure_attribute_in_production(db, participant, client
     ``settings.DEBUG``) catches accidental flips elsewhere."""
     resp = client.post(
         "/api/login",
-        data={"email": "participant@test.local", "password": "dogfood-dev-password"},
+        data={"email": "participant@test.local", "password": "hack-hamster-dev-password"},
         content_type="application/json",
     )
     assert resp.status_code == 200
@@ -717,7 +717,7 @@ def test_login_cookie_lacks_secure_attribute_in_dev(db, participant, client):
     """
     resp = client.post(
         "/api/login",
-        data={"email": "participant@test.local", "password": "dogfood-dev-password"},
+        data={"email": "participant@test.local", "password": "hack-hamster-dev-password"},
         content_type="application/json",
     )
     assert resp.status_code == 200
@@ -735,7 +735,7 @@ def test_login_cookie_is_httponly_and_samesite_lax(db, participant, client):
     cross-origin navigations)."""
     resp = client.post(
         "/api/login",
-        data={"email": "participant@test.local", "password": "dogfood-dev-password"},
+        data={"email": "participant@test.local", "password": "hack-hamster-dev-password"},
         content_type="application/json",
     )
     assert resp.status_code == 200

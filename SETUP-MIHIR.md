@@ -1,4 +1,4 @@
-# DOGFOOD 2026 — MIHIR: MACHINE SETUP
+# HACK HAMSTER 2026 — MIHIR: MACHINE SETUP
 
 **Do this by Sep 21. Not on kickoff day.**
 Every minute spent installing at 18:05 UTC on Sep 26 is a minute off the 72 hours, and
@@ -107,7 +107,7 @@ afterwards is painful.
 ### 3.1 Confirm you can push, this week
 
 The worst possible time to discover a credentials problem is at hour 20 with work sitting
-uncommitted. Test it now in a scratch repo you own — **not** in `dogfood-hackathon`:
+uncommitted. Test it now in a scratch repo you own — **not** in `hack-hamster-hackathon`:
 
 ```bash
 mkdir -p ~/scratch/push-test && cd ~/scratch/push-test
@@ -197,11 +197,11 @@ date -u                            # always reason in this
 For all pre-kickoff fluency work:
 
 ```bash
-mkdir -p ~/scratch/dogfood-practice && cd ~/scratch/dogfood-practice
+mkdir -p ~/scratch/hack-hamster-practice && cd ~/scratch/hack-hamster-practice
 ```
 
 **Rules for it:**
-- It never gets a remote pointing at `dogfood-hackathon`
+- It never gets a remote pointing at `hack-hamster-hackathon`
 - Nothing in it is copied into the real repo at kickoff
 - You rebuild from empty on Sep 26 — what carries over is your fluency, not your files
 
@@ -222,20 +222,20 @@ Run through this on **Sep 21** and again on **Sep 23**. Every box ticked, no exc
 - [ ] `git config --global core.autocrlf` prints `false`
 - [ ] `git config --global user.email` is your GitHub email
 - [ ] `python3 --version` prints 3.10+
-- [ ] You have accepted the collaborator invite to `dogfood-hackathon`
+- [ ] You have accepted the collaborator invite to `hack-hamster-hackathon`
 - [ ] You have pushed to a scratch repo successfully this week
 - [ ] Ports 3000, 8000, 5432 are free
 - [ ] Clock synced, and you know your offset from UTC
 - [ ] VS Code default EOL is `\n`
-- [ ] You are in the DOGFOOD Discord
-- [ ] You have read `DOGFOOD-PLAN.md` and `DOGFOOD-MIHIR.md` end to end
+- [ ] You are in the HACK HAMSTER Discord
+- [ ] You have read `HACK HAMSTER-PLAN.md` and `HACK HAMSTER-MIHIR.md` end to end
 - [ ] You have read `spec.md` (Sep 23 — already live) and we have re-planned against it
 
 ---
 
 ## 10. What NOT to do before kickoff
 
-- **Do not commit or push anything to `dogfood-hackathon`.** Rule 04: any project code committed
+- **Do not commit or push anything to `hack-hamster-hackathon`.** Rule 04: any project code committed
   before Sep 26 18:00 UTC is **disqualification**. The repo is empty and stays empty.
 - Do not "get a head start" by writing components you plan to paste in. That is the exact
   thing the rule forbids, and the commit timestamps are public.

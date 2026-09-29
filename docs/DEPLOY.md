@@ -1,4 +1,4 @@
-# DOGFOOD Portal — Production Deploy Guide
+# HACK HAMSTER Portal — Production Deploy Guide
 
 **Audience:** Whoever is putting the portal on a real host for the first
 time, or rolling out the next commit.
@@ -36,7 +36,7 @@ On the host you are deploying to:
 
 On the workstation you are deploying from:
 
-- Git, a clone of this repo at `N:\dogfood-hackathon` (or the path you
+- Git, a clone of this repo at `N:\hack-hamster-hackathon` (or the path you
   prefer), and `ssh` access to the host.
 
 ## 2. First-time deploy
@@ -48,8 +48,8 @@ Git Bash on Windows or any POSIX shell.
 ### 2.1 Clone and configure secrets
 
 ```bash
-git clone <your-fork-url> dogfood-portal
-cd dogfood-portal
+git clone <your-fork-url> hack-hamster-portal
+cd hack-hamster-portal
 
 cp .env.example .env
 # edit .env — see §4 for the full key list
@@ -58,8 +58,8 @@ cp .env.example .env
 Open `.env` in your editor and replace the dev defaults:
 
 ```env
-POSTGRES_DB=dogfood
-POSTGRES_USER=dogfood
+POSTGRES_DB=hack-hamster
+POSTGRES_USER=hack-hamster
 POSTGRES_PASSWORD=<long-random-string>
 POSTGRES_HOST=db
 POSTGRES_PORT=5432
@@ -144,7 +144,7 @@ A 503 here means `web` cannot reach `db`. Re-check the
 For every commit you want to roll out:
 
 ```bash
-cd dogfood-portal
+cd hack-hamster-portal
 git pull
 docker compose up -d --build web
 ```
@@ -175,7 +175,7 @@ production:
 
 | Variable | Consumed in | Purpose | Production value |
 |---|---|---|---|
-| `POSTGRES_DB` | `docker-compose.yml` (both services), `config/settings.py:101` | Logical database name | Same as dev (`dogfood`) is fine |
+| `POSTGRES_DB` | `docker-compose.yml` (both services), `config/settings.py:101` | Logical database name | Same as dev (`hack-hamster`) is fine |
 | `POSTGRES_USER` | `docker-compose.yml`, `config/settings.py:102` | DB role used by Django | Dedicated role, not `postgres` |
 | `POSTGRES_PASSWORD` | `docker-compose.yml`, `config/settings.py:103` | Password for that role | Long random; treat as a secret |
 | `POSTGRES_HOST` | `config/settings.py:104` | Postgres hostname | `db` (compose service name) |

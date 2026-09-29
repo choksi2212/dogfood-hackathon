@@ -13,7 +13,7 @@ Design notes (the *why*):
 - **Signed, replayable bodies.** The exact bytes we POST are stored on
   the delivery row and signed with HMAC-SHA256 using the
   subscription's server-generated secret
-  (``X-Dogfood-Signature: sha256=<hex>``). A receiver can verify
+  (``X-Hack-Hamster-Signature: sha256=<hex>``). A receiver can verify
   authenticity without trusting transport, and can re-verify the same
   body later straight from the delivery log.
 - **stdlib only.** ``urllib.request`` with a short timeout — no
@@ -91,8 +91,8 @@ def _attempt(hook: Webhook, delivery: WebhookDelivery, payload_type: str, payloa
         method="POST",
         headers={
             "Content-Type": "application/json",
-            "X-Dogfood-Event": payload_type,
-            "X-Dogfood-Signature": f"sha256={signature}",
+            "X-Hack-Hamster-Event": payload_type,
+            "X-Hack-Hamster-Signature": f"sha256={signature}",
         },
     )
 

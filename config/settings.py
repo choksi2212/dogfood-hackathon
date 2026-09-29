@@ -1,4 +1,4 @@
-"""Django settings for the DOGFOOD 2026 portal.
+"""Django settings for the HACK HAMSTER 2026 portal.
 
 All config is env-driven so the same image runs in dev, CI, and the
 judge's machine. Defaults are dev-safe; production must override via env.
@@ -105,7 +105,7 @@ TEMPLATES = [
 CACHES = {
     "default": {
         "BACKEND": os.environ.get("CACHE_BACKEND", "django.core.cache.backends.locmem.LocMemCache"),
-        "LOCATION": os.environ.get("CACHE_LOCATION", "dogfood-default"),
+        "LOCATION": os.environ.get("CACHE_LOCATION", "hack-hamster-default"),
         "TIMEOUT": int(os.environ.get("CACHE_TIMEOUT", "300")),
         "OPTIONS": {
             "MAX_ENTRIES": int(os.environ.get("CACHE_MAX_ENTRIES", "10000")),
@@ -118,9 +118,9 @@ CACHES = {
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("POSTGRES_DB", "dogfood"),
-        "USER": os.environ.get("POSTGRES_USER", "dogfood"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "dogfood"),
+        "NAME": os.environ.get("POSTGRES_DB", "hack-hamster"),
+        "USER": os.environ.get("POSTGRES_USER", "hack-hamster"),
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "hack-hamster"),
         "HOST": os.environ.get("POSTGRES_HOST", "db"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
         # ``None`` keeps each connection alive for the lifetime of the

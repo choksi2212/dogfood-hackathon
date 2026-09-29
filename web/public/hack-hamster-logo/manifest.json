@@ -1,0 +1,271 @@
+{
+  "brand": "Hack Hamster",
+  "wordmark": "hack-hamster.",
+  "palette": {
+    "dark": "#080F13",
+    "light": "#EEF4F6",
+    "teal": "#53D8CF",
+    "deep_teal": "#0B6E78",
+    "ink": "#061012",
+    "surface": "#EEF4F6"
+  },
+  "typeface": "Geist Sans",
+  "weight": 500,
+  "trackingEm": -0.02,
+  "measuredXHeightEm": 0.532,
+  "capHeightEm": 0.71,
+  "periodShape": "circle, baseline aligned",
+  "periodHeightX": 1,
+  "horizontalMarkHeightX": 2.4,
+  "stackedMarkWidthWordmark": 0.9,
+  "symbol": {
+    "viewBox": "0 0 8 10",
+    "upper": [
+      3,
+      5
+    ],
+    "lower": [
+      6,
+      3
+    ],
+    "notch": [
+      1,
+      1
+    ],
+    "radius": 0.5,
+    "path": "M 0 0.5 L 0 0.5 A 0.5 0.5 0 0 1 0.5 0 L 2.5 0 A 0.5 0.5 0 0 1 3 0.5 L 3 3.5 A 0.5 0.5 0 0 1 2.5 4 L 2.5 4 A 0.5 0.5 0 0 0 2 4.5 L 2 4.5 A 0.5 0.5 0 0 0 2.5 5 L 5.5 5 A 0.5 0.5 0 0 1 6 5.5 L 6 7.5 A 0.5 0.5 0 0 1 5.5 8 L 0.5 8 A 0.5 0.5 0 0 1 0 7.5 Z",
+    "opticalRefinement": "Original 4x3 / 6x5 bars failed the small-size L silhouette check. Refined master keeps bounding grid, notch, and radius."
+  },
+  "certificate": {
+    "markWidthMm": 40,
+    "wordmarkPt": 24,
+    "printWidthPt": 240,
+    "printHeightPt": 280
+  },
+  "files": [
+    {
+      "name": "01-horizontal-dark",
+      "width": 4096,
+      "height": 1024,
+      "variant": 1,
+      "background": "#080F13",
+      "transparent": false
+    },
+    {
+      "name": "02-horizontal-light",
+      "width": 4096,
+      "height": 1024,
+      "variant": 2,
+      "background": "#EEF4F6",
+      "transparent": false
+    },
+    {
+      "name": "03-stacked-dark",
+      "width": 2048,
+      "height": 2560,
+      "variant": 3,
+      "background": "#080F13",
+      "transparent": false
+    },
+    {
+      "name": "04-mark-dark",
+      "width": 2048,
+      "height": 2048,
+      "variant": 4,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "04-mark-dark-preview",
+      "width": 2048,
+      "height": 2048,
+      "variant": null,
+      "background": "#080F13",
+      "transparent": false
+    },
+    {
+      "name": "05-mark-light",
+      "width": 2048,
+      "height": 2048,
+      "variant": 5,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "05-mark-light-preview",
+      "width": 2048,
+      "height": 2048,
+      "variant": null,
+      "background": "#EEF4F6",
+      "transparent": false
+    },
+    {
+      "name": "06-wordmark-dark",
+      "width": 4096,
+      "height": 1024,
+      "variant": 6,
+      "background": "#080F13",
+      "transparent": false
+    },
+    {
+      "name": "07-wordmark-light",
+      "width": 4096,
+      "height": 1024,
+      "variant": 7,
+      "background": "#EEF4F6",
+      "transparent": false
+    },
+    {
+      "name": "08-monochrome-ink",
+      "width": 4096,
+      "height": 1024,
+      "variant": 8,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "08-monochrome-ink-preview",
+      "width": 4096,
+      "height": 1024,
+      "variant": null,
+      "background": "#EEF4F6",
+      "transparent": false
+    },
+    {
+      "name": "09-monochrome-reversed",
+      "width": 4096,
+      "height": 1024,
+      "variant": 9,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "09-monochrome-reversed-preview",
+      "width": 4096,
+      "height": 1024,
+      "variant": null,
+      "background": "#080F13",
+      "transparent": false
+    },
+    {
+      "name": "10-favicon-16",
+      "width": 16,
+      "height": 16,
+      "variant": 10,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "10-favicon-32",
+      "width": 32,
+      "height": 32,
+      "variant": 10,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "favicon-light-16",
+      "width": 16,
+      "height": 16,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "favicon-light-32",
+      "width": 32,
+      "height": 32,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "logo",
+      "width": 4096,
+      "height": 1024,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "logo-icon",
+      "width": 2048,
+      "height": 2048,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "app-icon",
+      "width": 1024,
+      "height": 1024,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "widget-header-dark",
+      "width": 112,
+      "height": 24,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "widget-header-light",
+      "width": 112,
+      "height": 24,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "widget-header-dark-4x",
+      "width": 448,
+      "height": 96,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "certificate-header",
+      "width": 2400,
+      "height": 2800,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "github-social-card",
+      "width": 1280,
+      "height": 640,
+      "variant": null,
+      "background": "#080F13",
+      "transparent": false
+    },
+    {
+      "name": "hack-hamster-family",
+      "width": 1920,
+      "height": 3100,
+      "variant": null,
+      "background": "mixed petrol and ice panels",
+      "transparent": false
+    },
+    {
+      "name": "construction",
+      "width": 1920,
+      "height": 1760,
+      "variant": null,
+      "background": "#080F13",
+      "transparent": false
+    },
+    {
+      "name": "production-formats",
+      "width": 1920,
+      "height": 1600,
+      "variant": null,
+      "background": "#080F13",
+      "transparent": false
+    }
+  ]
+}

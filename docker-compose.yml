@@ -1,4 +1,4 @@
-# Single-container deployment for the Ledger 2026 portal.
+# Single-container deployment for the Hack Hamster 2026 portal.
 #
 # This is the default: `docker compose up` brings up one container
 # with Postgres, Django, Next.js, and nginx all running under
@@ -9,19 +9,19 @@
 # (separate restartable containers + the observability stack —
 # Prometheus, Alertmanager, Grafana).
 
-name: ledger-portal
+name: hack-hamster-portal
 
 services:
   portal:
     build:
       context: .
       dockerfile: Dockerfile.all-in-one
-    image: ledger-portal:latest
+    image: hack-hamster-portal:latest
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-dogfood}
-      POSTGRES_USER: ${POSTGRES_USER:-dogfood}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dogfood}
+      POSTGRES_DB: ${POSTGRES_DB:-hack_hamster}
+      POSTGRES_USER: ${POSTGRES_USER:-hack_hamster}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hack-hamster}
       POSTGRES_HOST: 127.0.0.1
       POSTGRES_PORT: "5432"
       DJANGO_DEBUG: "true"

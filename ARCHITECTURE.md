@@ -1,12 +1,12 @@
-# DOGFOOD 2026 — System Architecture
+# HACK HAMSTER 2026 — System Architecture
 
-**Event:** dogfoodhack.com · Hackathon Raptors · "Build the platform that will judge you"
+**Event:** hackhamster.com · Hackathon Raptors · "Build the platform that will judge you"
 **Window:** Sep 26 18:00 UTC → Sep 29 18:00 UTC, 2026 (72h)
 **Team:** Manas (`choksi2212`) + Mihir (`Mihir-Rabari`)
 **Repo:** `https://github.com/choksi2212/dogfood-hackathon`
-**Spec:** `https://dogfoodhack.com/spec`
+**Spec:** `https://hackhamster.com/spec`
 **Stack:** Django 5 + DRF + PostgreSQL 16 + Next.js 15, all in `docker compose up`
-**Companion docs:** [PRD](DOGFOOD-PRD.md), [TRD](DOGFOOD-TRD.md), [Backend Impl](DOGFOOD-BACKEND-IMPL.md)
+**Companion docs:** [PRD](HACK HAMSTER-PRD.md), [TRD](HACK HAMSTER-TRD.md), [Backend Impl](HACK HAMSTER-BACKEND-IMPL.md)
 
 > The PRD says *what*. The TRD says *how*. This document says *how the how is shaped*.
 > The backend impl doc says *exactly what to type*.
@@ -51,7 +51,7 @@
   rendered for SEO and offline-first. Authenticated views are client-rendered for
   interactivity.
 - **Disjoint ownership.** No file has two editors. See Part 6.
-- **Frozen `.dogfood.toml` at H+20.** The contract with the acceptance mechanism is
+- **Frozen `.hack-hamster.toml` at H+20.** The contract with the acceptance mechanism is
   fixed.
 - **Backend is the source of truth.** The frontend never has business logic that
   diverges from the backend.
@@ -125,7 +125,7 @@
 
 ### 2.3 The internal network
 
-Docker Compose creates a network named `dogfood_default`. Containers reach each other
+Docker Compose creates a network named `hack-hamster_default`. Containers reach each other
 by service name:
 
 - `db:5432` — Postgres
@@ -717,13 +717,13 @@ participant = "Cookie: session=<hex-token>"
 ```
 
 The tokens are **deterministic**: each is
-`HMAC-SHA256(DJANGO_SECRET_KEY, "dogfood-2026-demo-session:{label}:{email}")`
+`HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`
 in hex (`Session.create(..., deterministic=True)` in
 `apps/accounts/models.py`). They are derived from the role label and the
 seeded user's email — never from a database primary key — so they are
 identical on every boot, on every machine, and across fresh database
 volumes. All five (organizer, judge_a, judge_b, judge_c, participant) are
-committed verbatim in `.dogfood.toml`'s `[auth]` block, so a fresh
+committed verbatim in `.hack-hamster.toml`'s `[auth]` block, so a fresh
 `docker compose up` followed by the official checker passes with **no
 copy-paste step**. The tokens change only if
 `DJANGO_SECRET_KEY` changes; re-run `manage.py import_fixtures` to print
@@ -744,7 +744,7 @@ The demo users are:
 | judge_c | `priya.nair@example.org` | judge | fixture judge `jdg_03` |
 | participant | `participant@test.local` | participant | member of the first fixture team |
 
-All demo accounts share the password `dogfood-dev-password`. judge_a/b/c are
+All demo accounts share the password `hack-hamster-dev-password`. judge_a/b/c are
 bound to the first three *fixture* judges rather than synthetic ones, so the
 T2 peer-isolation check runs against genuinely different real assignments.
 
@@ -873,7 +873,7 @@ All errors use a single envelope:
 A custom exception handler maps DRF exceptions to this envelope:
 
 ```python
-class DogfoodError(Exception):
+class Hack HamsterError(Exception):
     code: str
     message: str
     status_code: int = 400
@@ -883,13 +883,13 @@ class DogfoodError(Exception):
             self.message = message
         self.detail = detail
 
-class ForbiddenRole(DogfoodError):
+class ForbiddenRole(Hack HamsterError):
     code = 'forbidden_role'
     message = 'You do not have permission to do that.'
     status_code = 403
 
 def custom_exception_handler(exc, context):
-    if isinstance(exc, DogfoodError):
+    if isinstance(exc, Hack HamsterError):
         return Response(
             {'error': {'code': exc.code, 'message': exc.message, 'detail': exc.detail}},
             status=exc.status_code,
@@ -994,8 +994,8 @@ def deliver_webhook(webhook, event_type, payload):
         response = requests.post(
             webhook.url, data=body, headers={
                 'Content-Type': 'application/json',
-                'X-Dogfood-Signature': signature,
-                'X-Dogfood-Event': event_type,
+                'X-Hack-Hamster-Signature': signature,
+                'X-Hack-Hamster-Event': event_type,
             },
             timeout=10,
         )
@@ -1238,7 +1238,7 @@ export async function GET() {
 ### 8.1 The Django app layout
 
 ```
-dogfood-hackathon/
+hack-hamster-hackathon/
 ├── manage.py
 ├── config/
 │   ├── settings.py
@@ -1412,7 +1412,7 @@ REST_FRAMEWORK = {
 }
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'DOGFOOD API',
+    'TITLE': 'HACK HAMSTER API',
     'DESCRIPTION': 'Hackathon submission and judging portal',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
@@ -1422,8 +1422,8 @@ AUTH_USER_MODEL = 'accounts.User'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'dogfood',
-        'USER': 'dogfood',
+        'NAME': 'hack-hamster',
+        'USER': 'hack-hamster',
         'PASSWORD': os.environ['DB_PASSWORD'],
         'HOST': 'db',
         'PORT': '5432',
@@ -1455,7 +1455,7 @@ Two management commands, both under `apps/accounts/management/commands/`:
 **`import_fixtures`** — loads the official `fixtures.json` into the real
 schema and seeds the five deterministic demo sessions (see §5.9). Idempotent:
 every boot re-imports, and the printed session cookies always match the
-committed `.dogfood.toml`.
+committed `.hack-hamster.toml`.
 
 **`seed_fixtures`** — the older synthetic-data seeder; used only as a
 fallback when `fixtures.json` is missing (see `entrypoint.sh`).
@@ -1735,13 +1735,13 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: dogfood
+      POSTGRES_USER: hack-hamster
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: dogfood
+      POSTGRES_DB: hack-hamster
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dogfood -d dogfood"]
+      test: ["CMD-SHELL", "pg_isready -U hack-hamster -d hack-hamster"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -1751,7 +1751,7 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     environment:
-      DATABASE_URL: postgres://dogfood:${DB_PASSWORD}@db:5432/dogfood
+      DATABASE_URL: postgres://hack-hamster:${DB_PASSWORD}@db:5432/hack-hamster
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       DJANGO_DEBUG: "false"
     depends_on:
@@ -1854,7 +1854,7 @@ logs:
     docker compose logs -f
 
 accept:
-    docker compose exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
+    docker compose exec -T web python acceptance.py .hack-hamster.toml | tee acceptance-report.txt
 
 test:
     docker compose exec -T backend pytest
@@ -2014,7 +2014,7 @@ def test_acceptance_mechanism(docker_compose_up):
     """Runs run.py against a fresh docker compose."""
     # Assume the portal is up via fixture
     result = subprocess.run(
-        ['python3', 'run.py', '.dogfood.toml'],
+        ['python3', 'run.py', '.hack-hamster.toml'],
         capture_output=True, text=True,
     )
     report = parse_report(result.stdout)
@@ -2444,7 +2444,7 @@ view body:
 ```
                 ┌─────────────────────────────────────────────┐
                 │  run.py (provided by spec)                 │
-                │  Reads .dogfood.toml, makes 7 HTTP calls   │
+                │  Reads .hack-hamster.toml, makes 7 HTTP calls   │
                 └──────────────────┬──────────────────────────┘
                                    │
                 ┌──────────────────▼──────────────────────────┐
@@ -2768,7 +2768,7 @@ class NormalizeView(APIView):
 def generate_proof(run: NormalizationRun, result: FitResult) -> str:
     """Generate the FIG. 03 proof file."""
     lines = []
-    lines.append(f"DOGFOOD normalization proof")
+    lines.append(f"HACK HAMSTER normalization proof")
     lines.append(f"event: {run.event.slug}")
     lines.append(f"method: {run.method}")
     lines.append(f"created_at: {run.created_at.isoformat()}")
@@ -2915,7 +2915,7 @@ def sign_body(secret, body):
     return hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
 ```
 
-Headers: `X-Dogfood-Signature: sha256=<hex>` and `X-Dogfood-Event: <type>`.
+Headers: `X-Hack-Hamster-Signature: sha256=<hex>` and `X-Hack-Hamster-Event: <type>`.
 The receiver recomputes the HMAC over the raw body with their stored secret
 and compares in constant time. Delivery uses stdlib `urllib` only — no
 outbound HTTP dependency to vet, which keeps the "runs offline on a laptop"
@@ -3216,7 +3216,7 @@ middleware; success and error by views.
 ### 18.7 DB-level audit immutability
 
 ```sql
-REVOKE UPDATE, DELETE ON audit_auditevent FROM dogfood;
+REVOKE UPDATE, DELETE ON audit_auditevent FROM hack-hamster;
 ```
 
 The application user cannot update or delete audit events. The migrations apply this
@@ -3227,7 +3227,7 @@ grant on every fresh database.
 ### 19.1 The acceptance mechanism as architecture
 
 `run.py` is a 30-line Python script that:
-1. Reads `.dogfood.toml`.
+1. Reads `.hack-hamster.toml`.
 2. Makes 7 HTTP calls against the portal.
 3. Asserts each call's expected response.
 4. Prints a PASS/FAIL report.
@@ -3240,11 +3240,11 @@ script is the oracle.
 ```
 make accept
   ↓
-docker compose exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
+docker compose exec -T web python acceptance.py .hack-hamster.toml | tee acceptance-report.txt
   ↓
 acceptance.py (vendored byte-for-byte from the spec's run.py — only the
 filename differs; see README §"The acceptance checks"):
-  reads .dogfood.toml
+  reads .hack-hamster.toml
   for each check:
     make HTTP request
     assert response
@@ -3256,7 +3256,7 @@ git add acceptance-report.txt
 git commit -m "docs: publish acceptance-report.txt for <gate>"
 ```
 
-### 19.3 The .dogfood.toml architecture
+### 19.3 The .hack-hamster.toml architecture
 The file has five sections: the four the checker reads (`[portal]`, `[tiers]`,
 `[auth]`, `[routes]`) plus our `[bonuses]` block. The checker reads them; we
 do not modify the schema.
@@ -3296,7 +3296,7 @@ The report is whatever the checker prints. We do not modify the format. We
 redirect to `acceptance-report.txt` and commit. The committed report:
 
 ```
-DOGFOOD 2026 acceptance report
+HACK HAMSTER 2026 acceptance report
 portal: http://localhost:8000
 claimed: T1 T2 T3
 fixtures: fixtures.json
@@ -3356,12 +3356,12 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: dogfood
-          POSTGRES_PASSWORD: dogfood
-          POSTGRES_DB: dogfood
+          POSTGRES_USER: hack-hamster
+          POSTGRES_PASSWORD: hack-hamster
+          POSTGRES_DB: hack-hamster
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U dogfood"
+          --health-cmd "pg_isready -U hack-hamster"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       POSTGRES_HOST: 127.0.0.1
@@ -3779,7 +3779,7 @@ The terms used in this document. Same as the PRD glossary but with technical det
 - **`pairwise_ranking.json`.** Output of a pairwise fit.
 - **`THREAT-MODEL.md`.** The +3 bonus artifact.
 - **`openapi.yaml`.** The +3 bonus artifact.
-- **`.dogfood.toml`.** The seam.
+- **`.hack-hamster.toml`.** The seam.
 
 ### 23.5 The branches
 
@@ -3805,17 +3805,17 @@ The terms used in this document. Same as the PRD glossary but with technical det
 
 ### 24.1 Companion documents
 
-- [PRD](DOGFOOD-PRD.md) — what and why
-- [TRD](DOGFOOD-TRD.md) — how
-- [Backend Impl](DOGFOOD-BACKEND-IMPL.md) — exactly what to type
-- [Master Plan](DOGFOOD-PLAN.md)
-- [Manas Build Doc](DOGFOOD-MANAS.md)
-- [Mihir Build Doc](DOGFOOD-MIHIR.md)
+- [PRD](HACK HAMSTER-PRD.md) — what and why
+- [TRD](HACK HAMSTER-TRD.md) — how
+- [Backend Impl](HACK HAMSTER-BACKEND-IMPL.md) — exactly what to type
+- [Master Plan](HACK HAMSTER-PLAN.md)
+- [Manas Build Doc](HACK HAMSTER-MANAS.md)
+- [Mihir Build Doc](HACK HAMSTER-MIHIR.md)
 
 ### 24.2 External
 
-- Brief: `https://dogfoodhack.com`
-- Spec: `https://dogfoodhack.com/spec`
+- Brief: `https://hackhamster.com`
+- Spec: `https://hackhamster.com/spec`
 - Spec run.py: provided at kickoff
 - Spec fixtures.json: provided at kickoff
 - Discord: `https://discord.gg/xfYPDZYqeh`
@@ -3948,7 +3948,7 @@ This part documents the cold-start flow, which is the 20% Adoptability criterion
 
 ```
 git clone https://github.com/choksi2212/dogfood-hackathon
-cd dogfood-hackathon
+cd hack-hamster-hackathon
 cp .env.example .env  (and edit)
 docker compose up -d
 ```
@@ -4000,7 +4000,7 @@ docker compose down -v  (wipe everything)
 docker compose up       (cold start)
 curl http://localhost:8080/healthz  (wait for 200)
 curl http://localhost:8080/readyz  (wait for 200)
-python3 run.py .dogfood.toml  (should pass all 7)
+python3 run.py .hack-hamster.toml  (should pass all 7)
 ```
 
 This test runs at H+66 and H+70.
@@ -4029,7 +4029,7 @@ These are documented tradeoffs.
 
 ## Part 27 — Closing Notes
 
-This document is the architectural reference for the DOGFOOD hackathon build. It is
+This document is the architectural reference for the HACK HAMSTER hackathon build. It is
 written for Manas and Mihir to read together at H+0 (kickoff hour) and refer to
 during the 72 hours.
 
@@ -4037,7 +4037,7 @@ The architecture is intentionally minimal:
 - Three processes (nginx, Django, Next.js).
 - One database (Postgres).
 - One exposed port (8080).
-- One config file (.dogfood.toml).
+- One config file (.hack-hamster.toml).
 - One acceptance mechanism (run.py).
 - One integrator (Mihir).
 
@@ -4078,7 +4078,7 @@ Mihir is the sole integrator. Manas pushes only to `manas`.
 
 ```
 G1 H+3    docker compose up green
-G2 H+20   T1 green, first acceptance report, .dogfood.toml published
+G2 H+20   T1 green, first acceptance report, .hack-hamster.toml published
 G3 H+34   T2 green, role isolation matrix
 G4 H+40   Normalization on fixtures
 G5 H+48   T3 green
@@ -4181,7 +4181,7 @@ API First             +3   openapi.yaml generated from code; every UI action →
 make up         # docker compose up -d
 make down       # docker compose down
 make logs       # docker compose logs -f
-make accept     # run.py .dogfood.toml > acceptance-report.txt
+make accept     # run.py .hack-hamster.toml > acceptance-report.txt
 make test       # pytest
 make seed       # python manage.py import_fixtures (official fixtures + demo sessions)
 make clean      # docker compose down -v

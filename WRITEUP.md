@@ -1,4 +1,4 @@
-# WRITEUP — DOGFOOD 2026 submission
+# WRITEUP — HACK HAMSTER 2026 submission
 
 **Team:** Manas (`choksi2212`) + Mihir (`Mihir-Rabari`) · **Window:** Sep 26–29, 2026 (72h)
 
@@ -78,17 +78,17 @@ verification and is rejected (`tests/auth`).
 ## 3. The adoption trap we fixed: deterministic demo cookies
 
 The first seeding flow printed random session tokens and told you to paste
-them into `.dogfood.toml` — so every fresh volume invalidated the committed
+them into `.hack-hamster.toml` — so every fresh volume invalidated the committed
 config, and the likeliest way a judge's fresh clone would fail was a stale
 paste. We replaced the flow: `import_fixtures` seeds five demo sessions with
 **deterministic** tokens,
-`HMAC-SHA256(DJANGO_SECRET_KEY, "dogfood-2026-demo-session:{label}:{email}")`,
+`HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`,
 derived from label + email — never a database PK, which fresh volumes would
-change. The committed `.dogfood.toml` therefore works on any machine after
+change. The committed `.hack-hamster.toml` therefore works on any machine after
 `docker compose up` with zero manual steps, and the demo logins are stable:
 `organizer@test.local`, `tomas.varga@example.org` (jdg_01),
 `wei.lindqvist@example.org` (jdg_02), `priya.nair@example.org` (jdg_03),
-`participant@test.local` — all with password `dogfood-dev-password`.
+`participant@test.local` — all with password `hack-hamster-dev-password`.
 
 ## 4. Honest limitations
 

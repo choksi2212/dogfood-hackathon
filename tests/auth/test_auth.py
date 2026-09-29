@@ -295,7 +295,7 @@ def test_login_with_valid_credentials_sets_cookie(participant, client):
     """Correct email + password returns 200 with a session cookie."""
     resp = client.post(
         "/api/login",
-        data={"email": "participant@test.local", "password": "dogfood-dev-password"},
+        data={"email": "participant@test.local", "password": "hack-hamster-dev-password"},
         content_type="application/json",
     )
     assert resp.status_code == 200, resp.content
@@ -385,7 +385,7 @@ def test_login_cookie_is_httponly(participant, client):
     """The session cookie on a successful login is HttpOnly."""
     resp = client.post(
         "/api/login",
-        data={"email": "participant@test.local", "password": "dogfood-dev-password"},
+        data={"email": "participant@test.local", "password": "hack-hamster-dev-password"},
         content_type="application/json",
     )
     assert resp.status_code == 200
@@ -409,7 +409,7 @@ def test_login_cookie_is_samesite_lax(participant, client):
     """The session cookie on a successful login has SameSite=Lax."""
     resp = client.post(
         "/api/login",
-        data={"email": "participant@test.local", "password": "dogfood-dev-password"},
+        data={"email": "participant@test.local", "password": "hack-hamster-dev-password"},
         content_type="application/json",
     )
     assert resp.status_code == 200
@@ -451,7 +451,7 @@ def test_login_cookie_is_not_secure_when_debug_true(participant, client):
     print("DEBUG in test:", settings.DEBUG, "env:", os.environ.get("DJANGO_DEBUG"))
     resp = client.post(
         "/api/login",
-        data={"email": "participant@test.local", "password": "dogfood-dev-password"},
+        data={"email": "participant@test.local", "password": "hack-hamster-dev-password"},
         content_type="application/json",
     )
     assert resp.status_code == 200
@@ -469,7 +469,7 @@ def test_login_cookie_is_secure_when_debug_false(participant, client):
     """DEBUG=False (production) MUST set Secure so the cookie only travels over HTTPS."""
     resp = client.post(
         "/api/login",
-        data={"email": "participant@test.local", "password": "dogfood-dev-password"},
+        data={"email": "participant@test.local", "password": "hack-hamster-dev-password"},
         content_type="application/json",
     )
     assert resp.status_code == 200

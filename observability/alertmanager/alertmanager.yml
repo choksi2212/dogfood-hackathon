@@ -1,6 +1,6 @@
 # Alertmanager configuration.
 #
-# Default routing: every alert goes to the ``dogfood-portal-default``
+# Default routing: every alert goes to the ``hack-hamster-portal-default``
 # receiver, which posts JSON to the local webhook. Point
 # ``$ALERT_WEBHOOK_URL`` at Slack / PagerDuty / Discord / whatever.
 #
@@ -12,7 +12,7 @@ global:
   resolve_timeout: 5m
 
 route:
-  receiver: dogfood-portal-default
+  receiver: hack-hamster-portal-default
   group_by: [alertname, service]
   group_wait: 30s
   group_interval: 5m
@@ -21,7 +21,7 @@ route:
     # Critical alerts page immediately, individually.
     - matchers:
         - severity = "critical"
-      receiver: dogfood-portal-critical
+      receiver: hack-hamster-portal-critical
       group_wait: 10s
       group_interval: 1m
       repeat_interval: 1h
@@ -30,7 +30,7 @@ route:
     # Warnings batch into 30-minute windows.
     - matchers:
         - severity = "warning"
-      receiver: dogfood-portal-default
+      receiver: hack-hamster-portal-default
       group_wait: 5m
       group_interval: 30m
       repeat_interval: 12h
@@ -45,7 +45,7 @@ inhibit_rules:
     equal: [alertname, service]
 
 receivers:
-  - name: dogfood-portal-default
+  - name: hack-hamster-portal-default
     webhook_configs:
       # Alertmanager doesn't expand ${VAR} in YAML — set the URL via
       # the AM webhook receiver at the call site, or edit this file
@@ -53,7 +53,7 @@ receivers:
       - url: "http://127.0.0.1:5001/alerts"
         send_resolved: true
 
-  - name: dogfood-portal-critical
+  - name: hack-hamster-portal-critical
     webhook_configs:
       - url: "http://127.0.0.1:5001/alerts"
         send_resolved: true

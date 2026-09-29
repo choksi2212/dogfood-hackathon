@@ -6,7 +6,7 @@ cookie. Output is a human-readable table plus a per-cell expected-vs-
 actual report. Run from repo root with the portal up:
 
   docker compose exec web python scripts/role_isolation_matrix.py \\
-      .dogfood.toml role-isolation-matrix.txt
+      .hack-hamster.toml role-isolation-matrix.txt
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ def http(method: str, url: str, cookie: str | None) -> tuple[int, str]:
 
 
 def main() -> int:
-    cfg_path = Path(sys.argv[1] if len(sys.argv) > 1 else ".dogfood.toml")
+    cfg_path = Path(sys.argv[1] if len(sys.argv) > 1 else ".hack-hamster.toml")
     out_path = Path(sys.argv[2] if len(sys.argv) > 2 else "role-isolation-matrix.txt")
     cfg = tomllib.loads(cfg_path.read_text())
     base = cfg["server"]["base_url"].rstrip("/")
@@ -70,7 +70,7 @@ def main() -> int:
             results[(actor_name, cell_name)] = (status, body)
 
     lines = [
-        "DOGFOOD role-isolation matrix",
+        "HACK HAMSTER role-isolation matrix",
         "=============================",
         f"Generated against {base}",
         f"Config: {cfg_path}",

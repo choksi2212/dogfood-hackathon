@@ -1,7 +1,7 @@
 # Alert rules — Prometheus evaluates these every ``evaluation_interval``
 # (15s) and ships firing alerts to Alertmanager.
 #
-# Naming convention: ``Dogfood<Component><Symptom>``. Severity is
+# Naming convention: ``Hack Hamster<Component><Symptom>``. Severity is
 # carried in the ``severity`` label so Alertmanager can route.
 #
 # To add a rule: drop a new entry below. The YAML schema is the
@@ -11,11 +11,11 @@ groups:
   # --------------------------------------------------------------------
   # Portal HTTP health
   # --------------------------------------------------------------------
-  - name: dogfood-portal-http
+  - name: hack-hamster-portal-http
     interval: 30s
     rules:
       # 5xx rate over 1% across 5 minutes — pages someone.
-      - alert: DogfoodPortalHighErrorRate
+      - alert: Hack HamsterPortalHighErrorRate
         expr: |
           sum(rate(http_requests_total{service="portal",status=~"5.."}[5m]))
           /
@@ -35,7 +35,7 @@ groups:
 
       # p95 latency above 2s for 10 minutes — degraded but not yet
       # paging.
-      - alert: DogfoodPortalSlowRequests
+      - alert: Hack HamsterPortalSlowRequests
         expr: |
           histogram_quantile(
             0.95,
@@ -53,8 +53,8 @@ groups:
             the Endpoint Detail dashboard.
 
       # Scrapes failing — the metrics pipeline is broken.
-      - alert: DogfoodPortalScrapeFailing
-        expr: up{job="dogfood-portal"} == 0
+      - alert: Hack HamsterPortalScrapeFailing
+        expr: up{job="hack-hamster-portal"} == 0
         for: 2m
         labels:
           severity: critical
@@ -62,19 +62,19 @@ groups:
         annotations:
           summary: "Prometheus can't reach the portal /metrics endpoint"
           description: |
-            The scrape target ``dogfood-portal`` has been down for 2
+            The scrape target ``hack-hamster-portal`` has been down for 2
             minutes. Either Django is crashed, the network bridge
             broke, or the rate-limiter is blocking Prometheus.
 
   # --------------------------------------------------------------------
   # Capacity / saturation
   # --------------------------------------------------------------------
-  - name: dogfood-portal-capacity
+  - name: hack-hamster-portal-capacity
     interval: 1m
     rules:
       # Sustained concurrency — handler pool saturated, p99 will
       # climb next.
-      - alert: DogfoodPortalConcurrencySaturation
+      - alert: Hack HamsterPortalConcurrencySaturation
         expr: |
           max_over_time(http_requests_in_progress[5m]) > 50
         for: 5m

@@ -1,4 +1,4 @@
-# Prometheus configuration for the DOGFOOD portal.
+# Prometheus configuration for the HACK HAMSTER portal.
 #
 # Local-only stack — Prometheus scrapes Django's /metrics directly and
 # evaluates alert rules. Alertmanager routes firing alerts to the
@@ -15,7 +15,7 @@ global:
   scrape_timeout: 10s
   evaluation_interval: 15s
   external_labels:
-    service: dogfood-portal
+    service: hack-hamster-portal
     environment: local
 
 # Load alerting rules from a separate file so the rule list can grow
@@ -36,7 +36,7 @@ scrape_configs:
   # The route-pattern label (e.g. ``/api/events/{slug}/submit``)
   # keeps cardinality bounded — operator dashboards group by it.
   # --------------------------------------------------------------------
-  - job_name: dogfood-portal
+  - job_name: hack-hamster-portal
     metrics_path: /metrics
     scheme: http
     scrape_interval: 15s

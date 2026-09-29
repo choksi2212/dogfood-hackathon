@@ -1,10 +1,10 @@
-# DOGFOOD 2026 — Technical Requirements Document
+# HACK HAMSTER 2026 — Technical Requirements Document
 
-**Event:** dogfoodhack.com · Hackathon Raptors · "Build the platform that will judge you"
+**Event:** hackhamster.com · Hackathon Raptors · "Build the platform that will judge you"
 **Window:** Sep 26 18:00 UTC → Sep 29 18:00 UTC, 2026 (72h)
 **Team:** Manas (`choksi2212`) + Mihir (`Mihir-Rabari`)
 **Repo:** `https://github.com/choksi2212/dogfood-hackathon`
-**Spec:** live Sep 23, 2026 — `https://dogfoodhack.com/spec`
+**Spec:** live Sep 23, 2026 — `https://hackhamster.com/spec`
 **Stack:** Django 5 + Django REST Framework + PostgreSQL 16 + Next.js 15, all in `docker compose up`
 **Companion docs:** [PRD](PRD.md), [Architecture](../ARCHITECTURE.md), [Backend Impl](BACKEND-IMPL.md)
 
@@ -158,7 +158,7 @@ commands. Owns all business logic and data access.
 
 **Role.** The only persistent data store.
 **Container.** `postgres:16-alpine`.
-**Configuration.** One database `dogfood`, one user `dogfood`, password from `.env`.
+**Configuration.** One database `hack-hamster`, one user `hack-hamster`, password from `.env`.
 **Volume.** Mounted to the host: `postgres-data:/var/lib/postgresql/data`.
 **No published port** — apps reach it via the internal Docker network on `db:5432`.
 
@@ -317,8 +317,8 @@ in the backend impl doc §2.
 
 ### 3.2 The five route names (the spec contract)
 
-The acceptance mechanism (`run.py`) reads `.dogfood.toml`'s `[routes]` block to find
-the five URLs. We name them and they appear in `.dogfood.toml`. The five are:
+The acceptance mechanism (`run.py`) reads `.hack-hamster.toml`'s `[routes]` block to find
+the five URLs. We name them and they appear in `.hack-hamster.toml`. The five are:
 
 | Key | Our choice | Why |
 |---|---|---|
@@ -330,7 +330,7 @@ the five URLs. We name them and they appear in `.dogfood.toml`. The five are:
 
 ### 3.3 The four auth headers
 
-The seed script prints four lines on portal boot. They go into `.dogfood.toml`'s
+The seed script prints four lines on portal boot. They go into `.hack-hamster.toml`'s
 `[auth]` block:
 
 ```
@@ -354,7 +354,7 @@ reference and to satisfy the API First bonus.
 ### 3.5 Versioning
 
 There is no API versioning. The event is 72 hours. The API is frozen at H+20 (when
-`.dogfood.toml` is published). After that, no endpoint changes. If a bug is found in
+`.hack-hamster.toml` is published). After that, no endpoint changes. If a bug is found in
 an endpoint, it is fixed; if a new endpoint is needed, it is added without versioning.
 
 ---
@@ -487,7 +487,7 @@ External system         nginx                 Django                    Postgres
    │                      │                     │  HMAC sign              │
    │ ◄────────────────────│ ◄────────────────── │                          │
    │   POST {payload}     │                     │                          │
-   │   X-Dogfood-Sig: ... │                     │                          │
+   │   X-Hack Hamster-Sig: ... │                     │                          │
    │                      │                     │                          │
    │ ────────────────────►│ ──────────────────► │ 200 if 2xx, else retry   │
    │                      │                     │ ──────────────────────►  │  UPDATE delivery
@@ -834,13 +834,13 @@ We do not implement these. The 72-hour scope does not require them.
 ### 8.1 Repository layout
 
 ```
-dogfood-hackathon/
+hack-hamster-hackathon/
 ├── README.md
 ├── LICENSE
 ├── .gitignore
 ├── .gitattributes           (* text=auto eol=lf)
 ├── .env.example             (compose defaults; production overrides)
-├── .dogfood.toml            (the spec config: 5 routes + 5 auth headers + claims)
+├── .hack-hamster.toml            (the spec config: 5 routes + 5 auth headers + claims)
 ├── .github/workflows/       (tests.yml, lint.yml)
 ├── acceptance.py            (the vendored checker — run.py, only the name differs)
 ├── acceptance-report.txt    (the committed report, regenerated on every gate)
@@ -900,13 +900,13 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: dogfood
+      POSTGRES_USER: hack-hamster
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: dogfood
+      POSTGRES_DB: hack-hamster
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dogfood -d dogfood"]
+      test: ["CMD-SHELL", "pg_isready -U hack-hamster -d hack-hamster"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -916,7 +916,7 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     environment:
-      DATABASE_URL: postgres://dogfood:${DB_PASSWORD}@db:5432/dogfood
+      DATABASE_URL: postgres://hack-hamster:${DB_PASSWORD}@db:5432/hack-hamster
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       DJANGO_DEBUG: "false"
       DJANGO_ALLOWED_HOSTS: localhost,backend
@@ -1000,7 +1000,7 @@ CMD ["npm", "start"]
 # Condensed from the real Makefile (COMPOSE ?= docker compose).
 up:          $(COMPOSE) up --build
 seed:        $(COMPOSE) exec -T web python manage.py import_fixtures
-accept:      $(COMPOSE) exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
+accept:      $(COMPOSE) exec -T web python acceptance.py .hack-hamster.toml | tee acceptance-report.txt
 test:        $(COMPOSE) exec -T web pytest tests/ -v
 lint:        ruff check .
              ruff format --check .
@@ -1078,7 +1078,7 @@ matches.
     /----------\
    /   Unit     \    pytest, no DB
   /--------------\
- / Manual + Dogfood\ acceptance mechanism + human
+ / Manual + Hack Hamster\ acceptance mechanism + human
 /__________________\
 ```
 
@@ -1141,7 +1141,7 @@ The full 30-cell matrix is parameterized. The test outputs the actual status cod
 
 ### 9.4 The acceptance mechanism (run.py)
 
-`run.py` is provided by the spec. It reads `.dogfood.toml` and makes seven HTTP calls.
+`run.py` is provided by the spec. It reads `.hack-hamster.toml` and makes seven HTTP calls.
 We do not modify `run.py`. We make it pass.
 
 The seven calls (mapped to our routes):
@@ -1170,7 +1170,7 @@ T2 · An organizer can export CSV.
 GET {routes.csv_export} as organizer → expect 200 and a CSV body
 ```
 
-Our `.dogfood.toml` maps these to:
+Our `.hack-hamster.toml` maps these to:
 
 ```
 [portal]
@@ -1273,7 +1273,7 @@ The browser-side fetch uses the public origin (`/`); the server-side fetch uses
 ### 10.3 External: Webhook receivers
 
 Webhook receivers are external HTTPS endpoints. We POST a JSON payload with an
-HMAC-SHA256 signature in `X-Dogfood-Signature`. Receivers verify by recomputing the
+HMAC-SHA256 signature in `X-Hack-Hamster-Signature`. Receivers verify by recomputing the
 HMAC with their per-webhook secret.
 
 ### 10.4 External: Email (dev only)
@@ -1326,7 +1326,7 @@ The acceptance mechanism is seven HTTP calls. It does not verify:
 We do not chase "100% acceptance coverage" — there is no such thing. We make the
 seven checks pass and document the rest.
 
-### 11.2 What we claim in `.dogfood.toml`
+### 11.2 What we claim in `.hack-hamster.toml`
 
 ```
 [tiers]
@@ -1348,7 +1348,7 @@ that costs points — honesty here is the discipline.
 
 | Question | Resolution |
 |---|---|
-| How does the acceptance suite reach our app? | Via `.dogfood.toml` declaring our URLs and auth headers |
+| How does the acceptance suite reach our app? | Via `.hack-hamster.toml` declaring our URLs and auth headers |
 | Are there per-tier checks? | No. Seven checks total; T3/T4 have zero |
 | Does the suite log in? | No. Pre-baked session headers |
 | Are our route names ours? | Yes ("No fixed API routes. Yours are yours") |
@@ -1391,7 +1391,7 @@ are open to revision based on organizer preference at event setup.
 | Branch flow: `main ← mihir ← manas`, Mihir is sole integrator | Conflict-zero by construction |
 | Stack: Django + DRF + Postgres + Next.js | Sep 13, confirmed by spec |
 | Pre-pull base images Sep 23 | Spec dropped a day early |
-| Freeze `.dogfood.toml` at H+20 | Acceptance mechanism depends on it |
+| Freeze `.hack-hamster.toml` at H+20 | Acceptance mechanism depends on it |
 | `docker compose up` with network off | Spec §11 rule 1 |
 
 
@@ -2405,14 +2405,14 @@ docker compose exec web python manage.py import_fixtures
 ```
 
 `import_fixtures` also prints the five auth headers to stdout. They are already
-committed in `.dogfood.toml`'s `[auth]` block — the tokens are deterministic
+committed in `.hack-hamster.toml`'s `[auth]` block — the tokens are deterministic
 HMAC values, so they match every fresh boot.
 
 ### 17.4 Building the production images
 
 ```bash
 # The Django service image is the root Dockerfile (gunicorn config.wsgi)
-docker build -t dogfood/web:dev .
+docker build -t hack-hamster/web:dev .
 
 # Everything the compose stack defines
 docker compose build
@@ -2436,7 +2436,7 @@ For the 72-hour scope, deployment is:
 
 ```bash
 git clone https://github.com/choksi2212/dogfood-hackathon
-cd dogfood-hackathon
+cd hack-hamster-hackathon
 cp .env.example .env  # set DB_PASSWORD and DJANGO_SECRET_KEY
 docker compose up -d
 ```
@@ -2523,7 +2523,7 @@ See `THREAT-MODEL.md` for the full list. The top technical risks:
 - Claim a bonus we cannot defend.
 - Commit before kickoff.
 
-- Edit `.dogfood.toml` after H+71.
+- Edit `.hack-hamster.toml` after H+71.
 
 ## Part 19 — Normalization (detailed technical spec)
 
@@ -2625,7 +2625,7 @@ The fixtures deliberately include:
 `normalization-proof.txt` (the +5 bonus artifact):
 
 ```
-DOGFOOD normalization proof
+HACK HAMSTER normalization proof
 event: sample-hack-2026
 method: additive_alternating_means
 seed: 42
@@ -2968,7 +2968,7 @@ fixtures.
 
 ### 22.5 What we do NOT claim
 
-If any of the above is incomplete at H+71, we do not claim it in `.dogfood.toml`. The
+If any of the above is incomplete at H+71, we do not claim it in `.hack-hamster.toml`. The
 bonus is graded by the artifact; we do not overclaim.
 
 ## Part 23 — Detailed Feature Implementation Notes
@@ -3383,9 +3383,9 @@ only as a fallback when `fixtures.json` is missing.)
 
 `import_fixtures` also seeds five demo sessions — organizer, judge_a, judge_b,
 judge_c, participant — bound to the real fixture users, each with the known dev
-password `dogfood-dev-password`. The session tokens are deterministic:
-`HMAC-SHA256(DJANGO_SECRET_KEY, "dogfood-2026-demo-session:{label}:{email}")`,
-so the five committed `.dogfood.toml` `[auth]` headers match every fresh boot.
+password `hack-hamster-dev-password`. The session tokens are deterministic:
+`HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`,
+so the five committed `.hack-hamster.toml` `[auth]` headers match every fresh boot.
 
 ### 24.3 The flow at H+0
 
@@ -3615,7 +3615,7 @@ hour 48.
 
 **Reason:** The warning is about *half-done* bonuses, not *none*. The discipline that
 replaces the cut list: a bonus is either complete and documented, or it is not in
-`.dogfood.toml`. No 90% claims. The honest-tier-claims framing is in the spec §06:
+`.hack-hamster.toml`. No 90% claims. The honest-tier-claims framing is in the spec §06:
 "claimed but not verified" is the only thing that costs points.
 
 ### 28.4 Branch flow (Sep 13)
@@ -3732,7 +3732,7 @@ larger for bigger codebases.
 ### 28.11 The five route names (Sep 23)
 
 **Context:** The spec gives us route name freedom ("No fixed API routes. Yours are
-yours"). We had to pick names for `.dogfood.toml`.
+yours"). We had to pick names for `.hack-hamster.toml`.
 
 **Alternatives:**
 - `/api/gallery`, `/api/submit`, etc. (REST-style)
@@ -3922,7 +3922,7 @@ authoritative definition; this list is the same terms with technical detail.
 - **`pairwise_ranking.json`.** The +5 bonus artifact. Generated from a pairwise run.
 - **`THREAT-MODEL.md`.** The +3 bonus artifact.
 - **`openapi.yaml`.** The +3 bonus artifact.
-- **`.dogfood.toml`.** The seam. Declares URLs and auth headers.
+- **`.hack-hamster.toml`.** The seam. Declares URLs and auth headers.
 
 ### 29.5 The commands
 
@@ -3959,8 +3959,8 @@ authoritative definition; this list is the same terms with technical detail.
 
 ### 30.1 The brief and the spec
 
-- Main brief: `https://dogfoodhack.com`
-- Spec: `https://dogfoodhack.com/spec`
+- Main brief: `https://hackhamster.com`
+- Spec: `https://hackhamster.com/spec`
 - `run.py`: provided in the spec, downloaded at kickoff
 - `fixtures.json`: provided at kickoff
 - Discord: `https://discord.gg/xfYPDZYqeh`

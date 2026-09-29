@@ -1,4 +1,4 @@
-// The five route names run.py (and .dogfood.toml's [routes] block) know
+// The five route names run.py (and .hack-hamster.toml's [routes] block) know
 // about: gallery, submit, judge_scores, peer_scores, csv_export. Every
 // call the frontend makes to the backend goes through one of these, so a
 // path change on either side is a one-line fix here — not a hunt through

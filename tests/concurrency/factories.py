@@ -29,7 +29,7 @@ from apps.judging.models import JudgeAssignment
 from apps.submissions.models import Submission
 from apps.teams.models import Team, TeamMember
 
-DEMO_PASSWORD = "dogfood-dev-password"
+DEMO_PASSWORD = "hack-hamster-dev-password"
 EVENT_SLUG = "concurrency-hack"
 
 

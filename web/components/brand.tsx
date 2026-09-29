@@ -3,14 +3,14 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 
 /**
- * Brand mark for Ledger.
+ * Brand mark for Hack Hamster.
  *
  * - `compact` shows only the symbol (for tight spaces — sidebar collapsed,
  *   mobile nav, etc.).
  * - The lockup picks the dark or light horizontal variant based on the
  *   resolved theme; the symbol picks dark or light mark accordingly.
  *
- * Uses the SVG files under /public/ledger-logo/. Mark = `#53D8CF` (teal)
+ * Uses the SVG files under /public/hack-hamster-logo/. Mark = `#53D8CF` (teal)
  * on dark surfaces, `#0B6E78` (deep teal) on light — chosen by GPT-6 to
  * harmonize with the existing After-Hours Indigo design system without
  * competing with the violet accents.
@@ -25,7 +25,7 @@ export function Brand({
   return (
     <Link
       href="/"
-      aria-label="Ledger home"
+      aria-label="Hack Hamster home"
       className={cn(
         "inline-flex items-center gap-2.5 transition-opacity hover:opacity-80",
         className,
@@ -51,16 +51,16 @@ function LogoLockup() {
   return (
     <>
       <Image
-        src="/ledger-logo/01-horizontal-dark.svg"
-        alt="Ledger"
+        src="/hack-hamster-logo/01-horizontal-dark.svg"
+        alt="Hack Hamster"
         width={120}
         height={30}
         className="hidden h-7 w-auto dark:block"
         priority
       />
       <Image
-        src="/ledger-logo/02-horizontal-light.svg"
-        alt="Ledger"
+        src="/hack-hamster-logo/02-horizontal-light.svg"
+        alt="Hack Hamster"
         width={120}
         height={30}
         className="block h-7 w-auto dark:hidden"
@@ -74,7 +74,7 @@ function LogoMark() {
   return (
     <>
       <Image
-        src="/ledger-logo/04-mark-dark.svg"
+        src="/hack-hamster-logo/04-mark-dark.svg"
         alt=""
         width={36}
         height={36}
@@ -82,7 +82,7 @@ function LogoMark() {
         aria-hidden
       />
       <Image
-        src="/ledger-logo/05-mark-light.svg"
+        src="/hack-hamster-logo/05-mark-light.svg"
         alt=""
         width={36}
         height={36}
