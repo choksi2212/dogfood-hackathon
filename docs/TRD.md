@@ -327,7 +327,7 @@ The catalog is organized by app. Full per-endpoint specification (parameters, bo
 
 ### 3.2 The five route names (the spec contract)
 
-`run.py` reads `.hack-hamster.toml`'s `[routes]` block to find the five URLs. Our choices:
+`run.py` reads `.dogfood.toml`'s `[routes]` block to find the five URLs. Our choices:
 
 | Key | Our choice | Why |
 |---|---|---|
@@ -339,7 +339,7 @@ The catalog is organized by app. Full per-endpoint specification (parameters, bo
 
 ### 3.3 The four auth headers
 
-The seed script prints four lines on portal boot. They go into `.hack-hamster.toml`'s `[auth]` block:
+The seed script prints four lines on portal boot. They go into `.dogfood.toml`'s `[auth]` block:
 
 ```
 organizer   = "Cookie: session=<opaque-token-for-organizer>"
@@ -356,7 +356,7 @@ The mechanism (cookie, bearer, basic) is ours. We use cookies because the fronte
 
 ### 3.5 Versioning
 
-No API versioning. The event is 72 hours. The API is frozen at H+20 (when `.hack-hamster.toml` is published). After that, no endpoint changes. If a bug is found in an endpoint, it is fixed; if a new endpoint is needed, it is added without versioning.
+No API versioning. The event is 72 hours. The API is frozen at H+20 (when `.dogfood.toml` is published). After that, no endpoint changes. If a bug is found in an endpoint, it is fixed; if a new endpoint is needed, it is added without versioning.
 
 ---
 
@@ -776,7 +776,7 @@ hack-hamster-hackathon/
 ├── .gitignore
 ├── .gitattributes           (* text=auto eol=lf)
 ├── .env.example
-├── .hack-hamster.toml       (spec config: 5 routes + 5 auth headers + claims)
+├── .dogfood.toml       (spec config: 5 routes + 5 auth headers + claims)
 ├── .github/workflows/       (tests.yml, lint.yml)
 ├── acceptance.py            (vendored checker — run.py, only the name differs)
 ├── acceptance-report.txt    (committed report, regenerated on every gate)
@@ -906,7 +906,7 @@ CMD ["npm", "start"]
 # Condensed from the real Makefile (COMPOSE ?= docker compose).
 up:          $(COMPOSE) up --build
 seed:        $(COMPOSE) exec -T web python manage.py import_fixtures
-accept:      $(COMPOSE) exec -T web python acceptance.py .hack-hamster.toml | tee acceptance-report.txt
+accept:      $(COMPOSE) exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
 test:        $(COMPOSE) exec -T web pytest tests/ -v
 lint:        ruff check .
              ruff format --check .
@@ -1032,7 +1032,7 @@ The full 30-cell matrix is parameterized. The test outputs the actual status cod
 
 ### 9.4 The acceptance mechanism (run.py)
 
-`run.py` is provided by the spec. It reads `.hack-hamster.toml` and makes seven HTTP calls. We do not modify `run.py`. We make it pass.
+`run.py` is provided by the spec. It reads `.dogfood.toml` and makes seven HTTP calls. We do not modify `run.py`. We make it pass.
 
 The seven calls (mapped to our routes):
 
@@ -1060,7 +1060,7 @@ T2 · An organizer can export CSV.
 GET {routes.csv_export} as organizer → expect 200 and a CSV body
 ```
 
-Our `.hack-hamster.toml` maps these to:
+Our `.dogfood.toml` maps these to:
 
 ```
 [portal]
@@ -1200,7 +1200,7 @@ The acceptance mechanism is seven HTTP calls. It does not verify:
 
 We do not chase "100% acceptance coverage" — there is no such thing. We make the seven checks pass and document the rest.
 
-### 11.2 What we claim in `.hack-hamster.toml`
+### 11.2 What we claim in `.dogfood.toml`
 
 ```
 [tiers]
@@ -1219,7 +1219,7 @@ We do NOT claim T3 and T4 unless we are confident we can demo them. The video is
 
 | Question | Resolution |
 |---|---|
-| How does the acceptance suite reach our app? | Via `.hack-hamster.toml` declaring our URLs and auth headers |
+| How does the acceptance suite reach our app? | Via `.dogfood.toml` declaring our URLs and auth headers |
 | Are there per-tier checks? | No. Seven checks total; T3/T4 have zero |
 | Does the suite log in? | No. Pre-baked session headers |
 | Are our route names ours? | Yes ("No fixed API routes. Yours are yours") |
@@ -1261,7 +1261,7 @@ These defaults are documented in the PRD feature sections and in JUDGING.md. The
 | Branch flow: `main ← mihir ← manas`, Mihir is sole integrator | Conflict-zero by construction |
 | Stack: Django + DRF + Postgres + Next.js | Sep 13, confirmed by spec |
 | Pre-pull base images Sep 23 | Spec dropped a day early |
-| Freeze `.hack-hamster.toml` at H+20 | Acceptance mechanism depends on it |
+| Freeze `.dogfood.toml` at H+20 | Acceptance mechanism depends on it |
 | `docker compose up` with network off | Spec §11 rule 1 |
 
 ---
@@ -1608,7 +1608,7 @@ Migrations are committed in the repo. They are the schema history.
 docker compose exec web python manage.py import_fixtures
 ```
 
-`import_fixtures` also prints the five auth headers to stdout. They are already committed in `.hack-hamster.toml`'s `[auth]` block — the tokens are deterministic HMAC values, so they match every fresh boot.
+`import_fixtures` also prints the five auth headers to stdout. They are already committed in `.dogfood.toml`'s `[auth]` block — the tokens are deterministic HMAC values, so they match every fresh boot.
 
 ### 17.4 Building the production images
 
@@ -1716,7 +1716,7 @@ See `THREAT-MODEL.md` for the full list.
 - Add a feature not in the PRD.
 - Claim a bonus we cannot defend.
 - Commit before kickoff.
-- Edit `.hack-hamster.toml` after H+71.
+- Edit `.dogfood.toml` after H+71.
 
 
 ## Part 19 — Normalization (technical spec)
@@ -2076,7 +2076,7 @@ The "residual risk" section is the most important. A judge reads it to see wheth
 
 ### 22.5 What we do NOT claim
 
-If any of the above is incomplete at H+71, we do not claim it in `.hack-hamster.toml`. The bonus is graded by the artifact; we do not overclaim.
+If any of the above is incomplete at H+71, we do not claim it in `.dogfood.toml`. The bonus is graded by the artifact; we do not overclaim.
 
 ---
 
@@ -2230,7 +2230,7 @@ def verify_payload(payload: dict, signature: str) -> bool:
 
 ### 24.2 The five demo sessions
 
-`import_fixtures` also seeds five demo sessions — organizer, judge_a, judge_b, judge_c, participant — bound to the real fixture users, each with the known dev password `hack-hamster-dev-password`. The session tokens are deterministic: `HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`, so the five committed `.hack-hamster.toml` `[auth]` headers match every fresh boot.
+`import_fixtures` also seeds five demo sessions — organizer, judge_a, judge_b, judge_c, participant — bound to the real fixture users, each with the known dev password `hack-hamster-dev-password`. The session tokens are deterministic: `HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`, so the five committed `.dogfood.toml` `[auth]` headers match every fresh boot.
 
 ### 24.3 The flow at H+0
 
@@ -2449,7 +2449,7 @@ These are documented as out-of-scope in the PRD; restated here for emphasis.
 - **`pairwise_ranking.json`** — The +5 bonus artifact.
 - **`THREAT-MODEL.md`** — The +3 bonus artifact.
 - **`openapi.yaml`** — The +3 bonus artifact.
-- **`.hack-hamster.toml`** — The seam. Declares URLs and auth headers.
+- **`.dogfood.toml`** — The seam. Declares URLs and auth headers.
 
 **Commands:** `make up`, `make down`, `make logs`, `make accept`, `make test`, `make seed`, `make clean`.
 

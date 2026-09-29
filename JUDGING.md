@@ -10,7 +10,7 @@ sentence below is written for the statistician or platform engineer who reads th
 25%-weighted human grade and asks: *why this method, and not something else?*
 
 The portal is built to make the answers in this document **testable by curl**. The
-acceptance mechanism `python3 run.py .hack-hamster.toml` exercises seven HTTP checks
+acceptance mechanism `python3 run.py .dogfood.toml` exercises seven HTTP checks
 against a running portal (see [docs/PRD.md §5](docs/PRD.md#5-acceptance--verification));
 five of those seven checks (T2) hit the role-isolation matrix defended in §5 below.
 A submission that passes all seven has provably correct role isolation, not just
@@ -531,7 +531,7 @@ Same `fixtures.json`, same assignment seed → identical pipeline:
 ```bash
 docker compose down -v
 docker compose up -d        # entrypoint.sh: wait-for-db → migrate → import_fixtures
-# As the organizer (headers in .hack-hamster.toml [auth]):
+# As the organizer (headers in .dogfood.toml [auth]):
 curl -X POST http://localhost:8000/api/events/sample-hack-2026/assignments/run
 curl -X POST http://localhost:8000/api/events/sample-hack-2026/normalize
 ```

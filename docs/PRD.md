@@ -155,7 +155,7 @@ We have four weighted criteria (40% / 25% / 20% / 15%) plus four bonuses (+5/+5/
 | Threat model names the four attacks | +3 Threat Model (tiebreak) | §3.6, `THREAT-MODEL.md` |
 | Every UI action is a documented API endpoint | +3 API First (tiebreak) | §4.5, §3.4, `openapi.yaml` |
 
-**No tier or bonus is claimed in `.hack-hamster.toml` unless it is complete and verifiable.** A bonus at 90% is not claimed at 90% — it is finished or it is not in the file.
+**No tier or bonus is claimed in `.dogfood.toml` unless it is complete and verifiable.** A bonus at 90% is not claimed at 90% — it is finished or it is not in the file.
 
 ### 1.5 Target metrics
 
@@ -168,7 +168,7 @@ We have four weighted criteria (40% / 25% / 20% / 15%) plus four bonuses (+5/+5/
 | Postgres cold-start to ready | ≤ 10 seconds | healthcheck latency |
 | Frontend initial paint (gallery) | ≤ 1.5 seconds on localhost | Lighthouse, manual |
 | Role isolation matrix | 30/30 cells verified by real HTTP | committed `role-isolation-matrix.txt` |
-| `.hack-hamster.toml` claimed tiers | exactly what the report verifies | diff script, run on the final commit |
+| `.dogfood.toml` claimed tiers | exactly what the report verifies | diff script, run on the final commit |
 | Bonuses claimed | all four, each with its artefact present | ls of the deliverable list |
 
 **Qualitative targets (the 15% Code Quality criterion):**
@@ -295,7 +295,7 @@ Session       id (uuid), user_id, token_hash (unique, sha256),
               created_at, last_seen_at, expires_at, ip, user_agent
 ```
 
-**Acceptance:** the five pre-baked session headers in `.hack-hamster.toml` produce distinct, non-privileged sessions that authenticate as the right role. Seed script prints these on portal boot.
+**Acceptance:** the five pre-baked session headers in `.dogfood.toml` produce distinct, non-privileged sessions that authenticate as the right role. Seed script prints these on portal boot.
 
 **Edge cases:** duplicate email → 409; 5 wrong passwords → 429 then 1h; password reset mid-session → session invalidated.
 
@@ -1076,12 +1076,12 @@ The 25% Judging Integrity criterion is the primary security gate. The threat mod
 The acceptance mechanism is `run.py`, a 30-line Python script that runs seven HTTP checks against our portal. The output is `acceptance-report.txt`, committed.
 
 ```bash
-python3 run.py .hack-hamster.toml > acceptance-report.txt
+python3 run.py .dogfood.toml > acceptance-report.txt
 git add acceptance-report.txt
 git commit -m "docs: publish acceptance-report.txt for <gate>"
 ```
 
-`run.py` is standard library only. It reads `.hack-hamster.toml`, attaches the four auth headers, makes seven GET/POST requests. Each request is logged with the URL, the auth used, and the response. A PASS line per check; a FAIL line with enough detail to fix without guessing.
+`run.py` is standard library only. It reads `.dogfood.toml`, attaches the four auth headers, makes seven GET/POST requests. Each request is logged with the URL, the auth used, and the response. A PASS line per check; a FAIL line with enough detail to fix without guessing.
 
 ### 5.2 The seven checks mapped to features
 
@@ -1097,11 +1097,11 @@ git commit -m "docs: publish acceptance-report.txt for <gate>"
 
 ### 5.3 Honest tier claim discipline
 
-The `.hack-hamster.toml` `claimed` list is what we assert. The `acceptance-report.txt` is what the machine says. The gap between them is the only thing that costs points.
+The `.dogfood.toml` `claimed` list is what we assert. The `acceptance-report.txt` is what the machine says. The gap between them is the only thing that costs points.
 
 - A tier is claimed iff the corresponding acceptance checks pass (T1, T2) and the corresponding docs and video exist (T3, T4, bonuses).
 - A bonus is claimed iff its artifact is present and defensible.
-- The final `.hack-hamster.toml` is committed at H+71. Before that, intermediate files may overclaim; the final commit is canonical.
+- The final `.dogfood.toml` is committed at H+71. Before that, intermediate files may overclaim; the final commit is canonical.
 - A claim that cannot be backed by an artifact is removed, not softened.
 
 A line `claimed but not verified: T3 T4` is the only thing that directly costs. A clean report with two honest FAILs is better than a README claiming everything works.
@@ -1150,7 +1150,7 @@ If 6-month project: OAuth and magic-link first; email notifications second; skil
 | Acceptance mechanism misinterpreted | Low | High | Read run.py verbatim; do not guess |
 | Role isolation breaks on a curl we did not test | Medium | High | Generate `role-isolation-matrix.txt` from real HTTP |
 | Image uploads fail on Windows path encoding | Medium | Medium | UUID-prefixed file names; avoid `os.path` quirks |
-| Frontend and backend drift | High | Medium | Five-route contract in `.hack-hamster.toml` is the only contract |
+| Frontend and backend drift | High | Medium | Five-route contract in `.dogfood.toml` is the only contract |
 | Fixtures have unannounced edge case | Medium | Medium | Three announced edge cases handled; spec says "include awkward cases on purpose" |
 | Audit log fills Postgres | Low | Low | Append-only, no delete; volume bounded by event activity |
 
@@ -1204,7 +1204,7 @@ See `THREAT-MODEL.md` for the full list. High-impact:
 1. Pull `fixtures.json` and `run.py`.
 2. Read `run.py` (30 lines).
 3. Run it against an empty portal — expect 7 FAILs with `connection refused`.
-4. Confirm the four auth headers from the seed script match `.hack-hamster.toml`.
+4. Confirm the four auth headers from the seed script match `.dogfood.toml`.
 5. `LICENSE` + `README.md` on `main`. Then G1.
 
 ### 8.3 The 72 hours
@@ -1213,7 +1213,7 @@ See `THREAT-MODEL.md` for the full list. High-impact:
 |---|---|---|
 | H+3 | G1 | docker compose up green |
 | H+8 | — | make accept wired |
-| H+20 | G2 | T1 green, first acceptance report, .hack-hamster.toml to Mihir |
+| H+20 | G2 | T1 green, first acceptance report, .dogfood.toml to Mihir |
 | H+34 | G3 | T2 green, role isolation provable |
 | H+40 | G4 | Normalization on fixtures |
 | H+48 | G5 | T3 green, video script locked |
@@ -1222,7 +1222,7 @@ See `THREAT-MODEL.md` for the full list. High-impact:
 | H+66 | G8 | All four bonus docs finished |
 | H+68 | — | Demo video recorded |
 | H+70 | G9 | Clean-machine run |
-| H+71 | — | .hack-hamster.toml final, last commit |
+| H+71 | — | .dogfood.toml final, last commit |
 
 ### 8.4 Post-freeze
 
@@ -1355,8 +1355,8 @@ docker compose up
 # entrypoint waits for postgres, migrates, then runs import_fixtures,
 # which seeds five demo sessions with DETERMINISTIC cookies
 # (HMAC-SHA256 of DJANGO_SECRET_KEY + label + email). The committed
-# .hack-hamster.toml [auth] values are already correct — no copy-paste step.
-python3 acceptance.py .hack-hamster.toml > acceptance-report.txt
+# .dogfood.toml [auth] values are already correct — no copy-paste step.
+python3 acceptance.py .dogfood.toml > acceptance-report.txt
 # inspect the report; if PASS, the portal is verified
 ```
 
@@ -1395,8 +1395,8 @@ For eventual Raptors deployment (post-freeze):
 
 - [ ] `docker compose down -v && docker compose up` works cold.
 - [ ] Network is off; the portal is reachable at `localhost`.
-- [ ] `.hack-hamster.toml` is filled in with the four auth headers from the seed script.
-- [ ] `python3 run.py .hack-hamster.toml` passes all seven checks.
+- [ ] `.dogfood.toml` is filled in with the four auth headers from the seed script.
+- [ ] `python3 run.py .dogfood.toml` passes all seven checks.
 - [ ] `role-isolation-matrix.txt` shows 30/30.
 - [ ] `normalization-proof.txt` exists with FIG. 03 shape.
 - [ ] `THREAT-MODEL.md` has a residual-risk section.
@@ -1407,7 +1407,7 @@ For eventual Raptors deployment (post-freeze):
 
 ### 11.7 Final-commit discipline
 
-- `.hack-hamster.toml` matches `acceptance-report.txt` exactly.
+- `.dogfood.toml` matches `acceptance-report.txt` exactly.
 - Every bonus claimed has its artifact in the repo.
 - No new files committed after H+71.
 - The final commit message: `freeze: H+71, ready for judging`.
@@ -1430,8 +1430,8 @@ For eventual Raptors deployment (post-freeze):
 | **Normalization** | The process of removing judge-level bias from raw scores before ranking. Two-way additive model — see §3.2.4. |
 | **Pairwise comparison** | A judge's pick of which of two projects is better. Input to the Bradley-Terry model. |
 | **CSV export** | Organizer-facing dump of all data at any pipeline stage. |
-| **Acceptance mechanism** | `run.py` reading `.hack-hamster.toml` and making seven HTTP calls. Output is `acceptance-report.txt`. |
-| **`.hack-hamster.toml`** | Repo-root config: portal URL, tier claims, five pre-baked session headers, five route names. |
+| **Acceptance mechanism** | `run.py` reading `.dogfood.toml` and making seven HTTP calls. Output is `acceptance-report.txt`. |
+| **`.dogfood.toml`** | Repo-root config: portal URL, tier claims, five pre-baked session headers, five route names. |
 | **Audit event** | Append-only record of every consequential action. |
 | **Public API** | HTTP surface documented in `openapi.yaml`. |
 | **HACK HAMSTER window** | Sep 26 18:00 UTC → Sep 29 18:00 UTC, 2026. |
@@ -1620,7 +1620,7 @@ For full marks, the repo root contains:
 - `acceptance-report.txt`
 - `role-isolation-matrix.txt`
 - `normalization-proof.txt`
-- `.hack-hamster.toml`
+- `.dogfood.toml`
 - `docker-compose.yml`
 - `src/` (the implementation)
 - `tests/` (our tests)
@@ -1629,7 +1629,7 @@ For full marks, the repo root contains:
 ### 14.7 The disciplinary checklist
 
 - [ ] No commit before Sep 26 18:00 UTC.
-- [ ] No `.hack-hamster.toml` edit after H+71.
+- [ ] No `.dogfood.toml` edit after H+71.
 - [ ] No new feature after H+62.
 - [ ] All commits use explicit paths (no `git add .`).
 - [ ] No suppressed warnings (`# noqa`, `# type: ignore` in shipped code).

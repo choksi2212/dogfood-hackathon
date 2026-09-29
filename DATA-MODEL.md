@@ -177,7 +177,7 @@ users_user ──┬── users_session
 One Django management command populates the database on every boot:
 `apps/accounts/management/commands/import_fixtures.py` ([BACKEND-IMPL Part 15](docs/BACKEND-IMPL.md)). `entrypoint.sh` runs it automatically after `migrate`, so a bare `docker compose up` boots a seeded portal; `make seed` re-runs it by hand.
 
-`import_fixtures` loads `fixtures.json` into the real schema and seeds five demo sessions (organizer, judge_a, judge_b, judge_c, participant). Their `Cookie: session=<token>` headers are **deterministic** — each token is `HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`, derived from the role label and the seeded user's email, never from a DB PK. All five are committed in `.hack-hamster.toml` under `[auth]`; they match every fresh boot and fresh volume. They change only if `DJANGO_SECRET_KEY` changes — re-run `make seed` to print the new values.
+`import_fixtures` loads `fixtures.json` into the real schema and seeds five demo sessions (organizer, judge_a, judge_b, judge_c, participant). Their `Cookie: session=<token>` headers are **deterministic** — each token is `HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`, derived from the role label and the seeded user's email, never from a DB PK. All five are committed in `.dogfood.toml` under `[auth]`; they match every fresh boot and fresh volume. They change only if `DJANGO_SECRET_KEY` changes — re-run `make seed` to print the new values.
 
 ### 3.2 The fixtures.json shape
 
@@ -236,7 +236,7 @@ The fixture's `(project, judge)` pairs are deduplicated with a `seen` set; a dup
 
 Check 3 (`POST submit` as participant → 4xx) depends on `submissions_close_at` being in the past. The seed reads the event's deadline directly from `fixtures.json` and sets the submission's `status = 'submitted'`. The `@deadline_gated` decorator on the submit view reads `event.submissions_close_at` and returns `422 deadline_passed` when `now() > deadline`.
 
-Do not edit the fixture's `submissions_close_at` to a future date without also updating `.hack-hamster.toml`'s `[routes.submit]` to point at a submission whose status is `draft` — and even then, the check is designed around the deadline being in the past.
+Do not edit the fixture's `submissions_close_at` to a future date without also updating `.dogfood.toml`'s `[routes.submit]` to point at a submission whose status is `draft` — and even then, the check is designed around the deadline being in the past.
 
 ### 3.6 docker compose up ordering
 
@@ -1110,3 +1110,7 @@ The per-model column lists in Part 8 mirror [`docs/BACKEND-IMPL.md`](docs/BACKEN
 | `api` | §12.1 |
 
 Algorithm internals (alternating means, Bradley-Terry, pair selection, CSV export, session rotation, audit grants) live in the corresponding BACKEND-IMPL section. This document is the map; the impl doc is the territory.
+
+## Import / export — the honest version
+
+CSV is **export-only**: a one-way window onto judging data for spreadsheets and records. The full-fidelity round-trip path is the fixtures-shaped JSON bulk import/export (`POST /api/events/<slug>/import`, `GET /api/events/<slug>/export`), which is byte-identical on round-trip. The six per-stage CSV endpoints (scores, assignments, projects, votes, audit, rankings) are for organizers who live in spreadsheets.

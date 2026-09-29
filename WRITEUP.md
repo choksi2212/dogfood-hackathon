@@ -32,7 +32,7 @@ journey
       G1 docker compose up green: 5: Manas
       Monorepo and five routes: 4: Mihir
     section Build (Sep 27)
-      G2 .hack-hamster.toml handover: 5: Manas
+      G2 .dogfood.toml handover: 5: Manas
       G3 T2 complete and role isolation: 5: Manas
       G4 normalization proof: 4: Manas
     section Build (Sep 28)
@@ -95,13 +95,13 @@ Enforcement lives in the backend permission layer (`apps/accounts/permissions.py
 
 ## 3. Adoption trap fixed: deterministic demo cookies
 
-The first seeding flow printed random session tokens and told you to paste them into `.hack-hamster.toml` — every fresh volume invalidated the committed config. Replaced: `import_fixtures` seeds five demo sessions with **deterministic** tokens,
+The first seeding flow printed random session tokens and told you to paste them into `.dogfood.toml` — every fresh volume invalidated the committed config. Replaced: `import_fixtures` seeds five demo sessions with **deterministic** tokens,
 
 ```
 HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")
 ```
 
-derived from label + email — never a database PK, which fresh volumes change. The committed `.hack-hamster.toml` works on any machine after `docker compose up` with zero manual steps. Demo logins (all with password `hack-hamster-dev-password`):
+derived from label + email — never a database PK, which fresh volumes change. The committed `.dogfood.toml` works on any machine after `docker compose up` with zero manual steps. Demo logins (all with password `hack-hamster-dev-password`):
 
 - `organizer@test.local`
 - `tomas.varga@example.org` (jdg_01)

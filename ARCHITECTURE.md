@@ -73,7 +73,7 @@ flowchart LR
 - **Permissions over templates.** A deny is enforced at the API layer. Templates can hide controls; APIs must deny first.
 - **Server-rendered public, client-rendered auth.** The public gallery is server-rendered for SEO and offline-first. Authenticated views are client-rendered for interactivity.
 - **Disjoint ownership.** No file has two editors. See Part 6.
-- **Frozen `.hack-hamster.toml` at H+20.** The contract with the acceptance mechanism is fixed.
+- **Frozen `.dogfood.toml` at H+20.** The contract with the acceptance mechanism is fixed.
 - **Backend is the source of truth.** The frontend never has business logic that diverges from the backend.
 
 ### 1.4 What the architecture is NOT
@@ -1322,7 +1322,7 @@ logs:
     docker compose logs -f
 
 accept:
-    docker compose exec -T web python acceptance.py .hack-hamster.toml | tee acceptance-report.txt
+    docker compose exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
 
 test:
     docker compose exec -T backend pytest
@@ -1455,7 +1455,7 @@ def test_acceptance_mechanism(docker_compose_up):
     """Runs run.py against a fresh docker compose."""
     # Assume the portal is up via fixture
     result = subprocess.run(
-        ['python3', 'run.py', '.hack-hamster.toml'],
+        ['python3', 'run.py', '.dogfood.toml'],
         capture_output=True, text=True,
     )
     report = parse_report(result.stdout)
@@ -1838,7 +1838,7 @@ view body:
 ```
                 ┌─────────────────────────────────────────────┐
                 │  run.py (provided by spec)                 │
-                │  Reads .hack-hamster.toml, makes 7 HTTP calls   │
+                │  Reads .dogfood.toml, makes 7 HTTP calls   │
                 └──────────────────┬──────────────────────────┘
                                    │
                 ┌──────────────────▼──────────────────────────┐
@@ -2431,11 +2431,11 @@ REVOKE UPDATE, DELETE ON audit_auditevent FROM hack-hamster;
 ```
 make accept
   ↓
-docker compose exec -T web python acceptance.py .hack-hamster.toml | tee acceptance-report.txt
+docker compose exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
   ↓
 acceptance.py (vendored byte-for-byte from the spec's run.py — only the
 filename differs; see README §"The acceptance checks"):
-  reads .hack-hamster.toml
+  reads .dogfood.toml
   for each check:
     make HTTP request
     assert response
@@ -2447,7 +2447,7 @@ git add acceptance-report.txt
 git commit -m "docs: publish acceptance-report.txt for <gate>"
 ```
 
-### 19.3 The .hack-hamster.toml architecture
+### 19.3 The .dogfood.toml architecture
 
 ```toml
 [portal]
@@ -2638,7 +2638,7 @@ nginx (reverse proxy, 1 exposed port) · Django + DRF (API, 3 gunicorn workers) 
 
 ### 23.4 Artifacts
 
-`acceptance-report.txt` (run.py output) · `role-isolation-matrix.txt` · `normalization-proof.txt` · `pairwise_ranking.json` · `THREAT-MODEL.md` (+3 bonus) · `openapi.yaml` (+3 bonus) · `.hack-hamster.toml` (the seam).
+`acceptance-report.txt` (run.py output) · `role-isolation-matrix.txt` · `normalization-proof.txt` · `pairwise_ranking.json` · `THREAT-MODEL.md` (+3 bonus) · `openapi.yaml` (+3 bonus) · `.dogfood.toml` (the seam).
 
 ### 23.5 Branches
 
@@ -2751,7 +2751,7 @@ docker compose down -v  (wipe everything)
 docker compose up       (cold start)
 curl http://localhost:8000/healthz  (wait for 200)
 curl http://localhost:8000/readyz  (wait for 200)
-python3 run.py .hack-hamster.toml  (should pass all 7)
+python3 run.py .dogfood.toml  (should pass all 7)
 ```
 
 ### 26.6 What can go wrong at cold start
@@ -2802,7 +2802,7 @@ manas   ← backend + data + maths
 
 ```
 G1 H+3    docker compose up green
-G2 H+20   T1 green, first acceptance report, .hack-hamster.toml published
+G2 H+20   T1 green, first acceptance report, .dogfood.toml published
 G3 H+34   T2 green, role isolation matrix
 G4 H+40   Normalization on fixtures
 G5 H+48   T3 green
@@ -2894,7 +2894,7 @@ API First             +3   openapi.yaml generated from code; every UI action →
 make up         # docker compose up -d
 make down       # docker compose down
 make logs       # docker compose logs -f
-make accept     # run.py .hack-hamster.toml > acceptance-report.txt
+make accept     # run.py .dogfood.toml > acceptance-report.txt
 make test       # pytest
 make seed       # python manage.py import_fixtures (official fixtures + demo sessions)
 make clean      # docker compose down -v

@@ -27,7 +27,7 @@
 - [Part 12 — API App (apps/api)](#part-12--api-app-appsapi)
 - [Part 13 — CSV Export](#part-13--csv-export)
 - [Part 14 — The Role-Isolation Matrix Test](#part-14--the-role-isolation-matrix-test)
-- [Part 15 — The .hack-hamster.toml](#part-15--the-hack-hamstertoml)
+- [Part 15 — The .dogfood.toml](#part-15--the-hack-hamstertoml)
 - [Part 16 — URLs Cross-Reference](#part-16--urls-cross-reference)
 - [Related docs](#related-docs)
 
@@ -80,7 +80,7 @@ hack-hamster-hackathon/
 ├── LICENSE                  MIT or Apache-2.0
 ├── .gitignore
 ├── .gitattributes           * text=auto eol=lf
-├── .hack-hamster.toml
+├── .dogfood.toml
 ├── acceptance-report.txt
 ├── docker-compose.yml
 ├── Dockerfile.backend
@@ -197,7 +197,7 @@ djangorestframework-stubs==3.15.2
 # Condensed from the real Makefile (COMPOSE ?= docker compose).
 up:          $(COMPOSE) up --build
 seed:        $(COMPOSE) exec -T web python manage.py import_fixtures
-accept:      $(COMPOSE) exec -T web python acceptance.py .hack-hamster.toml | tee acceptance-report.txt
+accept:      $(COMPOSE) exec -T web python acceptance.py .dogfood.toml | tee acceptance-report.txt
 test:        $(COMPOSE) exec -T web pytest tests/ -v
 lint:        ruff check .
              ruff format --check .
@@ -917,7 +917,7 @@ class Command(BaseCommand):
             self.stdout.write(f'{label.upper()}_HEADER = "Cookie: session={token}"')
 ```
 
-The five demo sessions bind to the first three **fixture** judges — `judge_a` → `tomas.varga@example.org`, `judge_b` → `wei.lindqvist@example.org`, `judge_c` → `priya.nair@example.org` — plus the organizer and participant accounts, all with the dev password `hack-hamster-dev-password`. Each token is `HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`, so the five committed `.hack-hamster.toml` `[auth]` headers are valid on every fresh volume; they change only if `DJANGO_SECRET_KEY` changes (re-run `make seed` to print the new values). The command is idempotent, and `entrypoint.sh` runs it automatically after `migrate`. No separate user-seeder command; legacy `seed_fixtures` (synthetic data) is only a fallback when `fixtures.json` is missing.
+The five demo sessions bind to the first three **fixture** judges — `judge_a` → `tomas.varga@example.org`, `judge_b` → `wei.lindqvist@example.org`, `judge_c` → `priya.nair@example.org` — plus the organizer and participant accounts, all with the dev password `hack-hamster-dev-password`. Each token is `HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`, so the five committed `.dogfood.toml` `[auth]` headers are valid on every fresh volume; they change only if `DJANGO_SECRET_KEY` changes (re-run `make seed` to print the new values). The command is idempotent, and `entrypoint.sh` runs it automatically after `migrate`. No separate user-seeder command; legacy `seed_fixtures` (synthetic data) is only a fallback when `fixtures.json` is missing.
 
 
 ## Part 4 — Events App (apps/events)
@@ -4025,7 +4025,7 @@ class Command(BaseCommand):
 
 ---
 
-## Part 15 — The .hack-hamster.toml
+## Part 15 — The .dogfood.toml
 
 ### 15.1 The file
 
@@ -4057,23 +4057,23 @@ csv_export   = "/api/csv_export"
 
 ### 15.2 How the [auth] block is populated
 
-It is not a manual step. `import_fixtures` seeds the demo sessions with DETERMINISTIC tokens — `HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`, derived from the role label and the seeded user's email (never a database PK, which fresh volumes would change) — so the committed `.hack-hamster.toml` is valid after any `docker compose up` and on any fresh database volume:
+It is not a manual step. `import_fixtures` seeds the demo sessions with DETERMINISTIC tokens — `HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`, derived from the role label and the seeded user's email (never a database PK, which fresh volumes would change) — so the committed `.dogfood.toml` is valid after any `docker compose up` and on any fresh database volume:
 
 ```bash
 # 1. Bring up the portal (entrypoint runs migrate + import_fixtures)
 docker compose up
 
 # 2. Run the checker — the committed [auth] values just work
-python3 acceptance.py .hack-hamster.toml        # or the official run.py
+python3 acceptance.py .dogfood.toml        # or the official run.py
 ```
 
-`import_fixtures` still prints the headers ("Stable demo session cookies (deterministic — they match the committed .hack-hamster.toml)") for the one case that needs them: if you changed `DJANGO_SECRET_KEY`, copy the newly printed values into `.hack-hamster.toml`.
+`import_fixtures` still prints the headers ("Stable demo session cookies (deterministic — they match the committed .dogfood.toml)") for the one case that needs them: if you changed `DJANGO_SECRET_KEY`, copy the newly printed values into `.dogfood.toml`.
 
 ### 15.3 The run.py script (provided by spec)
 
 The spec provides `run.py`. We do not modify it. It:
 
-1. Parses `.hack-hamster.toml`.
+1. Parses `.dogfood.toml`.
 2. Makes the 7 HTTP calls.
 3. Asserts the responses.
 4. Prints PASS/FAIL with detail.
