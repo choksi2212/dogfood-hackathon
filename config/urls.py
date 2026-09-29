@@ -16,7 +16,8 @@ G4 (normalization):
 
 G5 (voting):
   /api/events/<slug>/submissions/<id>/vote  cast/retract
-  /api/events/<slug>/votes/results          organizer, per-project tally
+  /api/events/<slug>/votes/results          live tally — organizers always,
+                                             any session after results_at
   /api/events/<slug>/audit-log              organizer, human-readable trail
 
 G6 (pairwise):

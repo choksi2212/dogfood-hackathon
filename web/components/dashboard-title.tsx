@@ -7,6 +7,8 @@ export function DashboardTitle() {
     ? "Review workspace"
     : ((
         {
+          "/dashboard": "My dashboard",
+          "/results": "Results",
           "/submit": "Your submission",
           "/vote": "Community voting",
           "/judge": "Judge workspace",
