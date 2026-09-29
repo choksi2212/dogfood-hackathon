@@ -39,7 +39,7 @@
 sequenceDiagram
     autonumber
     participant Browser as 🟦 Browser
-    participant Nginx as 🟠 Nginx<br/>(TLS + X-Forwarded-For)
+    participant Nginx as 🟠 Nginx<br/>(TLS, X-Forwarded-For)
     participant MW as 🟣 Django Middleware Stack
     participant View as 🟣 DRF View
     participant ORM as 🟡 Django ORM
@@ -49,17 +49,17 @@ sequenceDiagram
     Browser->>Nginx: HTTPS GET /api/events/sample-hack-2026/...
     Nginx->>MW: HTTP request<br/>X-Forwarded-For set
     MW->>MW: SessionMiddleware<br/>resolve cookie → user
-    MW->>MW: RateLimitMiddleware<br/>check bucket per IP+class
+    MW->>MW: RateLimitMiddleware<br/>check bucket per IP, class
     MW->>MW: AuditMiddleware<br/>(post-response, see below)
     MW->>View: dispatch resolved URL
     View->>View: Permission classes<br/>(IsAuthenticated, IsOrganizer…)
     View->>View: @deadline_gated(...)<br/>compare now vs Event.<field>
-    View->>ORM: serializer + queryset
+    View->>ORM: serializer and queryset
     ORM->>PG: SELECT / INSERT / UPDATE
     PG-->>ORM: result rows
     ORM-->>View: model instances
     View-->>MW: Response (2xx / 4xx / 5xx)
-    alt response is 401 or 403 on /api/*
+    alt response is 401 or 403 on /api/star
         MW->>Audit: INSERT row<br/>(actor, action, ip, result='denied')
     end
     MW-->>Nginx: HTTP response

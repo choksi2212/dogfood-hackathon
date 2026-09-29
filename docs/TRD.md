@@ -36,22 +36,22 @@
 ```mermaid
 flowchart TB
     subgraph Client["🌐 Browser (no container)"]
-        NX["Next.js 15 / React 19<br/>App Router, CSS Modules<br/>fetch + useState, no third-party UI"]
+        NX["Next.js 15 / React 19<br/>App Router, CSS Modules<br/>fetch, useState, no third-party UI"]
     end
 
     subgraph Edge["🟠 Edge — one exposed port"]
-        NG["nginx 1.27-alpine<br/>reverse proxy on ${WEB_PORT:-8000}<br/>serves /_next/static/* and /static/* directly"]
+        NG["nginx 1.27-alpine<br/>reverse proxy on ${WEB_PORT:-8000}<br/>serves /_next/static/star and /static/star directly"]
     end
 
     subgraph App["🟠 Application — internal network"]
-        DJ["Django 5 + DRF 3.15<br/>gunicorn 23, 3 workers<br/>drf-spectacular → OpenAPI"]
+        DJ["Django 5 and DRF 3.15<br/>gunicorn 23, 3 workers<br/>drf-spectacular → OpenAPI"]
         ORM["🟣 Django ORM<br/>14 apps · migrations = schema history<br/>psycopg connection, no pool"]
         PERM["🟣 Permission classes<br/>IsOrganizer · IsJudge · IsOwnJudge · …<br/>deny at dispatch(), before view body"]
-        AUD["🟣 Audit log<br/>append-only AuditEvent<br/>DB-level grant revokes UPDATE/DELETE"]
+        AUD["🟣 Audit log<br/>append-only AuditEvent<br/>DB-level grant revokes UPDATE and DELETE"]
     end
 
     subgraph Data["🔵 State — single Postgres, no published port"]
-        PG["PostgreSQL 16-alpine<br/>JSONB · tsvector + GIN · UUID PKs<br/>partial indexes · volume-mounted"]
+        PG["PostgreSQL 16-alpine<br/>JSONB · tsvector, GIN · UUID PKs<br/>partial indexes · volume-mounted"]
     end
 
     subgraph Files["🟠 Local media"]
@@ -59,7 +59,7 @@ flowchart TB
     end
 
     NX -->|HTTPS via nginx| NG
-    NG -->|/api/* · /admin/* · /healthz · /readyz| DJ
+    NG -->|/api/star · /admin/star · /healthz · /readyz| DJ
     DJ -->|middleware: session lookup| ORM
     DJ -->|permission classes| PERM
     PERM -->|allow| ORM

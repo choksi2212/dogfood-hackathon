@@ -34,14 +34,14 @@ The portal defends against the five attacks the kickoff spec names explicitly, p
 
 ```mermaid
 flowchart TB
-    Goal(["🏆 Final ranking integrity<br/>(+3 bonus artifact)"]):::violet
+    Goal(["🏆 Final ranking integrity<br/>+3 bonus artifact"]):::violet
 
     %% Five primary attacks
-    A1["🟠 A1. Sybil votes<br/>(one human, many accounts)"]:::orange
-    A2["🟠 A2. Ballot stuffing<br/>(automated bot votes)"]:::orange
-    A3["🟠 A3. Scraping<br/>(bulk harvesting)"]:::orange
-    A4["🟠 A4. Judge collusion<br/>(score coordination)"]:::orange
-    A5["🟠 A5. Deadline gaming<br/>(submit after close)"]:::orange
+    A1["🟠 A1. Sybil votes<br/>one human, many accounts"]:::orange
+    A2["🟠 A2. Ballot stuffing<br/>automated bot votes"]:::orange
+    A3["🟠 A3. Scraping<br/>bulk harvesting"]:::orange
+    A4["🟠 A4. Judge collusion<br/>score coordination"]:::orange
+    A5["🟠 A5. Deadline gaming<br/>submit after close"]:::orange
 
     Goal --> A1
     Goal --> A2
@@ -53,41 +53,41 @@ flowchart TB
     A1 --> A1m1["M1a: per-IP rate limit<br/>5/15min on /api/auth/"]:::yellow
     A1 --> A1m2["M1b: unique email<br/>DB-level UNIQUE"]:::yellow
     A1 --> A1m3["M1c: AuditEvent row<br/>on every 401/403"]:::yellow
-    A1 -.->|"residual: rotating IPs,<br/>botnet, residential proxies"| A1r["⚠️ Mitigated, not solved"]:::red
+    A1 -. "residual: rotating IPs,<br/>botnet, residential proxies" .-> A1r["⚠️ Mitigated, not solved"]:::red
 
     %% A2 — Ballot stuffing
     A2 --> A2m1["M2a: write-bucket limit<br/>10/60s/IP"]:::yellow
-    A2 --> A2m2["M2b: per-user UNIQUE<br/>(voter, project)"]:::yellow
+    A2 --> A2m2["M2b: per-user UNIQUE<br/>voter, project"]:::yellow
     A2 --> A2m3["M2c: AuditEvent<br/>on every vote cast"]:::yellow
-    A2 -.->|"residual: botnet,<br/>Sybil sibling"| A2r["⚠️ Mitigated, not solved"]:::red
+    A2 -. "residual: botnet,<br/>Sybil sibling" .-> A2r["⚠️ Mitigated, not solved"]:::red
 
     %% A3 — Scraping
     A3 --> A3m1["M3a: read-bucket limit<br/>60/60s/IP"]:::yellow
     A3 --> A3m2["M3b: X-RateLimit-Remaining<br/>on every response"]:::yellow
-    A3 --> A3m3["M3c: no PII in public<br/>serializer (allow-list)"]:::yellow
+    A3 --> A3m3["M3c: no PII in public<br/>serializer allow-list"]:::yellow
     A3 --> A3m4["M3d: VoteAudit IP/UA hash"]:::yellow
-    A3 -.->|"residual: residential<br/>proxy pool, polite scraper"| A3r["⚠️ Acceptable cost"]:::red
+    A3 -. "residual: residential<br/>proxy pool, polite scraper" .-> A3r["⚠️ Acceptable cost"]:::red
 
     %% A4 — Judge collusion
     A4 --> A4m1["M4a: PeerScoresView<br/>returns 403 by design"]:::yellow
     A4 --> A4m2["M4b: 3 judges / project<br/>invariant (assignment)"]:::yellow
-    A4 --> A4m3["M4c: AuditEvent per score save<br/>(per-criterion payload)"]:::yellow
-    A4 --> A4m4["M4d: disjoint batches<br/>(no shared project)"]:::yellow
-    A4 -.->|"residual: off-platform<br/>(Discord, in-person)"| A4r["⚠️ Out of scope for software"]:::red
+    A4 --> A4m3["M4c: AuditEvent per score save<br/>per-criterion payload"]:::yellow
+    A4 --> A4m4["M4d: disjoint batches<br/>no shared project"]:::yellow
+    A4 -. "residual: off-platform<br/>Discord, in-person" .-> A4r["⚠️ Out of scope for software"]:::red
 
     %% A5 — Deadline gaming
     A5 --> A5m1["M5a: @deadline_gated<br/>422 after submissions_close_at"]:::yellow
     A5 --> A5m2["M5b: submitted_at<br/>immutable once stamped"]:::yellow
     A5 --> A5m3["M5c: USE_TZ=True<br/>server clock is source of truth"]:::yellow
-    A5 -.->|"residual: edits inside<br/>the window (by design)"| A5r["⚠️ Intentional behavior"]:::red
+    A5 -. "residual: edits inside<br/>the window by design" .-> A5r["⚠️ Intentional behavior"]:::red
 
     %% Append-only audit
-    Audit["📜 Append-only AuditEvent<br/>(DB grants REVOKE UPDATE/DELETE)"]:::violet
+    Audit["📜 Append-only AuditEvent<br/>DB grants REVOKE UPDATE/DELETE"]:::violet
     A1m3 & A2m3 & A4m3 & A5m3 -.-> Audit
 
     %% Secondary threats
-    Sec["🟣 Secondary threats<br/>(documented for completeness)"]:::violet
-    Sec -.->|"webhook SSRF, certificate forgery,<br/>XSS, CSRF, SQL injection,<br/>brute-force login"| Sx["10 controls — see §5"]
+    Sec["🟣 Secondary threats<br/>documented for completeness"]:::violet
+    Sec -. "webhook SSRF, certificate forgery,<br/>XSS, CSRF, SQL injection,<br/>brute-force login" .-> Sx["10 controls — see §5"]
 
     classDef orange fill:#F4A261,stroke:#6C567B,stroke-width:1px,color:#1f2937
     classDef yellow fill:#E9C46A,stroke:#6C567B,stroke-width:1px,color:#1f2937

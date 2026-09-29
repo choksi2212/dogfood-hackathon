@@ -19,7 +19,7 @@ flowchart LR
         P[("🗄️ projects<br/>(track.order, name)")]
         J[("🗄️ judges")]
         COI[("🗄️ team_memberships")]
-        CFG["⚙️ reviews_per_project<br/>+ seed"]
+        CFG["⚙️ reviews_per_project<br/>seed"]
     end
 
     subgraph RUN["🧠 Greedy assignment run"]
@@ -32,14 +32,14 @@ flowchart LR
 
     subgraph RETRY["🔁 Retry loop"]
         direction TB
-        R1["seed += 1"]
+        R1["seed increment"]
         R2["attempt ≤ 10?"]
     end
 
     subgraph OUT["📤 Result"]
         direction TB
         OK["⚖️ JudgeAssignment rows<br/>disjoint + COI-clean"]
-        ERR["🔴 AssignmentError<br/>(no projects /<br/>insufficient judges)"]
+        ERR["🔴 AssignmentError<br/>no projects or insufficient judges"]
     end
 
     P --> S1

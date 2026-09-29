@@ -24,22 +24,22 @@
 
 ```mermaid
 flowchart LR
-    subgraph SRC["📥 Sources"]
+    subgraph SRC["Sources"]
         direction TB
-        FIX["📜 fixture builder<br/>(_fixtures.py)"]
-        ALGO["🐍 algorithm<br/>(normalize / BT /<br/>CSV writer / schema)"]
+        FIX["fixture builder<br/>underscore fixtures.py"]
+        ALGO["algorithm<br/>normalize, BT,<br/>CSV writer, schema"]
     end
 
-    subgraph OUT["📦 Output"]
+    subgraph OUT["Output"]
         direction TB
-        OUT1["⚖️ produced output<br/>(theta, q, JSON, header)"]
-        GOLD[("📁 fixtures/*.json<br/>+ csv_header.txt<br/>checked-in canonical")]
+        OUT1["produced output<br/>theta, q, JSON, header"]
+        GOLD[("fixtures, all json files,<br/>with csv_header.txt<br/>checked-in canonical")]
     end
 
-    subgraph CHK["🧪 Assertion"]
+    subgraph CHK["Assertion"]
         direction TB
-        CMP["⚖️ produced == golden?<br/>(structural compare)"]
-        RES["📤 PASS / FAIL<br/>with diff on failure"]
+        CMP["produced equals golden<br/>structural compare"]
+        RES["PASS or FAIL<br/>with diff on failure"]
     end
 
     FIX --> ALGO --> OUT1

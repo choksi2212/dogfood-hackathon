@@ -32,9 +32,9 @@
 ```mermaid
 flowchart LR
     Browser(["🌐 Browser"]):::yellow --> Nginx{{"🚪 nginx :8000"}}:::orange
-    Nginx -->|"/api/*"| Django["🐍 Django + DRF<br/>(3 gunicorn workers)"]:::orange
-    Nginx -->|"/, /event, /judge"| Next["⚛️ Next.js :3000"]:::orange
-    Django -->|ORM| DB[("🗄️ Postgres 16<br/>postgres-data volume")]:::blue
+    Nginx -- "/api/*" --> Django["🐍 Django + DRF<br/>3 gunicorn workers"]:::orange
+    Nginx -- "/, /event, /judge" --> Next["⚛️ Next.js :3000"]:::orange
+    Django -- ORM --> DB[("🗄️ Postgres 16<br/>postgres-data volume")]:::blue
     Next -. "fetch /api/" .-> Django
     Webhook["📡 External subscriber"]:::yellow -. "HMAC-SHA256<br/>signed POST" .-> Django
     Django -- "append-only<br/>audit row" --> Audit[["📜 AuditEvent"]]:::violet

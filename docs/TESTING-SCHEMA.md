@@ -16,7 +16,7 @@ erDiagram
     User ||--o{ Membership : "is member of"
     User ||--o{ TeamMember : "joins"
     User ||--o{ Submission : "authors via team"
-    User ||--o{ Score : "casts (judge)"
+    User ||--o{ Score : "casts as judge"
     User ||--o{ Session : "owns"
 
     Event ||--o{ Track : "has"
@@ -39,31 +39,31 @@ erDiagram
     Webhook ||--o{ WebhookDelivery : "tracks"
 
     User {
-        uuid id PK
+        string id PK
         string email UK
     }
     Event {
-        uuid id PK
-        slug slug UK
+        string id PK
+        string slug UK
         datetime submissions_close_at
         datetime judging_open_at
         datetime judging_close_at
     }
     Submission {
-        uuid id PK
-        uuid team_id FK
-        uuid track_id FK
+        string id PK
+        string team_id FK
+        string track_id FK
         string status
     }
     JudgeAssignment {
-        uuid id PK
-        uuid judge_id FK
-        uuid batch_id FK
+        string id PK
+        string judge_id FK
+        string batch_id FK
     }
     Score {
-        uuid id PK
-        uuid assignment_id FK
-        uuid criterion_id FK
+        string id PK
+        string assignment_id FK
+        string criterion_id FK
         int value
     }
 ```

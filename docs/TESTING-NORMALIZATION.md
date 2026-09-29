@@ -13,34 +13,34 @@
 
 ```mermaid
 flowchart TB
-    subgraph RAW["📊 Raw scores"]
+    subgraph RAW["Raw scores"]
         direction TB
-        R1["📥 scores table<br/>(judge × project → value)"]
-        R2["🧮 judge_mean[j]<br/>= mean over project"]
-        R3["🧮 project_mean[i]<br/>= mean over judge"]
+        R1["scores table<br/>(judge by project to value)"]
+        R2["judge_mean over projects"]
+        R3["project_mean over judges"]
     end
 
-    subgraph FIT["⚖️ Alternating-means fit"]
+    subgraph FIT["Alternating-means fit"]
         direction TB
-        F1["⚖️ hold b fixed →<br/>solve q_i = mean over j"]
-        F2["⚖️ hold q fixed →<br/>solve b_j = mean over i"]
-        F3["⚖️ recentre:<br/>sum(b) = 0"]
-        F4["🔁 iterate until<br/>max|Δ| < ε"]
+        F1["hold b fixed,<br/>solve q by mean over j"]
+        F2["hold q fixed,<br/>solve b by mean over i"]
+        F3["recentre:<br/>sum of b equals 0"]
+        F4["iterate until<br/>max delta less than epsilon"]
     end
 
-    subgraph OUT["📤 Normalized output"]
+    subgraph OUT["Normalized output"]
         direction TB
-        O1["📦 adj_score[i,j]<br/>= q_i + grand_mean"]
-        O2["📦 bias[j]<br/>= mean(residual)"]
-        O3["📦 rank[i]<br/>= order by adj_score"]
+        O1["adj_score — q plus grand mean"]
+        O2["bias — mean of residual"]
+        O3["rank — order by adj_score"]
     end
 
-    subgraph GUARD["🛡️ Edge cases"]
+    subgraph GUARD["Edge cases"]
         direction TB
-        G1["🔴 zero-var rater:<br/>leverage = 0"]
-        G2["🔴 duplicate entry:<br/>dedup, last wins"]
-        G3["🔴 disconnected:<br/>is_connected = False"]
-        G4["🔴 no projects:<br/>empty + is_connected = False"]
+        G1["zero-var rater:<br/>leverage equals 0"]
+        G2["duplicate entry:<br/>dedup, last wins"]
+        G3["disconnected:<br/>is_connected is False"]
+        G4["no projects:<br/>empty, is_connected is False"]
     end
 
     R1 --> R2

@@ -47,8 +47,8 @@ flowchart LR
 
     O --> PAY --> CAN --> HMAC --> SIG --> ROW
     ROW --> V1 --> V2 --> V3
-    V3 -->|match| OK["✅ 200 + signature"]
-    V3 -->|mismatch| T1 --> T2
+    V3 -- match --> OK["✅ 200, signature"]
+    V3 -- mismatch --> T1 --> T2
 
     style I fill:#FFE8D6,stroke:#F4A261,color:#1D3557
     style S fill:#EDE7F6,stroke:#6C567B,color:#1D3557

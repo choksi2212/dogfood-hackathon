@@ -13,35 +13,35 @@
 
 ```mermaid
 flowchart LR
-    subgraph REQ["📥 Request"]
+    subgraph REQ["Request"]
         direction TB
-        ORG["🧑‍💼 Organizer<br/>GET /api/csv_export?event_slug=…"]
-        ANON["🌐 Anonymous"]
-        JUDGE["👤 Judge"]
+        ORG["Organizer<br/>GET /api/csv_export?event_slug/other-slug"]
+        ANON["Anonymous"]
+        JUDGE["Judge"]
     end
 
-    subgraph GATE["🔒 Permission gate"]
+    subgraph GATE["Permission gate"]
         direction TB
-        AUTH["⚖️ IsAuthenticated?"]
-        ORG2["⚖️ IsOrganizer?"]
+        AUTH["IsAuthenticated"]
+        ORG2["IsOrganizer"]
     end
 
-    subgraph STREAM["📤 Streaming export"]
+    subgraph STREAM["Streaming export"]
         direction TB
-        Q["⚖️ NormalizedScore<br/>.select_related(*)<br/>.order_by(...)"]
-        HDR["📝 Header row<br/>event_slug, project_id,<br/>project_name, judge_email,<br/>criterion_name, score, weight"]
-        ROW["📝 N×M×K data rows<br/>RFC 4180 quoting"]
-        UTF["🌐 UTF-8 preserved<br/>(→, emoji, 中文)"]
-        RESP["📡 StreamingHttpResponse<br/>Content-Type: text/csv<br/>Content-Disposition: attachment"]
+        Q["NormalizedScore<br/>select_related all<br/>order_by score"]
+        HDR["Header row<br/>event_slug, project_id,<br/>project_name, judge_email,<br/>criterion_name, score, weight"]
+        ROW["N by M by K data rows<br/>RFC 4180 quoting"]
+        UTF["UTF-8 preserved<br/>(arrow, emoji, CJK)"]
+        RESP["StreamingHttpResponse<br/>Content-Type text/csv<br/>Content-Disposition attachment"]
     end
 
     ORG --> AUTH --> ORG2 --> Q
     Q --> HDR --> ROW --> UTF --> RESP
     ANON --> AUTH
-    AUTH -->|no| R401["🔴 401"]
+    AUTH -->|no| R401["401"]
     JUDGE --> AUTH
     AUTH -->|yes| ORG2
-    ORG2 -->|no| R403["🔴 403"]
+    ORG2 -->|no| R403["403"]
 
     style REQ fill:#FDF6E3,stroke:#E9C46A,color:#1D3557
     style GATE fill:#FFE8D6,stroke:#F4A261,color:#1D3557

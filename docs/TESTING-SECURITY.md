@@ -24,40 +24,40 @@ Functional, not fuzzing. Each probe sends one or two targeted payloads against t
 
 ```mermaid
 flowchart TB
-    subgraph IN["📥 Inbound request"]
+    subgraph IN["Inbound request"]
         direction TB
-        REQ["🌐 Browser / attacker"]
-        PAY["💉 payload<br/>(SQLi / XSS / traversal /<br/>cookie / brute / CSRF)"]
+        REQ["Browser or attacker"]
+        PAY["payload<br/>SQLi, XSS, traversal,<br/>cookie, brute, CSRF"]
     end
 
-    subgraph E["🚪 Edge"]
+    subgraph E["Edge"]
         direction TB
-        NG["🚪 nginx<br/>Host header check"]
-        MW["🧱 Middleware<br/>(Security, Session, Audit)"]
-        RL["🛡️ RateLimitMiddleware<br/>LIMITS[auth] = 5/15m<br/>LIMITS[write] = 10/60s"]
+        NG["nginx<br/>Host header check"]
+        MW["Middleware<br/>Security, Session, Audit"]
+        RL["RateLimitMiddleware<br/>LIMITS auth — 5 per 15m<br/>LIMITS write — 10 per 60s"]
     end
 
-    subgraph V["⚖️ View layer"]
+    subgraph V["View layer"]
         direction TB
-        P1["🔒 IsAuthenticated?"]
-        P2["🔒 IsOrganizer?"]
-        P3["🔒 IsAssignedJudge?"]
-        P4["🔒 IsOwnJudge?"]
-        ORM["🐍 Django ORM<br/>(parameterized —<br/>SQLi-safe by construction)"]
-        SER["📦 DRF serializer<br/>(JSON-safe —<br/>XSS-safe at render)"]
+        P1["IsAuthenticated"]
+        P2["IsOrganizer"]
+        P3["IsAssignedJudge"]
+        P4["IsOwnJudge"]
+        ORM["Django ORM<br/>parameterized,<br/>SQLi-safe by construction"]
+        SER["DRF serializer<br/>JSON-safe,<br/>XSS-safe at render"]
     end
 
-    subgraph A["📜 Audit"]
+    subgraph A["Audit"]
         direction TB
-        LOG["📜 audit_log<br/>(append-only INSERT)"]
-        TOK["🔏 sha256(session token)<br/>(cookie tamper-safe)"]
+        LOG["audit_log<br/>append-only INSERT"]
+        TOK["sha256 of session token<br/>cookie tamper-safe"]
     end
 
-    subgraph OUT["📤 Outcomes"]
+    subgraph OUT["Outcomes"]
         direction TB
-        OK["✅ 200 / 201 / 4xx<br/>(no 5xx, no leakage)"]
-        BLOCK["🔴 401 / 403 / 429<br/>(rate-limited)"]
-        FAIL["🔴 400 signature_invalid<br/>(tamper detected)"]
+        OK["200 or 201 or 4xx<br/>no 5xx, no leakage"]
+        BLOCK["401 or 403 or 429<br/>rate-limited"]
+        FAIL["400 signature_invalid<br/>tamper detected"]
     end
 
     REQ --> PAY --> NG --> MW

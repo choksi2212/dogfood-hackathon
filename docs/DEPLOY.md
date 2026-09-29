@@ -28,9 +28,9 @@ flowchart TB
     UpWeb["🟢 docker compose up -d web<br/>entrypoint re-migrates"]:::compute
     Healthz(["💓 curl /healthz<br/>expect 200"]):::gate
     Accept(["✅ make accept<br/>7/7 PASS"]):::gate
-    Done(["🏁 Deploy done<br/>proxy + DNS"]):::ctl
+    Done(["🏁 Deploy done<br/>proxy and DNS"]):::ctl
 
-    SmokeFail{{"🔴 /healthz 503<br/>check .env + logs"}}:::alert
+    SmokeFail{{"🔴 /healthz 503<br/>check .env and logs"}}:::alert
 
     Start --> Clone --> Env --> Pull --> Build --> UpDb --> Mig --> UpWeb --> Healthz --> Accept --> Done
     Healthz -.->|fail| SmokeFail

@@ -22,19 +22,19 @@
 journey
     title Smoke test walkthrough
     section Boot
-      Probe /healthz: 4: Tester
-      Probe /: 4: Tester
+      Probe healthz: 4: Tester
+      Probe root: 4: Tester
     section Spec routes
-      Probe /api/gallery (public): 4: Tester
-      Probe /api/judge/scores (401): 3: Tester
-      Probe /api/judge/peer-scores (401): 5: Tester
-      Probe /api/csv_export (401): 3: Tester
-      Probe /api/events/.../submit (401): 3: Tester
+      Probe gallery public: 4: Tester
+      Probe scores denied: 3: Tester
+      Probe peer scores denied: 5: Tester
+      Probe csv denied: 3: Tester
+      Probe submit denied: 3: Tester
     section T4 surface
-      Probe /widget.js (200 JS): 4: Tester
-      Probe /api/schema/ (200 YAML): 4: Tester
+      Probe widget js: 4: Tester
+      Probe schema: 4: Tester
     section Migrations
-      Assert showmigrations clean: 5: Tester
+      Assert migrations clean: 5: Tester
 ```
 
 What they catch:

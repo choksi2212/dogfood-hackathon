@@ -60,10 +60,10 @@ flowchart LR
     Team --> Submission
     Submission -->|deadline| Locked
     Locked -->|judging_open_at| Assignment
-    Judge -->|bulk-invite + assign| Assignment
+    Judge -->|bulk-invite and assign| Assignment
     Assignment --> Score
     Score -->|trigger| Norm
-    Organizer -->|trigger + export| Norm
+    Organizer -->|trigger and export| Norm
     Norm -->|publish| Results
     Locked -->|voting window| Voting
     Voting -->|with judge scores| Results

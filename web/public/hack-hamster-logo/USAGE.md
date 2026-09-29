@@ -24,10 +24,10 @@ stateDiagram-v2
     ChooseSurface --> DarkSurface : dark UI
     ChooseSurface --> LightSurface : light UI
 
-    DarkSurface --> FaviconNative : ≤ 32px
-    DarkSurface --> MarkOrLockup : > 32px
-    LightSurface --> FaviconNative : ≤ 32px
-    LightSurface --> MarkOrLockup : > 32px
+    DarkSurface --> FaviconNative : lte 32px
+    DarkSurface --> MarkOrLockup : gt 32px
+    LightSurface --> FaviconNative : lte 32px
+    LightSurface --> MarkOrLockup : gt 32px
 
     FaviconNative --> Favicon16 : 16px exact
     FaviconNative --> Favicon32 : 32px exact

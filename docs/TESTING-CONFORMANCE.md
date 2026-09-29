@@ -25,7 +25,7 @@ flowchart TB
         direction TB
         P1["⚖️ yaml.safe_load(openapi.yaml)"]
         P2["⚖️ urlpatterns → set of paths"]
-        P3["⚖️ JSON.loads(/api/schema/)"]
+        P3["⚖️ JSON.loads schema endpoint"]
     end
 
     subgraph DIFF["🔍 Diff detector"]
@@ -34,7 +34,7 @@ flowchart TB
         D2["🧪 live_routes ⊆ paths_in_yaml?"]
         D3["🧪 methods per path match?"]
         D4["🧪 every $ref resolves?"]
-        D5["🧪 yaml == json.dumps(<br/>/api/schema/)?"]
+        D5["🧪 yaml == json.dumps schema endpoint?"]
     end
 
     subgraph OUT["📤 Result"]

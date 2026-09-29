@@ -15,29 +15,29 @@ stateDiagram-v2
     direction TB
     [*] --> Draft
 
-    Draft: ⏳ Draft
-    Draft: now < submissions_close_at
-    Draft: 🟡 accept submissions
+    Draft: Draft
+    Draft: now is before submissions_close_at
+    Draft: accept submissions
 
-    Registration: 📝 Registration
-    Registration: submissions_close_at ≤ now < judging_open_at
-    Registration: 🔴 refuse submissions
+    Registration: Registration
+    Registration: submissions_close_at lte now is before judging_open_at
+    Registration: refuse submissions
 
-    SubmissionsClosed: 🚪 Submissions closed
-    SubmissionsClosed: judging_open_at ≤ now < judging_close_at
-    SubmissionsClosed: 🟠 judges active
+    SubmissionsClosed: Submissions closed
+    SubmissionsClosed: judging_open_at lte now is before judging_close_at
+    SubmissionsClosed: judges active
 
-    Judging: ⚖️ Judging
-    Judging: judging_open_at ≤ now < judging_close_at
-    Judging: 🟠 scores accepted
+    Judging: Judging
+    Judging: judging_open_at lte now is before judging_close_at
+    Judging: scores accepted
 
-    ResultsPending: 🕒 Results pending
-    ResultsPending: judging_close_at ≤ now < results_at
-    ResultsPending: 🔒 scores locked
+    ResultsPending: Results pending
+    ResultsPending: judging_close_at lte now is before results_at
+    ResultsPending: scores locked
 
-    ResultsPublished: 🏆 Results published
-    ResultsPublished: now ≥ results_at
-    ResultsPublished: 🟢 winners public
+    ResultsPublished: Results published
+    ResultsPublished: now is at or after results_at
+    ResultsPublished: winners public
 
     Draft --> Registration: submissions_close_at reached
     Registration --> Judging: judging_open_at reached
@@ -45,14 +45,14 @@ stateDiagram-v2
     ResultsPending --> ResultsPublished: results_at reached
 
     note right of Draft
-        🧪 Submit before close → 201 (or 422 in demo)
-        🧪 Submit at close (now − 1µs) → 422 deadline_passed
+        Submit before close returns 201 or 422 in demo
+        Submit at close (now minus 1us) returns 422 deadline_passed
     end note
 
     note right of Judging
-        🧪 Score before open → 403 deadline_not_open
-        🧪 Score after close → 422 deadline_passed
-        🧪 Vote before judging_close_at → 422 (voting opens after)
+        Score before open returns 403 deadline_not_open
+        Score after close returns 422 deadline_passed
+        Vote before judging_close_at returns 422, voting opens after
     end note
 ```
 

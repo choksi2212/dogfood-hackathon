@@ -28,7 +28,7 @@ sequenceDiagram
         V->>DB: INSERT session<br/>(sha256(token) → row)
         V->>A: log(actor, "auth.login")
         V->>M: set_cookie(name=session_id,<br/>value=token, HttpOnly,<br/>SameSite=Lax, Secure?)
-        V-->>B: 200 + Set-Cookie
+        V-->>B: 200, Set-Cookie
     end
 
     B->>V: GET /api/me (Cookie: session_id=token)

@@ -40,19 +40,20 @@ gantt
     tickInterval 12hour
     %% Sep 26 18:00 UTC → Sep 29 18:00 UTC (H+0 → H+72)
     section G1 G2 setup
-    Boot, seed, docker compose green (G1)   :milestone, m1, 2026-09-26T21:00:00Z, 0m
-    T1 green, .hack-hamster.toml published (G2) :milestone, m2, 2026-09-27T14:00:00Z, 0m
+    Boot, seed, docker compose green     :milestone, g1, 2026-09-26T21:00:00Z, 0m
+    T1 green, .hack-hamster.toml published :milestone, g2, 2026-09-27T14:00:00Z, 0m
     section T1 T2 implementation
     T1 implementation 👤 manas + mihir :active, t1, 2026-09-26T18:00:00Z, 20h
-    T2 implementation + role isolation matrix (G3) :milestone, m3, 2026-09-28T04:00:00Z, 0m
+    T2 implementation :milestone, g3, 2026-09-28T04:00:00Z, 0m
+    role isolation matrix :milestone, g3b, 2026-09-28T04:00:00Z, 0m
     section T3 T4 polish + bonuses
-    Normalization on fixtures (G4) 👤 manas          :milestone, m4, 2026-09-28T10:00:00Z, 0m
-    T3 green (voting + comments + anti-abuse) (G5) :milestone, m5, 2026-09-28T18:00:00Z, 0m
-    Pairwise end-to-end, BT fit recovered (G6)     :milestone, m6, 2026-09-29T02:00:00Z, 0m
-    T4 surface complete (API + webhooks + certs + widget + bulk I/O) (G7) :milestone, m7, 2026-09-29T08:00:00Z, 0m
-    Bonus artefacts finished, feature freeze (G8) 👤 manas + mihir :milestone, m8, 2026-09-29T12:00:00Z, 0m
+    Normalization on fixtures 👤 manas          :milestone, g4, 2026-09-28T10:00:00Z, 0m
+    T3 green (voting + comments + anti-abuse)  :milestone, g5, 2026-09-28T18:00:00Z, 0m
+    Pairwise end-to-end, BT fit recovered     :milestone, g6, 2026-09-29T02:00:00Z, 0m
+    T4 surface complete (API + webhooks + certs + widget + bulk I/O) :milestone, g7, 2026-09-29T08:00:00Z, 0m
+    Bonus artefacts finished, feature freeze 👤 manas + mihir :milestone, g8, 2026-09-29T12:00:00Z, 0m
     section G9 ship
-    Clean-machine run + final report + ship (G9)  :milestone, m9, 2026-09-29T16:00:00Z, 0m
+    Clean-machine run + final report + ship  :milestone, g9, 2026-09-29T16:00:00Z, 0m
 ```
 
 > *Palette: 🟡 yellow (read paths / public surface), 🟠 orange (services / compute),

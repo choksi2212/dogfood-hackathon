@@ -15,7 +15,7 @@
 sequenceDiagram
     autonumber
     participant T as 🌐 Third-party site<br/>(example.com)
-    participant J as 📜 /widget.js
+    participant J as widget_js
     participant H as ⚖️ Hack-Hamster portal<br/>/api/widget/gallery
     participant DB as 🗄️ Postgres
 

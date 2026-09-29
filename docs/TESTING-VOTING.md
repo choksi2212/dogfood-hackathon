@@ -21,17 +21,17 @@ stateDiagram-v2
     Draft: 🧪 no Vote row, no audit
 
     Cast: 🟢 Cast
-    Cast: POST /api/events/.../vote
-    Cast: 🧪 Vote row + VoteAudit(action='cast')
-    Cast: simple: votes=1
-    Cast: quadratic: votes=N, cost=N²
-    Cast: budget = budget - cost
+    Cast: POST vote endpoint
+    Cast: 🧪 Vote row, VoteAudit action cast
+    Cast: simple mode, votes=1
+    Cast: quadratic mode, votes=N, cost=N²
+    Cast: budget deducts cost
 
     Retracted: ⚪ Retracted
-    Retracted: DELETE /api/events/.../vote
-    Retracted: 🧪 retracted_at != null
-    Retracted: 🧪 VoteAudit(action='retract')
-    Retracted: budget = budget + cost (refund)
+    Retracted: DELETE vote endpoint
+    Retracted: 🧪 retracted_at set
+    Retracted: 🧪 VoteAudit action retract
+    Retracted: budget refunds cost
 
     Counted: 🏆 Counted
     Counted: votes counted in results
@@ -43,17 +43,17 @@ stateDiagram-v2
     DeadlineMissed: 🧪 422 deadline_passed
 
     Abuse: 🚨 Abuse flagged
-    Abuse: AbuseFlag(status='pending')
-    Abuse: target_type='submission'
+    Abuse: AbuseFlag status pending
+    Abuse: target_type submission
     Abuse: 🧪 flagged separately
 
     Draft --> Cast: POST vote
     Cast --> Retracted: DELETE vote
-    Retracted --> Cast: POST same voter_key<br/>(idempotent re-cast)
+    Retracted --> Cast: POST same voter_key<br/>idempotent re-cast
     Cast --> Counted: judging_close_at passed
     Retracted --> Counted: judging_close_at passed
     Draft --> DeadlineMissed: now ≥ judging_close_at
-    Cast --> Abuse: anomaly detected<br/>(rate, fingerprint)
+    Cast --> Abuse: anomaly detected<br/>rate or fingerprint
 ```
 
 ## What it covers
