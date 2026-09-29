@@ -1,0 +1,261 @@
+{
+  "brand": "Hack Hamster",
+  "wordmark": "hack hamster",
+  "palette": {
+    "red": "#E2454A",
+    "offwhite": "#F5F5F5",
+    "gray": "#DADADA",
+    "charcoal": "#303030",
+    "white": "#FFFFFF"
+  },
+  "typeface": "Geist Sans",
+  "weight": 500,
+  "trackingEm": -0.02,
+  "measuredXHeightEm": 0.532,
+  "capHeightEm": 0.71,
+  "wordGapEm": 0.25,
+  "horizontalSymbolCanvasHeightX": 2.4,
+  "stackedSymbolCanvasWidthWordmark": 0.62,
+  "inspiration": {
+    "reference": "https://commons.wikimedia.org/wiki/File:XHamster_logo.svg",
+    "cues": "front-facing hamster, visible incisors, red first word and neutral second word",
+    "originalConstruction": true
+  },
+  "symbol": {
+    "viewBox": "0 0 24 24",
+    "visibleBounds": [
+      1,
+      2,
+      23,
+      23
+    ],
+    "path": "M12 4.5 C10.8 4.5 9.7 4.7 8.65 5.1 C8.5 3.4 7.3 2 5.75 2 C3.955 2 2.5 3.567 2.5 5.5 C2.5 6.7 3.03 7.76 3.84 8.39 C2.06 10.01 1 12.08 1 14.5 C1 20.02 5.93 23 12 23 C18.07 23 23 20.02 23 14.5 C23 12.08 21.94 10.01 20.16 8.39 C20.97 7.76 21.5 6.7 21.5 5.5 C21.5 3.567 20.045 2 18.25 2 C16.7 2 15.5 3.4 15.35 5.1 C14.3 4.7 13.2 4.5 12 4.5 Z M8 9.5 A1.5 1.5 0 0 1 9.5 11 V11.5 A1.5 1.5 0 0 1 6.5 11.5 V11 A1.5 1.5 0 0 1 8 9.5 Z M16 9.5 A1.5 1.5 0 0 1 17.5 11 V11.5 A1.5 1.5 0 0 1 14.5 11.5 V11 A1.5 1.5 0 0 1 16 9.5 Z M10 14 H14 L12 16.5 Z M9 18 H11.5 V21 H9.5 C9.224 21 9 20.776 9 20.5 Z M12.5 18 H15 V20.5 C15 20.776 14.776 21 14.5 21 H12.5 Z",
+    "fillRule": "evenodd",
+    "cutouts": "two rounded eyes, triangular nose and two rectangular incisors"
+  },
+  "certificate": {
+    "symbolCanvasWidthMm": 43.63636363636363,
+    "visibleMarkWidthMm": 40,
+    "wordmarkPt": 24,
+    "printWidthPt": 280,
+    "printHeightPt": 230
+  },
+  "files": [
+    {
+      "name": "01-horizontal-dark",
+      "width": 4096,
+      "height": 1024,
+      "variant": 1,
+      "background": "#303030",
+      "transparent": false
+    },
+    {
+      "name": "02-horizontal-light",
+      "width": 4096,
+      "height": 1024,
+      "variant": 2,
+      "background": "#F5F5F5",
+      "transparent": false
+    },
+    {
+      "name": "03-stacked-dark",
+      "width": 2048,
+      "height": 2048,
+      "variant": 3,
+      "background": "#303030",
+      "transparent": false
+    },
+    {
+      "name": "04-mark-dark",
+      "width": 2048,
+      "height": 2048,
+      "variant": 4,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "04-mark-dark-preview",
+      "width": 2048,
+      "height": 2048,
+      "variant": null,
+      "background": "#303030",
+      "transparent": false
+    },
+    {
+      "name": "05-mark-light",
+      "width": 2048,
+      "height": 2048,
+      "variant": 5,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "05-mark-light-preview",
+      "width": 2048,
+      "height": 2048,
+      "variant": null,
+      "background": "#F5F5F5",
+      "transparent": false
+    },
+    {
+      "name": "06-wordmark-dark",
+      "width": 4096,
+      "height": 1024,
+      "variant": 6,
+      "background": "#303030",
+      "transparent": false
+    },
+    {
+      "name": "07-wordmark-light",
+      "width": 4096,
+      "height": 1024,
+      "variant": 7,
+      "background": "#F5F5F5",
+      "transparent": false
+    },
+    {
+      "name": "08-monochrome-ink",
+      "width": 4096,
+      "height": 1024,
+      "variant": 8,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "08-monochrome-ink-preview",
+      "width": 4096,
+      "height": 1024,
+      "variant": null,
+      "background": "#FFFFFF",
+      "transparent": false
+    },
+    {
+      "name": "09-monochrome-reversed",
+      "width": 4096,
+      "height": 1024,
+      "variant": 9,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "09-monochrome-reversed-preview",
+      "width": 4096,
+      "height": 1024,
+      "variant": null,
+      "background": "#303030",
+      "transparent": false
+    },
+    {
+      "name": "10-favicon-16",
+      "width": 16,
+      "height": 16,
+      "variant": 10,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "10-favicon-32",
+      "width": 32,
+      "height": 32,
+      "variant": 10,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "favicon-reversed-16",
+      "width": 16,
+      "height": 16,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "favicon-reversed-32",
+      "width": 32,
+      "height": 32,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "logo",
+      "width": 4096,
+      "height": 1024,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "logo-icon",
+      "width": 2048,
+      "height": 2048,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "app-icon",
+      "width": 1024,
+      "height": 1024,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "widget-header-dark",
+      "width": 152,
+      "height": 24,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "widget-header-light",
+      "width": 152,
+      "height": 24,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "widget-header-dark-4x",
+      "width": 608,
+      "height": 96,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "certificate-header",
+      "width": 2800,
+      "height": 2300,
+      "variant": null,
+      "background": null,
+      "transparent": true
+    },
+    {
+      "name": "github-social-card",
+      "width": 1280,
+      "height": 640,
+      "variant": null,
+      "background": "#303030",
+      "transparent": false
+    },
+    {
+      "name": "hack-hamster-family",
+      "width": 1920,
+      "height": 2800,
+      "variant": null,
+      "background": "mixed charcoal and offwhite panels",
+      "transparent": false
+    },
+    {
+      "name": "production-formats",
+      "width": 1920,
+      "height": 1600,
+      "variant": null,
+      "background": "#303030",
+      "transparent": false
+    }
+  ]
+}
