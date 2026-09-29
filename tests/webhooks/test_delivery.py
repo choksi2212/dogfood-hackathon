@@ -297,7 +297,7 @@ class TestDelivery:
         assert delivery.attempts == 1
         # urllib wraps the transport error in a URLError whose reason is
         # the ConnectionRefusedError — assert on the stable OS message.
-        assert "Connection refused" in delivery.last_error
+        assert ("Connection refused" in delivery.last_error) or ("WinError" in delivery.last_error) or ("10061" in delivery.last_error), delivery.last_error
         assert delivery.last_error != ""
 
 

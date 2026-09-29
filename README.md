@@ -50,7 +50,7 @@ Nine base items, plus all four bonuses (+16). Everything below lives on `main` a
 |---|---|---|
 | 1 | Public GitHub repo, OSI licence (MIT) | [LICENSE](LICENSE) |
 | 2 | **`docker compose up`** → seeded, working portal, network off | [Dockerfile.all-in-one](Dockerfile.all-in-one) |
-| 3 | `.hack-hamster.toml` at the repo root — honest tier claims | [.hack-hamster.toml](.hack-hamster.toml) |
+| 3 | `.dogfood.toml` at the repo root — honest tier claims | [.dogfood.toml](.dogfood.toml) |
 | 4 | `acceptance-report.txt` committed — 7/7 PASS | [acceptance-report.txt](acceptance-report.txt) |
 | 5 | This README — what it does, how to run it, honest limits | (you're reading it) |
 | 6 | `ARCHITECTURE.md` — system shape, why | [ARCHITECTURE.md](ARCHITECTURE.md) |
@@ -399,7 +399,7 @@ cd dogfood-hackathon
 docker compose up --build -d
 
 # 3. Verify (acceptance suite)
-python run.py .hack-hamster.toml
+python run.py .dogfood.toml
 ```
 
 Expected: **7/7 PASS**. The output is committed as [acceptance-report.txt](acceptance-report.txt).
@@ -427,7 +427,7 @@ Then open **http://localhost:8000** in a browser. Five demo accounts are pre-see
 | Judge | `tomas.varga@example.org` | Score assigned projects against the weighted rubric |
 | Participant | `participant@test.local` | Submit a project, vote, comment |
 
-Password for all demo accounts: `hack-hamster-dev-password`. **Zero copy-paste after `docker compose up`** — the five demo session cookies in [.hack-hamster.toml](.hack-hamster.toml) are deterministic (HMAC-derived from `DJANGO_SECRET_KEY` + role + email), so they survive every `docker compose down -v && up`.
+Password for all demo accounts: `hack-hamster-dev-password`. **Zero copy-paste after `docker compose up`** — the five demo session cookies in [.dogfood.toml](.dogfood.toml) are deterministic (HMAC-derived from `DJANGO_SECRET_KEY` + role + email), so they survive every `docker compose down -v && up`.
 
 ---
 
@@ -588,7 +588,7 @@ flowchart LR
 
 | Layer | What it catches | Where it lives |
 |---|---|---|
-| **Acceptance** (7) | Spec contract regressions — gallery 200, judge blocked from peer scores, csv export 200 | [run.py](run.py) + [.hack-hamster.toml](.hack-hamster.toml) |
+| **Acceptance** (7) | Spec contract regressions — gallery 200, judge blocked from peer scores, csv export 200 | [run.py](run.py) + [.dogfood.toml](.dogfood.toml) |
 | **Conformance** (10) | URLconf paths undocumented in `openapi.yaml`; broken `$ref` pointers; duplicate tag/version | [tests/conformance/](tests/conformance/) |
 | **Pytest** (548) | Per-feature claims: voting, deadlines, role isolation, certificates, webhooks, normalization, pairwise, etc. | [tests/](tests/) — 20 categories |
 | **Golden** | Known-good algorithm output: normalization, Bradley–Terry recovered ranking, role-isolation matrix | [tests/golden/](tests/golden/) |
@@ -608,7 +608,7 @@ The 7 warnings are cache-key + teardown noise (non-blocking).
 
 If you have 10 minutes, read in this order:
 
-1. **[`.hack-hamster.toml`](.hack-hamster.toml)** — what we claim.
+1. **[`.dogfood.toml`](.dogfood.toml)** — what we claim.
 2. **[`acceptance-report.txt`](acceptance-report.txt)** — what the spec's checker verified.
 3. **[`ARCHITECTURE.md`](ARCHITECTURE.md)** — the shape of the system and why.
 4. **[`JUDGING.md`](JUDGING.md)** — the maths, defended.
