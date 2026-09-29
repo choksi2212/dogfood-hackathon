@@ -44,7 +44,7 @@ sequenceDiagram
     participant O as ⚖️ Organizer
     participant P as 📦 Pairwise console
     participant J as 🧭 Judge console
-    participant API as 🐍 Django + DRF
+    participant API as 🐍 Django and DRF
     participant DB as 🗄️ Postgres
     participant Pub as 🌐 Public
 
@@ -86,6 +86,7 @@ sequenceDiagram
     Note over Pub,DB: Publish
     O->>API: POST /publish
     API->>DB: set results_at; allow GET /results for non-organizers
+    Note over Pub,DB: Public gallery now visible
     Pub->>API: GET /gallery
     API->>DB: filter event + status=submitted
     DB-->>API: projects

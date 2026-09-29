@@ -22,7 +22,7 @@ flowchart LR
         direction TB
         M1["🧮 for each project i:<br/>wins_i = Σ [winner=i] + ½ Σ [winner=tie & i∈a,b]"]
         M2["🧮 for each project i:<br/>theta_i = log(<br/>wins_i / Σ_j (n_ij / (theta_i − theta_j)))]
-        M3["🔁 MM iteration<br/>until max|Δθ| < 1e-9"]
+        M3["🔁 MM iteration<br/>until convergence<br/>max Δθ &lt; 1e-9"]
         M4["⚖️ recentre:<br/>sum(theta) = 0"]
     end
 

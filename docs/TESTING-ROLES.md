@@ -44,35 +44,35 @@ flowchart TB
 
     subgraph OK["✅ 200 OK cells"]
         direction TB
-        O1[organizer × gallery 200]
-        O2[judge_a/b/c × gallery 200]
-        O3[participant × gallery 200]
-        O4[anonymous × gallery 200]
-        O5[organizer × csv_export 200]
-        O6[organizer × normalize 200]
-        O7[organizer × assignments/run 200]
-        O8[organizer × webhooks 200]
-        O9[judge_a/b/c × judge_scores 200]
+        O1["organizer × gallery 200"]
+        O2["judge_a/b/c × gallery 200"]
+        O3["participant × gallery 200"]
+        O4["anonymous × gallery 200"]
+        O5["organizer × csv_export 200"]
+        O6["organizer × normalize 200"]
+        O7["organizer × assignments/run 200"]
+        O8["organizer × webhooks 200"]
+        O9["judge_a/b/c × judge_scores 200"]
     end
 
     subgraph FORBID["🔴 403 / 401 cells"]
         direction TB
-        F1[judge_a/b/c × peer-scores 403]
-        F2[judge_a/b/c × submit 403]
-        F3[judge_a/b/c × csv_export 403]
-        F4[judge_a/b/c × normalize 403]
-        F5[judge_a/b/c × assignments/run 403]
-        F6[judge_a/b/c × webhooks 403]
-        F7[organizer × submit 403]
-        F8[organizer × judge_scores 403]
-        F9[organizer × peer-scores 403]
-        F10[participant × everything else 403]
-        F11[anonymous × everything else 401]
+        F1["judge_a/b/c × peer-scores 403"]
+        F2["judge_a/b/c × submit 403"]
+        F3["judge_a/b/c × csv_export 403"]
+        F4["judge_a/b/c × normalize 403"]
+        F5["judge_a/b/c × assignments/run 403"]
+        F6["judge_a/b/c × webhooks 403"]
+        F7["organizer × submit 403"]
+        F8["organizer × judge_scores 403"]
+        F9["organizer × peer-scores 403"]
+        F10["participant × everything else 403"]
+        F11["anonymous × everything else 401"]
     end
 
     subgraph DRIFT["⚠️ Drift cells"]
         direction TB
-        D1[participant × submit 422<br/>(deadline_passed in demo)]
+        D1["participant × submit 422<br/>(deadline_passed in demo)"]
     end
 
     ACTORS --> OK
@@ -123,7 +123,7 @@ Full 6 × 8 actor × route matrix. Proves the 25 % Judging Integrity criterion p
 
 ## Known drift
 
-- `test_matrix_cell[csv_export__judge_a/b/c/participant]`: View resolves the event first, then checks organizer role. Non-participant → 422 (validation) instead of 403 (forbidden). Reorder: organizer first, then event resolution.
+- `test_matrix_cell["csv_export__judge_a/b/c/participant"]`: View resolves the event first, then checks organizer role. Non-participant → 422 (validation) instead of 403 (forbidden). Reorder: organizer first, then event resolution.
 
 ## Run
 

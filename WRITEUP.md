@@ -22,29 +22,29 @@
 
 ```mermaid
 journey
-    title Hack Hamster 2026 — 72 hours, ten gates
-    section Pre-kickoff (Sep 13 → Sep 26)
-      Read the brief twice: 4: Manas, Mihir
-      Schema + maths on paper: 5: Manas
+    title Hack Hamster 2026, 72 hours, ten gates
+    section Pre-kickoff (Sep 13 to Sep 26)
+      Read the brief twice: 4: Manas
+      Schema and maths on paper: 5: Manas
       Threat model drafted: 4: Mihir
       Machine setup verified: 3: Mihir
     section Kickoff (Sep 26, 18:00 UTC)
-      G1 — docker compose up green: 5: Manas
-      Monorepo + five routes: 4: Mihir
+      G1 docker compose up green: 5: Manas
+      Monorepo and five routes: 4: Mihir
     section Build (Sep 27)
-      G2 — .hack-hamster.toml handover: 5: Manas, Mihir
-      G3 — T2 complete + role isolation: 5: Manas, Mihir
-      G4 — normalization proof: 4: Manas
+      G2 .hack-hamster.toml handover: 5: Manas
+      G3 T2 complete and role isolation: 5: Manas
+      G4 normalization proof: 4: Manas
     section Build (Sep 28)
-      G5 — T3 voting + anti-abuse: 5: Mihir
-      G6 — pairwise console live: 4: Mihir
-      G7 — T4 API/webhooks/certs: 4: Manas, Mihir
-      G8 — feature freeze, docs locked: 3: Manas
+      G5 T3 voting and anti-abuse: 5: Mihir
+      G6 pairwise console live: 4: Mihir
+      G7 T4 API webhooks certs: 4: Manas
+      G8 feature freeze and docs locked: 3: Manas
     section Close (Sep 29)
       Demo video recorded (H+68): 4: Mihir
-      G9 — clean-machine run on main: 5: Manas, Mihir
+      G9 clean-machine run on main: 5: Manas
       Acceptance report regenerated: 5: Manas
-      Final commit at 18:00 UTC: 5: Manas, Mihir
+      Final commit at 18:00 UTC: 5: Manas
 ```
 
 ---
