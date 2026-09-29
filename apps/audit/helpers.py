@@ -21,29 +21,10 @@ def log(actor, action, target=None, payload=None, request=None, result="success"
         user_agent=_ua_from_request(request),
         result=result,
     )
-    # T4: forward interesting actions to any subscribed webhooks.
-    # Forwarding is best-effort and fire-and-forget — see
-    # apps/api/delivery.py. We only forward successful actions
-    # (denials aren't usually what an organizer wants to react to)
-    # and only when we can resolve an event slug (so the webhook
-    # lookup has something to key off).
-    if event is not None and result == "success":
-        from apps.api.delivery import dispatch_event
-
-        dispatch_event(
-            event.slug,
-            action,
-            {
-                "actor": (
-                    getattr(actor, "email", None)
-                    if actor and getattr(actor, "is_authenticated", False)
-                    else None
-                ),
-                "target_type": type(target).__name__ if target else "",
-                "target_id": str(getattr(target, "id", "")) if target else "",
-                "payload": payload or {},
-            },
-        )
+    # T4 webhook dispatch happens per-view (see apps/webhooks/delivery.py),
+    # not from audit_log — each view knows which payload_type it wants to
+    # fire and the event is already in scope. Audit events are the
+    # immutable paper trail; webhook deliveries are the side effect.
 
 
 def _event_from_request(request):

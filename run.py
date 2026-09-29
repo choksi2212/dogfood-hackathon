@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DOGFOOD 2026 acceptance checker.
+"""Ledger 2026 acceptance checker.
 
 Usage:  python3 run.py .dogfood.toml > acceptance-report.txt
 
@@ -223,7 +223,7 @@ def main():
     fixture, fixture_path = load_fixture(args.fixtures, args.config)
     claimed = [t for t in cfg.get("tiers", {}).get("claimed", []) if t in TIERS]
 
-    print("DOGFOOD 2026 acceptance report")
+    print("Ledger 2026 acceptance report")
     print(f"portal: {cfg['portal']['base_url']}")
     print(f"claimed: {' '.join(claimed) or 'nothing'}")
     if fixture is None:
