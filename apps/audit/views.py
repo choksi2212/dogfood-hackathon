@@ -63,6 +63,11 @@ class AuditLogView(APIView):
                         "target_type": e.target_type,
                         "target_id": str(e.target_id) if e.target_id else None,
                         "result": e.result,
+                        # Issue #76: ip/user_agent were stored on the row
+                        # but never serialized — the exact fields an
+                        # organizer needs to investigate ballot stuffing.
+                        "ip": e.ip,
+                        "user_agent": e.user_agent,
                         "created_at": e.created_at.isoformat(),
                     }
                     for e in entries

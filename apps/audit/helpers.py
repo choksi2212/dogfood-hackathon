@@ -52,9 +52,16 @@ def _event_from_target(target):
 def _ip_from_request(request):
     if not request:
         return None
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    # Issue #45: X-Forwarded-For is client-controlled unless a trusted
+    # proxy set it. Only honour it when the deployment opted in via
+    # TRUST_PROXY=true; otherwise the audit trail must record the
+    # socket peer, not an attacker-chosen string.
+    import os
+
+    if os.environ.get("TRUST_PROXY", "").lower() in ("1", "true", "yes"):
+        forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
     return request.META.get("REMOTE_ADDR")
 
 

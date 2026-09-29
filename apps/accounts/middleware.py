@@ -3,12 +3,32 @@ hash-stored Session row. Sliding expiry: each authenticated request
 extends the session lifetime by 14 days.
 """
 
+import os
 from datetime import timedelta
 
 from django.contrib.auth.models import AnonymousUser
 from django.utils import timezone
 
 from .models import Session
+
+
+def _trust_proxy() -> bool:
+    """Issue #45: X-Forwarded-For is only honoured when the deployment
+    explicitly opts in. The header is client-controlled unless a trusted
+    proxy overwrites/appends it, so trusting it by default lets any
+    client mint a fresh rate-limit bucket per request."""
+    return os.environ.get("TRUST_PROXY", "").lower() in ("1", "true", "yes")
+
+
+def _client_ip(request) -> str | None:
+    """Resolve the client IP. Prefers the first X-Forwarded-For element
+    ONLY when TRUST_PROXY=true; otherwise REMOTE_ADDR (the socket peer),
+    which a client cannot forge."""
+    if _trust_proxy():
+        forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR")
 
 
 class SessionMiddleware:
@@ -68,18 +88,11 @@ class AuditMiddleware:
                 target_type="endpoint",
                 target_id=None,
                 payload={},
-                ip=self._get_ip(request),
+                ip=_client_ip(request),
                 user_agent=request.headers.get("User-Agent", "")[:255],
                 result="denied",
             )
         return response
-
-    @staticmethod
-    def _get_ip(request):
-        forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
-        return request.META.get("REMOTE_ADDR")
 
 
 class RateLimitMiddleware:
@@ -103,7 +116,7 @@ class RateLimitMiddleware:
     def __call__(self, request):
         from django.http import JsonResponse
 
-        ip = self._get_ip(request)
+        ip = _client_ip(request)
         endpoint_class = self._classify(request)
         limit, window = self.LIMITS[endpoint_class]
 
@@ -141,10 +154,3 @@ class RateLimitMiddleware:
         if request.method in ("POST", "PATCH", "DELETE", "PUT"):
             return "write"
         return "read"
-
-    @staticmethod
-    def _get_ip(request):
-        forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
-        return request.META.get("REMOTE_ADDR", "0.0.0.0")

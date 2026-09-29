@@ -29,6 +29,7 @@ Mode semantics (see ``Event.voting_mode``):
 """
 
 import hashlib
+import os
 
 from django.db import transaction
 from django.utils import timezone
@@ -37,6 +38,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.authentication import CookieSessionAuthentication
 from apps.audit.helpers import log as audit_log
 from apps.events.decorators import deadline_gated
 from apps.events.models import Event, Membership
@@ -44,6 +46,20 @@ from apps.submissions.models import Submission
 from apps.webhooks.delivery import notify
 
 from .models import Vote, VoteAudit, VoteBudget
+
+
+def _client_ip(request) -> str | None:
+    """Client IP. X-Forwarded-For is untrusted by default (issue #45):
+    a client can set the header to any value, so honouring it lets a
+    spoofed first element mint a fresh rate-limit bucket / fingerprint
+    per request. Deployments behind a trusted proxy that appends the
+    real client IP can opt in via TRUST_PROXY=true.
+    """
+    if os.environ.get("TRUST_PROXY", "").lower() in ("1", "true", "yes"):
+        forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR")
 
 QUADRATIC_BUDGET = 100
 SIMPLE_VOTE_VALUE = 1
@@ -58,10 +74,10 @@ def _voter_key(request, event) -> str:
     (shared NAT, library Wi-Fi) but cheap and well-bounded for the
     hackathon threat model.
 
-    `request.user` may be ``None`` for unauthenticated DRF requests when
-    the project default ``UNAUTHENTICATED_USER=None`` is in effect
-    (the `VoteView` skips authentication entirely). Treat that the same
-    as anonymous.
+    With ``CookieSessionAuthentication`` on the view, an anonymous
+    request resolves ``request.user`` to ``None`` (the project sets
+    ``UNAUTHENTICATED_USER = None``), which is handled here the same
+    as any unauthenticated request.
     """
     user = getattr(request, "user", None)
     if user is not None and getattr(user, "is_authenticated", False):
@@ -70,13 +86,6 @@ def _voter_key(request, event) -> str:
     ua = request.headers.get("User-Agent", "")
     digest = hashlib.sha256(f"{ip}{ua}".encode()).hexdigest()[:32]
     return f"fp:{digest}"
-
-
-def _client_ip(request) -> str | None:
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR")
 
 
 def _user_agent(request) -> str:
@@ -101,10 +110,21 @@ class VoteView(APIView):
     * Sets ``retracted_at`` and refunds the quadratic credit cost.
     * Does NOT delete the row. The audit trail references ``vote.id``
       and that FK must remain valid.
+    * Retraction is ownership-checked (issue #78): the request must
+      resolve to the SAME voter identity that cast the ballot — the
+      authenticated user for ``user:`` keys, or the same IP+UA
+      fingerprint for ``fp:`` keys. An anonymous visitor sharing the
+      fingerprint can no longer retract an authenticated participant's
+      ballot, because a ``user:`` row is never matched by a
+      fingerprint key.
     """
 
     permission_classes = [AllowAny]
-    authentication_classes: list = []  # explicitly public — no session lookup
+    # Session auth so an authenticated voter is identified as
+    # ``user:<id>`` (self-vote guard, audit attribution, retraction
+    # ownership). CookieSessionAuthentication returns None for
+    # anonymous requests, so open voting stays open for visitors.
+    authentication_classes = [CookieSessionAuthentication]
 
     @deadline_gated("judging_close_at")
     def post(self, request, slug, id):
@@ -299,27 +319,55 @@ class VoteView(APIView):
 
         voter_key = _voter_key(request, event)
 
-        with transaction.atomic():
-            try:
-                vote = Vote.objects.select_for_update().get(event=event, project=project, voter_key=voter_key)
-            except Vote.DoesNotExist:
-                return Response(
-                    {
-                        "error": {
-                            "code": "not_found",
-                            "message": "No ballot to retract.",
-                        }
-                    },
-                    status=status.HTTP_404_NOT_FOUND,
-                )
+        # Ownership check (issue #78): the lookup is scoped to the
+        # caller's own voter_key, so a request can only ever retract
+        # a ballot cast by the SAME identity — the authenticated user
+        # for ``user:`` keys, or the same IP+UA fingerprint for ``fp:``
+        # keys. (Pre-fix, authenticated voters were mis-keyed as
+        # fingerprints, so an anonymous visitor sharing the fingerprint
+        # could retract a participant's ballot.)
+        vote = Vote.objects.filter(event=event, project=project, voter_key=voter_key).first()
+        if vote is None:
+            return Response(
+                {
+                    "error": {
+                        "code": "not_found",
+                        "message": "No ballot to retract.",
+                    }
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
+        # Mode-mismatch guard (issue #77): a ballot cast under simple
+        # mode has no VoteBudget row. If the organizer has since
+        # flipped the event to quadratic, refunding would raise
+        # VoteBudget.DoesNotExist -> 500. Answer 409 instead.
+        if event.voting_mode == "quadratic" and vote.votes > 0 and not VoteBudget.objects.filter(
+            event=event, voter_key=vote.voter_key
+        ).exists():
+            return Response(
+                {
+                    "error": {
+                        "code": "mode_mismatch",
+                        "message": (
+                            "This ballot was cast before the event switched to "
+                            "quadratic voting and has no credit budget to refund; "
+                            "it cannot be retracted under the new mode."
+                        ),
+                    }
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        with transaction.atomic():
+            vote = Vote.objects.select_for_update().get(pk=vote.pk)
             if vote.retracted_at is not None:
                 # Idempotent: already retracted, no-op.
                 return Response({"retracted": True, "already": True})
 
             if event.voting_mode == "quadratic":
                 refund = vote.votes * vote.votes
-                budget = VoteBudget.objects.select_for_update().get(event=event, voter_key=voter_key)
+                budget = VoteBudget.objects.select_for_update().get(event=event, voter_key=vote.voter_key)
                 budget.spent_credits = max(0, budget.spent_credits - refund)
                 budget.save(update_fields=["spent_credits", "updated_at"])
 

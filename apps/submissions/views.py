@@ -18,6 +18,8 @@ import json
 from django.db import models
 from django.utils import timezone
 from django.utils.cache import patch_cache_control
+from django.db.models import Value
+from django.db.models.functions import MD5, Concat
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -25,6 +27,7 @@ from rest_framework.views import APIView
 
 from apps.webhooks.delivery import notify
 
+from apps.audit.helpers import log as audit_log
 from apps.events.decorators import deadline_gated
 from apps.events.models import Event, Track
 from apps.events.permissions import IsOrganizer, IsParticipant
@@ -181,13 +184,20 @@ class GalleryView(APIView):
         elif sort == "newest":
             qs = qs.order_by("-submitted_at", "-id")
         elif sort == "random":
-            # T3 random sort. Postgres `?` is a deterministic
-            # randomization that varies per query — fine for the gallery.
-            # If the caller passes `?seed=<int>`, we use it for a stable
-            # order (acceptance suite needs determinism).
+            # T3 random sort. Postgres `?` varies per query — fine for
+            # the gallery. With ``?seed=<int>`` we derive a stable
+            # per-seed order instead (issue #76: the documented seed
+            # param used to be a no-op — both branches ran the same
+            # ``order_by("?")``). MD5(id + seed) sorts deterministically
+            # for a given seed but unpredictably across seeds, and runs
+            # entirely in SQL so pagination stays consistent.
             seed = request.query_params.get("seed")
             if seed and seed.lstrip("-").isdigit():
-                qs = qs.order_by("?")  # Postgres still random; documented
+                qs = qs.annotate(
+                    _seed_pos=MD5(
+                        Concat("id", Value(str(int(seed))))
+                    )
+                ).order_by("_seed_pos", "id")
             else:
                 qs = qs.order_by("?")
         else:
@@ -790,6 +800,10 @@ class CommentListCreateView(APIView):
             )
 
         comment = Comment.objects.create(submission=submission, author=request.user, body=body)
+        # Issue #80: comment creation must reach the organizer-readable
+        # audit trail — without this the organizer has no signal a
+        # comment exists short of polling the public list.
+        audit_log(request.user, "comment.create", comment, request=request)
         return Response(CommentSerializer(comment).data, status=status.HTTP_201_CREATED)
 
 
@@ -818,11 +832,13 @@ class CommentModerateView(APIView):
             comment.is_hidden = True
             comment.hidden_by = request.user
             comment.save(update_fields=["is_hidden", "hidden_by", "updated_at"])
+            audit_log(request.user, "comment.hide", comment, request=request)
             return Response({"id": str(comment.id), "is_hidden": True})
         if action == "unhide":
             comment.is_hidden = False
             comment.hidden_by = None
             comment.save(update_fields=["is_hidden", "hidden_by", "updated_at"])
+            audit_log(request.user, "comment.unhide", comment, request=request)
             return Response({"id": str(comment.id), "is_hidden": False})
         return Response(
             {

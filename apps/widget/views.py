@@ -19,7 +19,13 @@ WIDGET_JS = """(function() {
     ul.style.listStyle = 'none';
     items.forEach(function(it) {
       var li = document.createElement('li');
-      li.innerHTML = '<strong>' + it.name + '</strong> — ' + it.tagline;
+      // Built with textContent only — project names/taglines are
+      // participant-controlled, so innerHTML here was a stored-XSS
+      // sink (issue #80). textContent assigns can never parse markup.
+      var strong = document.createElement('strong');
+      strong.textContent = it.name;
+      li.appendChild(strong);
+      li.appendChild(document.createTextNode(' — ' + (it.tagline || '')));
       ul.appendChild(li);
     });
     target.appendChild(ul);
