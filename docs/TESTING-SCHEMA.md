@@ -1,12 +1,76 @@
 # Test suite — schema
 
-`tests/schema/test_migrations.py` — `@pytest.mark.schema`
+> **Database schema integrity: migrations present for every app, applied on fresh DB, UUID PKs, FK cascades, AUTH_USER_MODEL usage, no migration cycles.** Tests live in `tests/schema/test_migrations.py` under `@pytest.mark.schema`.
+
+## Contents
+
+- [Model subset at a glance](#model-subset-at-a-glance)
+- [What it covers](#what-it-covers)
+- [Known drift](#known-drift)
+- [Run](#run)
+
+## Model subset at a glance
+
+```mermaid
+erDiagram
+    User ||--o{ Membership : "is member of"
+    User ||--o{ TeamMember : "joins"
+    User ||--o{ Submission : "authors via team"
+    User ||--o{ Score : "casts (judge)"
+    User ||--o{ Session : "owns"
+
+    Event ||--o{ Track : "has"
+    Event ||--o{ Membership : "has"
+    Event ||--o{ Submission : "has"
+    Event ||--o{ JudgeBatch : "has"
+    Event ||--o{ Certificate : "has"
+    Event ||--o{ AuditEvent : "logs"
+    Event ||--o{ Webhook : "subscribes"
+
+    Track ||--o{ Submission : "groups"
+    Team ||--o{ TeamMember : "has"
+    Team ||--|| Submission : "authors"
+
+    JudgeBatch ||--o{ JudgeAssignment : "contains"
+    JudgeAssignment ||--|| Review : "may have"
+    JudgeAssignment ||--o{ Score : "collects"
+    Rubric ||--o{ RubricCriterion : "has"
+
+    Webhook ||--o{ WebhookDelivery : "tracks"
+
+    User {
+        uuid id PK
+        string email UK
+    }
+    Event {
+        uuid id PK
+        slug slug UK
+        datetime submissions_close_at
+        datetime judging_open_at
+        datetime judging_close_at
+    }
+    Submission {
+        uuid id PK
+        uuid team_id FK
+        uuid track_id FK
+        string status
+    }
+    JudgeAssignment {
+        uuid id PK
+        uuid judge_id FK
+        uuid batch_id FK
+    }
+    Score {
+        uuid id PK
+        uuid assignment_id FK
+        uuid criterion_id FK
+        int value
+    }
+```
 
 ## What it covers
 
-Database schema integrity: migrations present for every app, applied
-on fresh DB, UUID PKs, FK cascades, AUTH_USER_MODEL usage, no
-migration cycles.
+Schema integrity: migrations present for every app, applied on fresh DB, UUID PKs, FK cascades, AUTH_USER_MODEL usage, no migration cycles.
 
 | Test | Asserts |
 |---|---|
@@ -22,16 +86,15 @@ migration cycles.
 
 ## Known drift
 
-- `test_event_delete_cascades_to_teams_submissions_memberships`: Some
-  FKs may be PROTECT (intentional — e.g., Event.created_by). Audit
-  which cascades vs protects.
-- `test_local_pk_columns_are_uuid`: AbstractUser.username still
-  exists and is a CharField. AbstractUser.id is a BigAutoField, not
-  UUID. Our `accounts.User` inherits this. Override `id` to UUIDField
-  if we want full UUID coverage.
+- `test_event_delete_cascades_to_teams_submissions_memberships`: Some FKs may be PROTECT (intentional — e.g., `Event.created_by`). Audit which cascade vs protect.
+- `test_local_pk_columns_are_uuid`: `AbstractUser.username` is a CharField; `AbstractUser.id` is a BigAutoField. Our `accounts.User` inherits both. Override `id` to UUIDField for full UUID coverage.
 
 ## Run
 
 ```bash
 make test-schema
 ```
+
+---
+
+[← Back to TESTING.md](TESTING.md)

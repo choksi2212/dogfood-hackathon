@@ -1,10 +1,67 @@
 # Test suite — assignment
 
-`tests/assignment/test_assignment.py` — `@pytest.mark.assignment`
+> **Greedy bipartite judge assignment with COI exclusion, retry-with-seed, and the per-judge zero-load guard.** Tests live in `tests/assignment/test_assignment.py` under `@pytest.mark.assignment`.
+
+## Contents
+
+- [Pipeline at a glance](#pipeline-at-a-glance)
+- [What it covers](#what-it-covers)
+- [Algorithm](#algorithm)
+- [Known drift](#known-drift)
+- [Run](#run)
+
+## Pipeline at a glance
+
+```mermaid
+flowchart LR
+    subgraph IN["📥 Inputs"]
+        direction TB
+        P[("🗄️ projects<br/>(track.order, name)")]
+        J[("🗄️ judges")]
+        COI[("🗄️ team_memberships")]
+        CFG["⚙️ reviews_per_project<br/>+ seed"]
+    end
+
+    subgraph RUN["🧠 Greedy assignment run"]
+        direction TB
+        S1["⚖️ sort projects<br/>(track.order, name)"]
+        S2["⚖️ for each project:<br/>pick k least-loaded judges"]
+        S3["🔍 exclude judges with COI<br/>(team_memberships)"]
+        S4["⚖️ zero-load guard:<br/>cap ≤ ceil(k·n/n_judges)"]
+    end
+
+    subgraph RETRY["🔁 Retry loop"]
+        direction TB
+        R1["seed += 1"]
+        R2["attempt ≤ 10?"]
+    end
+
+    subgraph OUT["📤 Result"]
+        direction TB
+        OK["⚖️ JudgeAssignment rows<br/>disjoint + COI-clean"]
+        ERR["🔴 AssignmentError<br/>(no projects /<br/>insufficient judges)"]
+    end
+
+    P --> S1
+    J --> S2
+    COI --> S3
+    CFG --> S2
+    S1 --> S2 --> S3 --> S4
+    S4 -->|all invariants pass| OK
+    S4 -->|cap reached| R1 --> R2
+    R2 -->|yes| S2
+    R2 -->|no, ≥ 10 attempts| ERR
+
+    style IN fill:#A8DADC,stroke:#2A9D8F,color:#1D3557
+    style RUN fill:#FFE8D6,stroke:#F4A261,color:#1D3557
+    style RETRY fill:#EDE7F6,stroke:#6C567B,color:#1D3557
+    style OK fill:#A8DADC,stroke:#2A9D8F,color:#1D3557
+    style ERR fill:#F1FAEE,stroke:#E63946,color:#1D3557
+```
 
 ## What it covers
 
-The greedy bipartite assignment with COI. Invariants per PLAN.md §3.
+Greedy bipartite assignment with COI. Invariants per PLAN.md §3.
 
 | Test | Asserts |
 |---|---|
@@ -22,26 +79,20 @@ The greedy bipartite assignment with COI. Invariants per PLAN.md §3.
 
 ## Algorithm
 
-Greedy: sort projects by (track.order, name); for each project, pick
-the `reviews_per_project` least-loaded judges who don't have COI.
-Retry with offset seed if invariants fail.
+Sort projects by (track.order, name). For each project, pick the `reviews_per_project` least-loaded judges with no COI. Retry with offset seed if invariants fail.
 
 ## Known drift
 
-- `test_coi_respected_judge_never_reviews_own_team`: Our algorithm
-  uses `team_memberships` to build the blacklist. Verify the
-  judge's team memberships are correctly captured before relying on
-  this test.
-- `test_same_seed_same_assignments`: True only when project set and
-  judge set are identical across the two runs. Test depends on
-  fixture order being deterministic.
-- `test_different_seed_yields_different_picks`: With small fixture
-  (10 projects, 3 judges), greedy can converge on the same picks
-  regardless of seed. Test should assert not-equal under a stress
-  fixture.
+- `test_coi_respected_judge_never_reviews_own_team`: Algorithm uses `team_memberships` for the blacklist — verify judge memberships are captured before relying on this.
+- `test_same_seed_same_assignments`: Only holds when project and judge sets are identical across runs; depends on deterministic fixture order.
+- `test_different_seed_yields_different_picks`: With small fixtures (10 projects, 3 judges), greedy can converge on identical picks regardless of seed. Test should assert not-equal under a stress fixture.
 
 ## Run
 
 ```bash
 make test-assignment
 ```
+
+---
+
+[← Back to TESTING.md](TESTING.md)

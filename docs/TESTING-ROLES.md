@@ -1,11 +1,97 @@
 # Test suite — roles
 
-`tests/roles/test_role_isolation.py` — `@pytest.mark.roles`
+> **Full 6 × 8 actor × route matrix.** Tests live in `tests/roles/test_role_isolation.py` under `@pytest.mark.roles`. Proves the 25% Judging Integrity criterion programmatically.
+
+## Contents
+
+- [48-cell matrix at a glance](#48-cell-matrix-at-a-glance)
+- [What it covers](#what-it-covers)
+- [The graded cell](#the-graded-cell)
+- [Known drift](#known-drift)
+- [Run](#run)
+
+## 48-cell matrix at a glance
+
+```mermaid
+flowchart TB
+    subgraph AXES["🧭 Axes"]
+        direction LR
+        ACT["🧑 Actors<br/>(6)"]
+        ROUTE["📍 Routes<br/>(8)"]
+    end
+
+    subgraph ACTORS["🧑 Actors (rows)"]
+        direction TB
+        A1[🧑‍💼 organizer]
+        A2[👤 judge_a]
+        A3[👤 judge_b]
+        A4[👤 judge_c]
+        A5[🧑 participant]
+        A6[🌐 anonymous]
+    end
+
+    subgraph ROUTES["📍 Routes (cols)"]
+        direction TB
+        R1["/api/gallery"]
+        R2["/api/events/.../submit"]
+        R3["/api/judge/scores"]
+        R4["/api/judge/peer-scores"]
+        R5["/api/csv_export"]
+        R6["/api/events/.../normalize"]
+        R7["/api/events/.../assignments/run"]
+        R8["/api/webhooks"]
+    end
+
+    subgraph OK["✅ 200 OK cells"]
+        direction TB
+        O1[organizer × gallery 200]
+        O2[judge_a/b/c × gallery 200]
+        O3[participant × gallery 200]
+        O4[anonymous × gallery 200]
+        O5[organizer × csv_export 200]
+        O6[organizer × normalize 200]
+        O7[organizer × assignments/run 200]
+        O8[organizer × webhooks 200]
+        O9[judge_a/b/c × judge_scores 200]
+    end
+
+    subgraph FORBID["🔴 403 / 401 cells"]
+        direction TB
+        F1[judge_a/b/c × peer-scores 403]
+        F2[judge_a/b/c × submit 403]
+        F3[judge_a/b/c × csv_export 403]
+        F4[judge_a/b/c × normalize 403]
+        F5[judge_a/b/c × assignments/run 403]
+        F6[judge_a/b/c × webhooks 403]
+        F7[organizer × submit 403]
+        F8[organizer × judge_scores 403]
+        F9[organizer × peer-scores 403]
+        F10[participant × everything else 403]
+        F11[anonymous × everything else 401]
+    end
+
+    subgraph DRIFT["⚠️ Drift cells"]
+        direction TB
+        D1[participant × submit 422<br/>(deadline_passed in demo)]
+    end
+
+    ACTORS --> OK
+    ACTORS --> FORBID
+    ACTORS --> DRIFT
+    ROUTES --> OK
+    ROUTES --> FORBID
+    ROUTES --> DRIFT
+
+    style ACTORS fill:#FDF6E3,stroke:#E9C46A,color:#1D3557
+    style ROUTES fill:#FDF6E3,stroke:#E9C46A,color:#1D3557
+    style OK fill:#A8DADC,stroke:#2A9D8F,color:#1D3557
+    style FORBID fill:#F1FAEE,stroke:#E63946,color:#1D3557
+    style DRIFT fill:#EDE7F6,stroke:#6C567B,color:#1D3557
+```
 
 ## What it covers
 
-Full 6 × 8 actor × route matrix. Proves the 25% Judging Integrity
-criterion programmatically.
+Full 6 × 8 actor × route matrix. Proves the 25 % Judging Integrity criterion programmatically.
 
 | Actor × Route | Expected |
 |---|---|
@@ -33,20 +119,18 @@ criterion programmatically.
 
 ## The graded cell
 
-`peer_scores` is a separate URL (not the same view behind a `?judge=` param).
-**Every actor** that hits it gets 403 — there is no clever request that
-crosses judges. This is the URL-named protection.
+`peer_scores` is a separate URL (not the same view behind a `?judge=` param). **Every actor** that hits it gets 403 — no clever request crosses judges. URL-named protection.
 
 ## Known drift
 
-- `test_matrix_cell[csv_export__judge_a/b/c/participant]`: Our view
-  resolves the event first, then checks organizer role. If the user is
-  not a participant of the event, the response is 422 (validation)
-  rather than 403 (forbidden). Reorder the check: organizer first,
-  then event resolution.
+- `test_matrix_cell[csv_export__judge_a/b/c/participant]`: View resolves the event first, then checks organizer role. Non-participant → 422 (validation) instead of 403 (forbidden). Reorder: organizer first, then event resolution.
 
 ## Run
 
 ```bash
 make test-roles
 ```
+
+---
+
+[← Back to TESTING.md](TESTING.md)

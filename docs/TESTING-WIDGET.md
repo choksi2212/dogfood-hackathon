@@ -1,11 +1,49 @@
 # Test suite — widget
 
-`tests/widget/test_widget.py` — `@pytest.mark.widget`
+> **Embeddable widget: `/widget.js` (JS shim) and `/api/widget/gallery` (JSON feed).** Tests live in `tests/widget/test_widget.py` under `@pytest.mark.widget`. CORS, content-type, JSON shape, public access.
+
+## Contents
+
+- [Embed at a glance](#embed-at-a-glance)
+- [What it covers](#what-it-covers)
+- [Known drift](#known-drift)
+- [Run](#run)
+
+## Embed at a glance
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant T as 🌐 Third-party site<br/>(example.com)
+    participant J as 📜 /widget.js
+    participant H as ⚖️ Hack-Hamster portal<br/>/api/widget/gallery
+    participant DB as 🗄️ Postgres
+
+    T->>J: GET https://hack-hamster/widget.js
+    J-->>T: 200 application/javascript<br/>Access-Control-Allow-Origin: *
+
+    Note over T: 🔧 <script> initialises:<br/>HH_WIDGET.init({event: "..."})
+
+    T->>H: GET /api/widget/gallery?event=...
+    H->>H: ⚖️ IsAuthenticated: AllowAny
+    H->>DB: ⚖️ Event.objects.filter(slug=...).first()
+    alt event unknown
+        DB-->>H: None
+        H-->>T: 200 {"items": [], "event": "..."}
+    else event exists
+        DB-->>H: Event
+        H->>DB: ⚖️ Submission.objects.filter(<br/>status='submitted',<br/>track__event=event).order_by(...)[:24]
+        DB-->>H: rows (max 24)
+        H->>H: ⚖️ WidgetSerializer<br/>(id, name, tagline, track_slug)
+        H-->>T: 200 {items: [...], event: "..."}<br/>Access-Control-Allow-Origin: *
+    end
+
+    Note over T: 🔧 DOM render:<br/>append <ul> with item HTML
+```
 
 ## What it covers
 
-Embeddable widget: `/widget.js` (JS shim) and `/api/widget/gallery`
-(JSON feed). CORS, content-type, JSON shape, public access.
+Embeddable widget: `/widget.js` (JS shim) and `/api/widget/gallery` (JSON feed). CORS, content-type, JSON shape, public access.
 
 | Test | Asserts |
 |---|---|
@@ -23,12 +61,14 @@ Embeddable widget: `/widget.js` (JS shim) and `/api/widget/gallery`
 
 ## Known drift
 
-- `test_widget_gallery_bogus_event_returns_empty_not_404`: Our view
-  returns `{items: []}` without the `event` key for unknown events.
-  The tests should assert `{items: []}` only.
+- `test_widget_gallery_bogus_event_returns_empty_not_404`: View returns `{items: []}` without the `event` key for unknown events. Tests should assert `{items: []}` only.
 
 ## Run
 
 ```bash
 make test-widget
 ```
+
+---
+
+[← Back to TESTING.md](TESTING.md)

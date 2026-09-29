@@ -4,128 +4,146 @@
 **Window:** Sep 26 18:00 UTC → Sep 29 18:00 UTC, 2026 (72h)
 **Stack:** Django 5 + DRF + PostgreSQL 16
 
-> The source of truth for every field, type, default, and FK in this schema is
-> [`docs/BACKEND-IMPL.md`](docs/BACKEND-IMPL.md). This document is the human-readable
-> map: every table, every column, every relationship, plus the import and export paths
-> that turn the schema into a working portal.
+> Source of truth for every field, type, default, FK: [`docs/BACKEND-IMPL.md`](docs/BACKEND-IMPL.md). This document is the human-readable map — every table, every column, every relationship, plus import/export paths.
 
 ---
 
-## If you only read one section
+## Hero
 
-Read **Part 1 (ERD)** for the shape, **Part 3 (imports)** for how `fixtures.json`
-becomes data, and **Part 4 (exports)** for how an organizer gets data back out. The
-per-table detail in Part 6 is reference material.
+**One-sentence role:** the per-table column map that makes the 40-table schema explainable in five minutes — every field, every FK, every index, plus how `fixtures.json` becomes a working portal.
 
-## How to read this doc
+## Table of contents
 
-Part 1 is the ERD as ASCII. Part 2 is the per-table column list. Part 3 covers
-imports. Part 4 covers exports. Part 5 covers the index strategy. Part 6 covers
-migrations. Part 7 covers PII. Part 8 lists the tables in detail.
+- [Part 1 — The ERD (visual + ASCII)](#part-1--the-erd)
+- [Part 2 — The 40 tables, one line each](#part-2--the-40-tables-one-line-each)
+- [Part 3 — Import paths (fixtures → DB)](#part-3--import-paths)
+- [Part 4 — Export paths (DB → CSV / dump)](#part-4--export-paths)
+- [Parts 5–7 — Indexes, migrations, PII handling](#parts-5-7--indexes-migrations-and-pii)
+- [Part 8 — Per-table column reference](#part-8--per-table-detail)
 
 ---
 
-## Part 1 — The ERD
+## Entity-relationship diagram
 
-The database is **40 tables** across **14 Django apps**. Every table has a UUID
-primary key unless noted. Every foreign key is named in the diagram. Shared
-references (e.g. `created_by_id`) point at `users_user`; read the arrow, not the
-text.
+```mermaid
+erDiagram
+    USERS_USER ||--o{ USERS_SESSION : "has"
+    USERS_USER ||--o{ EVENTS_MEMBERSHIP : "joins"
+    USERS_USER ||--o{ TEAMS_TEAMMEMBER : "member_of"
+    USERS_USER ||--o{ TEAMS_TEAMINVITE : "created_by"
+    USERS_USER ||--o{ SUBMISSIONS_COMMENT : "authored"
+    USERS_USER ||--o{ AUDIT_AUDITEVENT : "actor"
+
+    EVENTS_EVENT ||--o{ EVENTS_MEMBERSHIP : "scopes"
+    EVENTS_EVENT ||--|| EVENTS_RUBRIC : "1:1 rubric"
+    EVENTS_EVENT ||--o{ EVENTS_TRACK : "has"
+    EVENTS_TRACK  ||--o{ EVENTS_PRIZE : "optional"
+    EVENTS_RUBRIC ||--o{ EVENTS_RUBRICCRITERION : "criteria"
+
+    EVENTS_EVENT ||--o{ TEAMS_TEAM : "hosts"
+    TEAMS_TEAM   ||--o{ TEAMS_TEAMMEMBER : "members"
+    TEAMS_TEAM   ||--o{ TEAMS_TEAMINVITE : "invites"
+    TEAMS_TEAM   ||--|| SUBMISSIONS_SUBMISSION : "1:1 project"
+
+    SUBMISSIONS_SUBMISSION ||--o{ SUBMISSIONS_SUBMISSIONIMAGE : "gallery"
+    SUBMISSIONS_SUBMISSION ||--o{ SUBMISSIONS_SUBMISSIONANSWER : "answers"
+    SUBMISSIONS_SUBMISSION ||--o{ SUBMISSIONS_COMMENT : "comments"
+
+    EVENTS_EVENT ||--o{ JUDGING_JUDGEBATCH : "runs"
+    JUDGING_JUDGEBATCH ||--o{ JUDGING_JUDGEASSIGNMENT : "contains"
+    JUDGING_JUDGEASSIGNMENT ||--o{ JUDGING_SCORE : "scores"
+    JUDGING_JUDGEASSIGNMENT ||--|| JUDGING_REVIEW : "1:1 review"
+    JUDGING_JUDGEASSIGNMENT }o--|| USERS_USER : "judge"
+    JUDGING_JUDGEASSIGNMENT }o--|| SUBMISSIONS_SUBMISSION : "project"
+
+    EVENTS_EVENT ||--o{ VOTING_VOTE : "cast"
+    VOTING_VOTE   ||--o{ VOTING_VOTEAUDIT : "audit"
+    EVENTS_EVENT ||--o{ VOTING_VOTEBUDGET : "quadratic"
+
+    EVENTS_EVENT ||--o{ NORMALIZATION_NORMALIZATIONRUN : "runs"
+    NORMALIZATION_NORMALIZATIONRUN ||--o{ NORMALIZATION_NORMALIZEDSCORE : "outputs"
+    NORMALIZATION_NORMALIZATIONRUN ||--o{ NORMALIZATION_JUDGEBIAS : "biases"
+
+    EVENTS_EVENT ||--o{ PAIRWISE_PAIRWISERUN : "BT fits"
+    PAIRWISE_PAIRWISERUN ||--o{ PAIRWISE_PAIRWISERANKING : "rankings"
+    EVENTS_EVENT ||--o{ PAIRWISE_PAIRWISEBALLOT : "ballots"
+
+    EVENTS_EVENT ||--o{ AUDIT_AUDITEVENT : "scoped"
+    EVENTS_EVENT ||--o{ API_WEBHOOK : "subscribed"
+    API_WEBHOOK ||--o{ WEBHOOKS_WEBHOOKDELIVERY : "deliveries"
+    SUBMISSIONS_SUBMISSION ||--o{ CERTIFICATES_CERTIFICATE : "signs"
+    EVENTS_EVENT ||--o{ CERTIFICATES_JUDGERECORD : "judge record"
+
+    EVENTS_EVENT ||--|| BILLING_BILLINGACCOUNT : "1:1"
+    BILLING_BILLINGACCOUNT }o--|| BILLING_PLAN : "tier"
+    BILLING_BILLINGACCOUNT ||--o{ BILLING_INVOICE : "ledger"
+    ABUSE_ABUSEFLAG }o--o{ USERS_USER : "target/actor"
+```
+
+**Reading the diagram.** `users_user` is the gravitational centre; `events_event` is the second. Every per-event table fans out from the event. `submissions_submission` is a 1:1 child of `teams_team`. `judging_judgeassignment` is the bridge; `judging_score` is the leaf. Append-only tables: `audit_auditevent` (DB-level grants revoke UPDATE/DELETE) and `voting_voteaudit`. Colour key: 🟣 violet domain types · 🔵 blue state · 🟢 teal-bordered data stores.
+
+---
+
+## Part 1 — The ERD (ASCII)
+
+40 tables, 14 Django apps. Every table has a UUID PK unless noted. Shared references (`created_by_id`) point at `users_user`; read the arrow, not the text.
 
 ```
 users_user ──┬── users_session
-             │
              ├──< events_membership >── events_event ──┬──< events_track
-             │                                          │
              │                                          ├──< events_prize ── events_track (nullable)
-             │                                          │
              │                                          ├──< events_rubric ──< events_rubriccriterion
-             │                                          │
              │                                          ├──< teams_team ──┬──< teams_teammember >── users_user
-             │                                          │                 │
              │                                          │                 └──< teams_teaminvite
-             │                                          │
              │                                          ├──< submissions_submission ──┬──< submissions_submissionimage
-             │                                          │                            │
              │                                          │                            ├──< submissions_submissionanswer
-             │                                          │                            │
              │                                          │                            └──< submissions_comment
-             │                                          │
              │                                          ├──< judging_judgebatch ──< judging_judgeassignment >── users_user
-             │                                          │                                          │
              │                                          │                                          └── submissions_submission
-             │                                          │                                          │
              │                                          │                                          ├── judging_review
-             │                                          │                                          │
              │                                          │                                          └── judging_score >── events_rubriccriterion
-             │                                          │
              │                                          ├──< judging_judgeinvite
-             │                                          │
              │                                          ├──< voting_vote ──< voting_voteaudit
-             │                                          │
              │                                          ├──< voting_votebudget
-             │                                          │
              │                                          ├──< audit_auditevent
-             │                                          │
              │                                          ├──< normalization_normalizationrun ──┬──< normalization_normalizedscore
-             │                                          │                                     │
              │                                          │                                     └──< normalization_judgebias
-             │                                          │
              │                                          ├──< pairwise_pairwiserun ──┬──< pairwise_pairwiseranking
-             │                                          │                            │
              │                                          │                            └──< pairwise_pairwiseballot
-             │
              ├──< api_webhook ──< webhooks_webhookdelivery
-             │
              ├──< certificates_certificate
-             │
              ├──< certificates_judgerecord (judge, event)
-             │
              ├──< billing_billingaccount >── billing_plan
-             │
              ├──< billing_invoice
-             │
              ├──< abuse_abuseflag
-             │
              └──< users_usergroups / users_useruserpermissions (Django auth M2M)
 ```
 
-`users_user` is the gravitational centre. Every other app either owns a slice of
-data under an event or references the user table for actor identity. The event is
-the second centre: every per-event table fans out from `events_event`.
-
-`submissions_submission` is a 1:1 child of `teams_team` (one team has at most one
-submission). `judging_judgeassignment` is the bridge between judges and projects
-in a batch; `judging_score` is the leaf data on top of it.
-
-Append-only tables: `audit_auditevent` (DB-level grants revoke UPDATE/DELETE),
-`voting_voteaudit` (cast/retract log).
+`users_user` is the gravitational centre; `events_event` is the second. `submissions_submission` is a 1:1 child of `teams_team`. `judging_judgeassignment` is the bridge; `judging_score` is the leaf. Append-only: `audit_auditevent` (DB-level grants revoke UPDATE/DELETE), `voting_voteaudit` (cast/retract log).
 
 ---
 
-## Part 2 — The 40 tables, one line each
-
-A reference list. Each row: table name, app, purpose. Detailed columns in Part 8.
+## Part 2 — The 40 tables
 
 | Table | App | Purpose |
 |---|---|---|
-| `users_user` | accounts | The only auth identity. UUID PK, unique email, Argon2id password hash. |
-| `users_usergroups` | accounts | Group through-table for users (Django auth machinery). |
-| `users_useruserpermissions` | accounts | Per-user permission through-table (Django auth machinery). |
-| `users_session` | accounts | Server-side sessions. Cookie value is SHA-256-hashed; raw token never stored. |
-| `events_event` | events | One hackathon instance. Holds the four deadlines and a slug. |
-| `events_track` | events | Category inside an event. Unique within event by slug. |
-| `events_prize` | events | Prize definition. Optionally tied to a track. |
+| `users_user` | accounts | Only auth identity. UUID PK, unique email, Argon2id hash. |
+| `users_usergroups` | accounts | Group through-table (Django auth). |
+| `users_useruserpermissions` | accounts | Per-user permission through-table. |
+| `users_session` | accounts | Server-side sessions; cookie is SHA-256-hashed. |
+| `events_event` | events | One hackathon instance — deadlines + slug. |
+| `events_track` | events | Category inside an event; unique by (event, slug). |
+| `events_prize` | events | Prize definition; optionally tied to a track. |
 | `events_membership` | events | Per-event role assignment (participant, judge, organizer, admin, visitor). |
 | `events_rubric` | events | One rubric per event (1:1). |
-| `events_rubriccriterion` | events | One criterion of the rubric. Weight, min, max. |
+| `events_rubriccriterion` | events | One criterion of the rubric — weight, min, max. |
 | `teams_team` | teams | 1–4 participants forming one submission unit. |
 | `teams_teammember` | teams | Team membership with role (member or captain). |
-| `teams_teaminvite` | teams | Single-use invite link. Token stored as SHA-256 hash. |
-| `submissions_submission` | submissions | The team's project. Status, track, search vector. |
+| `teams_teaminvite` | teams | Single-use invite link; token stored as SHA-256 hash. |
+| `submissions_submission` | submissions | Team's project — status, track, search vector. |
 | `submissions_submissionimage` | submissions | Gallery image for a submission. |
-| `submissions_submissionanswer` | submissions | A team's answer to one of the event's custom questions. |
-| `submissions_comment` | submissions | T3 comment on a submission; PII-safe handle, organizer can hide. |
+| `submissions_submissionanswer` | submissions | A team's answer to one custom question. |
+| `submissions_comment` | submissions | T3 comment; PII-safe handle, organizer can hide. |
 | `judging_judgebatch` | judging | One run of the assignment algorithm. |
 | `judging_judgeassignment` | judging | One (judge, project) pair inside a batch. |
 | `judging_judgeinvite` | judging | Judge invitation record (email + token). |
@@ -139,16 +157,16 @@ A reference list. Each row: table name, app, purpose. Detailed columns in Part 8
 | `normalization_normalizedscore` | normalization | Per-project output of a run. |
 | `normalization_judgebias` | normalization | Per-judge bias from a run. |
 | `pairwise_pairwiserun` | pairwise | One Bradley-Terry fit run. |
-| `pairwise_pairwiseballot` | pairwise | One pairwise outcome (voter picked left, right, or tie). |
-| `pairwise_pairwiseranking` | pairwise | Per-project theta, wins/losses/ties, and rank from a run. |
-| `api_webhook` | api | Registered webhook endpoint per event; secret stored plaintext (hashing is future work). |
-| `webhooks_webhookdelivery` | webhooks | One delivery attempt (pending/delivered/failed) with response status and last error. |
-| `certificates_certificate` | certificates | Issued certificate — HMAC-signed JSON record for a submission, verifiable by public_id. |
-| `certificates_judgerecord` | certificates | Issued judge participation record — HMAC-signed JSON snapshot, verifiable by public_id. |
-| `billing_plan` | billing | A priced tier (free/pro/enterprise) with per-tier quotas. |
-| `billing_billingaccount` | billing | One row per event: current plan, status, and billing-cycle dates. |
-| `billing_invoice` | billing | Append-only log of charges, refunds, and plan changes. |
-| `abuse_abuseflag` | abuse | Organizer-reviewable flag on a target: pending → upheld/dismissed. |
+| `pairwise_pairwiseballot` | pairwise | One pairwise outcome (left, right, tie). |
+| `pairwise_pairwiseranking` | pairwise | Per-project theta, wins/losses/ties, rank. |
+| `api_webhook` | api | Webhook endpoint per event; secret stored plaintext (hashing is future work). |
+| `webhooks_webhookdelivery` | webhooks | One delivery attempt (pending/delivered/failed). |
+| `certificates_certificate` | certificates | Issued certificate — HMAC-signed JSON, verifiable by public_id. |
+| `certificates_judgerecord` | certificates | Issued judge participation record — HMAC-signed JSON snapshot. |
+| `billing_plan` | billing | A priced tier (free/pro/enterprise) with quotas. |
+| `billing_billingaccount` | billing | One row per event — current plan, status, billing-cycle dates. |
+| `billing_invoice` | billing | Append-only log of charges, refunds, plan changes. |
+| `abuse_abuseflag` | abuse | Organizer-reviewable flag on a target. |
 
 ---
 
@@ -157,30 +175,11 @@ A reference list. Each row: table name, app, purpose. Detailed columns in Part 8
 ### 3.1 The import command
 
 One Django management command populates the database on every boot:
-`apps/accounts/management/commands/import_fixtures.py` (see
-[`BACKEND-IMPL.md` Part 15](docs/BACKEND-IMPL.md)). `entrypoint.sh` runs it
-automatically after `migrate`, so a bare `docker compose up` boots a seeded
-portal; `make seed` re-runs it by hand.
+`apps/accounts/management/commands/import_fixtures.py` ([BACKEND-IMPL Part 15](docs/BACKEND-IMPL.md)). `entrypoint.sh` runs it automatically after `migrate`, so a bare `docker compose up` boots a seeded portal; `make seed` re-runs it by hand.
 
-```
-make seed
-  → python manage.py import_fixtures
-```
-
-`import_fixtures` loads the official `fixtures.json` into the real schema and
-seeds five demo sessions (organizer, judge_a, judge_b, judge_c, participant).
-Their `Cookie: session=<token>` headers are **deterministic** — each token is
-`HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`,
-derived from the role label and the seeded user's email, never from a database
-primary key. All five (including `judge_c`) are already committed in
-`.hack-hamster.toml` under `[auth]`; they match every fresh boot and every fresh
-database volume, so there is no copy-paste step. They change only if
-`DJANGO_SECRET_KEY` changes — re-run `make seed` to print the new values.
+`import_fixtures` loads `fixtures.json` into the real schema and seeds five demo sessions (organizer, judge_a, judge_b, judge_c, participant). Their `Cookie: session=<token>` headers are **deterministic** — each token is `HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`, derived from the role label and the seeded user's email, never from a DB PK. All five are committed in `.hack-hamster.toml` under `[auth]`; they match every fresh boot and fresh volume. They change only if `DJANGO_SECRET_KEY` changes — re-run `make seed` to print the new values.
 
 ### 3.2 The fixtures.json shape
-
-`fixtures.json` is committed at the repo root. Its top-level keys, mapped to
-tables:
 
 | Key | Table(s) populated |
 |---|---|
@@ -191,11 +190,9 @@ tables:
 | `teams` + `projects` | `users_user`, `events_membership` (participant), `teams_team`, `teams_teammember`, `submissions_submission` |
 | `scores` | `judging_judgebatch`, `judging_judgeassignment`, `judging_score` |
 
-### 3.3 The order of operations (import_fixtures)
+### 3.3 Order of operations
 
-The seed command does the inserts in dependency order. Migrations run first
-(Django's `migrate`); the FK targets exist before any data is inserted. The
-sequence inside the command:
+Migrations first (FK targets exist); then the seed inserts in dependency order:
 
 ```
 1. Event           (update_or_create by slug)         ← events_event
@@ -215,84 +212,59 @@ sequence inside the command:
      c. Score      (update_or_create by assignment+criterion) ← judging_score
 ```
 
-Order matters: rubric must exist before scores; tracks must exist before
-submissions; team must exist before its submission.
+Order: rubric before scores; tracks before submissions; team before its submission.
 
-### 3.4 Conflict behavior (idempotency)
+### 3.4 Conflict behaviour (idempotency)
 
-`seed_fixtures` is idempotent — re-running it on a populated database does not
-duplicate rows. The behaviour per row type:
+Re-running on a populated DB does not duplicate rows:
 
 | Row | On conflict |
 |---|---|
-| `events_event` | `update_or_create` by `slug` → updates the existing row's fields from the fixture. |
-| `events_track` | `update_or_create` by `(event, slug)` → updates the existing row. |
-| `events_rubriccriterion` | Deletes all existing criteria for the rubric, then re-inserts from the fixture. **Not idempotent on rows** — every run replaces the criteria set. |
-| `users_user` (judge) | `get_or_create` by `email` → existing user kept; `Membership` row added if missing. |
-| `teams_team` | `update_or_create` by `(event, name)` → updates `created_by`. |
-| `teams_teammember` | `get_or_create` by `(team, user)` → no duplicate. |
-| `submissions_submission` | `update_or_create` by `team` → updates fields. |
-| `judging_judgeassignment` | `get_or_create` by `(batch, judge, project)` → no duplicate. |
-| `judging_score` | `update_or_create` by `(assignment, criterion)` → updates value. |
+| `events_event` | `update_or_create` by `slug` |
+| `events_track` | `update_or_create` by `(event, slug)` |
+| `events_rubriccriterion` | Delete-all + re-insert. **Not idempotent on rows** — every run replaces the criteria set |
+| `users_user` (judge) | `get_or_create` by `email`; `Membership` added if missing |
+| `teams_team` | `update_or_create` by `(event, name)` |
+| `teams_teammember` | `get_or_create` by `(team, user)` |
+| `submissions_submission` | `update_or_create` by `team` |
+| `judging_judgeassignment` | `get_or_create` by `(batch, judge, project)` |
+| `judging_score` | `update_or_create` by `(assignment, criterion)` |
 
-The fixture's `(project, judge)` pairs are deduplicated with a `seen` set inside
-the loop: a duplicate pair is skipped before any DB write.
+The fixture's `(project, judge)` pairs are deduplicated with a `seen` set; a duplicate pair is skipped before any DB write.
 
-### 3.5 Why submissions_close_at comes from the fixture
+### 3.5 Why `submissions_close_at` comes from the fixture
 
-One acceptance check depends on `submissions_close_at` being in the past:
-`POST /api/events/sample-hack-2026/submissions/{id}/submit` as the participant
-header must return **4xx** because the deadline has passed. The seed sets the
-event's `submissions_close_at` to a value read directly from `fixtures.json`,
-and the submission's `status` is set to `'submitted'`. The `@deadline_gated`
-decorator on the submit view reads `event.submissions_close_at` and returns
-`422 deadline_passed` when `now() > deadline`.
+Check 3 (`POST submit` as participant → 4xx) depends on `submissions_close_at` being in the past. The seed reads the event's deadline directly from `fixtures.json` and sets the submission's `status = 'submitted'`. The `@deadline_gated` decorator on the submit view reads `event.submissions_close_at` and returns `422 deadline_passed` when `now() > deadline`.
 
-**Do not** edit the fixture's `submissions_close_at` to a future date without
-also updating `.hack-hamster.toml`'s `[routes.submit]` to point at a submission
-whose status is `draft` — and even then, the check is designed around the
-deadline being in the past.
+Do not edit the fixture's `submissions_close_at` to a future date without also updating `.hack-hamster.toml`'s `[routes.submit]` to point at a submission whose status is `draft` — and even then, the check is designed around the deadline being in the past.
 
 ### 3.6 docker compose up ordering
 
-`entrypoint.sh` runs the commands in this order at container start, then
-hands off to the image `CMD` (see [`BACKEND-IMPL.md` §1.8](docs/BACKEND-IMPL.md)):
+`entrypoint.sh` runs:
 
 ```
 wait-for-db → migrate → import_fixtures → exec gunicorn config.wsgi:application \
   --workers 3 --threads 2 --timeout 60
 ```
 
-So a fresh container will: (1) wait for `postgres` to pass its `pg_isready`
-healthcheck, (2) apply all migrations, (3) load the fixtures and seed the
-five demo sessions, (4) start serving. The `db` container has a `pg_isready`
-healthcheck; `web` waits for it via `depends_on.condition: service_healthy`.
-
-A second boot against the same volume is also safe: migrations are
-forward-only-no-op (no schema changes), `import_fixtures` is idempotent,
-and the demo session tokens are **deterministic** (§3.1) — they do not
-change on re-seed. The five pre-baked session headers in `.hack-hamster.toml`
-keep working across `make clean` (which removes the volume); they change
-only if `DJANGO_SECRET_KEY` changes.
+`db` has a `pg_isready` healthcheck; `web` waits for it via `depends_on.condition: service_healthy`. A second boot against the same volume is safe: migrations are no-op, `import_fixtures` is idempotent, demo session tokens are deterministic (§3.1) — they survive `make clean`.
 
 ### 3.7 Bulk import/export (B4, T4)
 
-The B4 bulk import/export reuses the fixtures shape — there is no CSV
-import:
+Reuses the fixtures shape — no CSV import:
 
 ```
 POST /api/events/{slug}/import    Permission: organizer/admin
-  Body:   fixtures-shaped JSON (the same keys as fixtures.json)
+  Body:   fixtures-shaped JSON (same keys as fixtures.json)
   200:    rows re-created (idempotent + atomic)
   413:    body over 5 MiB (rejected before parsing)
-  422:    malformed JSON / validation failure (all-or-nothing: a failed
-          import leaves the event exactly as it was)
+  422:    malformed JSON / validation failure (all-or-nothing)
   bootstrap: import into a fresh slug only
 
 GET /api/events/{slug}/export     Permission: organizer/admin
-  Response: fixtures-shaped JSON for the event (event, tracks, rubric,
-  judges, teams, projects, scores) — deterministic, with name-derived
-  trk_/jdg_/tm_/prj_ ids, so export → import → export is byte-identical.
+  Response: fixtures-shaped JSON (event, tracks, rubric, judges, teams,
+  projects, scores) — deterministic, name-derived trk_/jdg_/tm_/prj_ ids,
+  so export → import → export is byte-identical.
 ```
 
 CSV is export-only (the organizer score export, §4.1).
@@ -301,8 +273,7 @@ CSV is export-only (the organizer score export, §4.1).
 
 ## Part 4 — Export paths
 
-There are three ways data leaves the database. The first is the day-to-day
-organizer endpoint. The other two are the recovery story.
+Three ways data leaves the database. The first is the day-to-day organizer endpoint; the others are the recovery story.
 
 ### 4.1 The CSV export endpoint
 
@@ -312,9 +283,7 @@ Permission: IsOrganizer
 Response: 200 + Content-Type: text/csv, StreamingHttpResponse
 ```
 
-The view (`apps/judging/csv_view.py`, BACKEND-IMPL §13.1) streams one row per
-score, with the joined-in project, team, track, judge, criterion, review, and
-the latest normalization output. Columns (in order):
+`apps/judging/csv_view.py` (BACKEND-IMPL §13.1) streams one row per score, joined with project, team, track, judge, criterion, review, and the latest normalization output. Columns (in order):
 
 ```
 project_id, project_title, track, team,
@@ -324,138 +293,106 @@ comment, submitted_at,
 raw_mean, normalized_score, rank
 ```
 
-A footer row is yielded last with the event slug and a project count. The
-response uses `StreamingHttpResponse` so the organizer can pipe it straight to
-`> results.csv` without buffering.
+Footer row last (event slug + project count). `StreamingHttpResponse` so the organizer can pipe straight to `> results.csv` without buffering. `Content-Disposition: attachment; filename="export-{slug}.csv"`.
 
-`Content-Disposition: attachment; filename="export-{slug}.csv"`.
+### 4.2 The `pg_dump` backup story
 
-### 4.2 The database backup story (`pg_dump`-style)
-
-The production database lives on the `postgres-data` Docker volume (see
-[`BACKEND-IMPL.md` §1.7 and `ARCHITECTURE.md` §10.1](docs/BACKEND-IMPL.md)).
-The maintainer extracts a full logical backup with `pg_dump` from inside the
-`db` container:
+DB lives on the `postgres-data` Docker volume (BACKEND-IMPL §1.7, ARCHITECTURE §10.1). Extract a full logical backup from inside the `db` container:
 
 ```bash
 docker compose exec db pg_dump -U hack-hamster -d hack-hamster -Fc -f /tmp/backup.dump
 docker compose cp db:/tmp/backup.dump ./backups/$(date +%F).dump
 ```
 
-To restore onto a fresh database (for example, on a new host):
+Restore onto a fresh database:
 
 ```bash
 docker compose exec -T db pg_restore -U hack-hamster -d hack-hamster --clean --if-exists \
   < backups/2026-09-29.dump
 ```
 
-`docker compose cp` is the host-to-container copy primitive. For the
-plain-text SQL form (`pg_dump ... --no-owner`), pipe stdout directly:
+Plain-text SQL form (`pg_dump ... --no-owner`), pipe stdout directly:
 
 ```bash
 docker compose exec -T db pg_dump -U hack-hamster -d hack-hamster --no-owner \
   > backups/$(date +%F).sql
 ```
 
-Permissions needed: shell access on the host running `docker compose`. The
-`hack-hamster` Postgres user inside the container is the dump source. There is no
-separate read-only role; the application user can read every table, but cannot
-UPDATE or DELETE `audit_auditevent` (DB-level grants — see Part 7).
+Needs shell on the host running `docker compose`. The `hack-hamster` Postgres user inside the container is the dump source. No separate read-only role; app user can read every table but cannot UPDATE/DELETE `audit_auditevent` (DB-level grants — see Part 7).
 
-### 4.3 Extracting all data — the organizer playbook
+### 4.3 The organizer playbook
 
-For the post-event handoff, an organizer needs: every submission, every score,
-every audit row, every certificate. The minimum-fuss sequence:
+Post-event handoff sequence:
 
-1. **CSV** — call the export endpoint (§4.1) for the normalized scores and
-   reviews. This is the human-readable artifact.
-2. **Full backup** — run the `pg_dump` from §4.2. This is the recoverable
-   copy. Store it on a different host.
-3. **Certificates** — re-derive from `certificates_certificate` (already in the
-   backup), or re-issue via `POST /api/events/<slug>/certificates/issue`. The
-   records are JSON, not PDFs.
-4. **Audit log** — also in the backup. The grants make it immutable; the
-   backup is the only way to retain a tamper-evident copy off-host.
+1. **CSV** — call the export endpoint (§4.1) for normalized scores and reviews. Human-readable artifact.
+2. **Full backup** — run the `pg_dump` from §4.2. Recoverable copy. Store on a different host.
+3. **Certificates** — re-derive from `certificates_certificate` (already in the backup), or re-issue via `POST /api/events/<slug>/certificates/issue`. Records are JSON, not PDFs.
+4. **Audit log** — also in the backup. Grants make it immutable; the backup is the only tamper-evident off-host copy.
 
-The Django admin (`/admin/`) is the in-portal inspection surface. Organizers
-can browse every table, but the user-facing UI is the Next.js app, not the
-admin.
+Django admin (`/admin/`) is the in-portal inspection surface. Organizers can browse every table; user-facing UI is Next.js.
 
 ---
 
 ## Part 5 — Index strategy
 
-Every index has a justification. The justification is the query it serves. The
-five queries the `run.py` checker exercises are listed first because they are
-the load-bearing ones.
+Every index has a justification: the query it serves. The five queries `run.py` exercises come first.
 
-### 5.1 Indexes for the five spec routes
+### 5.1 Spec routes
 
-| Index | Table | Query served |
+| Index | Table | Query |
 |---|---|---|
-| `(event, status, track)` | `submissions_submission` | `gallery = filter event + status=submitted, order by track__order` |
-| GIN on `search_vector` | `submissions_submission` | `gallery ?q=` — full-text search via `plainto_tsquery` |
-| `(event, name)` | `teams_team` | Team lookup when forming a submission |
-| `(judge, batch)` | `judging_judgeassignment` | `me/batch` — list this judge's assignments |
-| `(batch, judge, project)` UNIQUE | `judging_judgeassignment` | `judge_scores` — own scores; CSV export join; uniqueness |
-| `(assignment, criterion)` UNIQUE | `judging_score` | Score save `update_or_create`; CSV export join |
+| `(event, status, track)` | `submissions_submission` | gallery filter + order by `track__order` |
+| GIN on `search_vector` | `submissions_submission` | `gallery ?q=` (`plainto_tsquery`) |
+| `(event, name)` | `teams_team` | Team lookup |
+| `(judge, batch)` | `judging_judgeassignment` | `me/batch` |
+| `(batch, judge, project)` UNIQUE | `judging_judgeassignment` | `judge_scores`, CSV join, uniqueness |
+| `(assignment, criterion)` UNIQUE | `judging_score` | Score save `update_or_create`, CSV join |
 | `(event, project, voter_key)` UNIQUE | `voting_vote` | Vote cast (idempotent on re-vote) |
 
-### 5.2 Indexes for the daily API
+### 5.2 Daily API
 
-| Index | Table | Justification |
+| Index | Table | Use |
 |---|---|---|
-| `email` UNIQUE | `users_user` | Login lookup by email |
-| `slug` UNIQUE | `events_event` | URL resolver reads `events/{slug}` on every API call |
-| `(event, slug)` UNIQUE | `events_track` | Track filter on gallery and submission form |
-| `(user, event)` UNIQUE | `events_membership` | Permission classes (`IsJudge`, `IsParticipant`, `IsOrganizer`) all filter this combo |
+| `email` UNIQUE | `users_user` | Login |
+| `slug` UNIQUE | `events_event` | URL resolver |
+| `(event, slug)` UNIQUE | `events_track` | Gallery + form filter |
+| `(user, event)` UNIQUE | `events_membership` | All permission classes |
 | `(team, user)` UNIQUE | `teams_teammember` | Membership checks |
-| `token_hash` UNIQUE | `teams_teaminvite` | Invite redemption by token |
-| `(submission, question_id)` UNIQUE | `submissions_submissionanswer` | Upsert on submit |
-| `(event, voter_key)` | `voting_vote` | Quadratic budget lookup |
-| `(event, created_at)` | `audit_auditevent` | Organizer audit log view (newest first) |
-| `(actor, created_at)` | `audit_auditevent` | Per-user audit drill-down |
-| `(action, created_at)` | `audit_auditevent` | Filter audit log by action type |
-| `(event, created_at)` | `normalization_normalizationrun` | Latest-run lookup for CSV export |
-| `(run, project)` UNIQUE | `normalization_normalizedscore` | Insert output of a fit |
-| `(run, judge)` UNIQUE | `normalization_judgebias` | Insert output of a fit |
-| `(event, left_project, right_project)` | `pairwise_pairwiseballot` | Pair selection skips already-seen pairs |
-| `(event, voter_key)` | `pairwise_pairwiseballot` | A voter's ballot history |
-| `(run, project)` UNIQUE | `pairwise_pairwiseranking` | Insert output of a BT fit |
+| `token_hash` UNIQUE | `teams_teaminvite` | Invite redemption |
+| `(submission, question_id)` UNIQUE | `submissions_submissionanswer` | Submit-time upsert |
+| `(event, voter_key)` | `voting_vote` | Quadratic budget |
+| `(event, created_at)` / `(actor, created_at)` / `(action, created_at)` | `audit_auditevent` | Three audit-log views |
+| `(event, created_at)` | `normalization_normalizationrun` | Latest-run lookup |
+| `(run, project)` UNIQUE | `normalization_normalizedscore` | Fit insert |
+| `(run, judge)` UNIQUE | `normalization_judgebias` | Fit insert |
+| `(event, left, right)` | `pairwise_pairwiseballot` | Skip seen pairs |
+| `(event, voter_key)` | `pairwise_pairwiseballot` | Voter history |
+| `(run, project)` UNIQUE | `pairwise_pairwiseranking` | BT fit insert |
 
-### 5.3 Indexes for `(user, last_seen_at)`
+### 5.3 Sessions
 
-The session-cleanup query and the "active sessions" admin view both read
-recent sessions for one user. The composite index keeps that to a B-tree
-seek. On the auth flow itself the `token_hash` unique index is what does
-the work — it is the cookie-to-session map.
+The session-cleanup query and "active sessions" admin view both read recent sessions for one user. `(user_id, last_seen_at)` keeps that to a B-tree seek. The auth flow itself is served by the `token_hash` UNIQUE index.
 
-### 5.4 What is NOT indexed
+### 5.4 Not indexed
 
-- `votes_submission_submission.demo_video_url`, `repo_url`, `live_url` — never
-  filtered, always displayed. Indexed would just slow writes.
-- `events_event.description` (TextField) — never searched in queries.
-- `voting_voteaudit.vote_id` — implied by FK and only ever read with the
-  parent vote; the FK index covers it.
-- `certificates_certificate.issued_by_id` — never filtered; `public_id` is the only
-  secondary index on that table.
+- `submissions_submission.demo_video_url`, `repo_url`, `live_url` — never filtered.
+- `events_event.description` — never searched.
+- `voting_voteaudit.vote_id` — FK covers it.
+- `certificates_certificate.issued_by_id` — never filtered; `public_id` is the secondary index.
 
-### 5.5 Index summary by table
-
-A compact listing. `unique_together` constraints create a UNIQUE btree index
-each — those count too.
+### 5.5 Summary
 
 | Table | Indexes |
 |---|---|
 | `users_user` | email UNIQUE |
-| `users_usergroups` | (user, group) UNIQUE (Django auth auto) |
-| `users_useruserpermissions` | (user, permission) UNIQUE (Django auth auto) |
+| `users_usergroups` | (user, group) UNIQUE (Django auth) |
+| `users_useruserpermissions` | (user, permission) UNIQUE (Django auth) |
 | `users_session` | token_hash UNIQUE; (user, last_seen_at) |
 | `events_event` | slug UNIQUE |
 | `events_track` | (event, slug) UNIQUE |
 | `events_prize` | none beyond PK |
 | `events_membership` | (user, event) UNIQUE |
-| `events_rubric` | implicit via OneToOne (event) |
+| `events_rubric` | implicit OneToOne (event) |
 | `events_rubriccriterion` | none beyond PK |
 | `teams_team` | (event, name) |
 | `teams_teammember` | (team, user) UNIQUE |
@@ -468,7 +405,7 @@ each — those count too.
 | `judging_judgeassignment` | (batch, judge, project) UNIQUE; (judge, batch); (project) |
 | `judging_judgeinvite` | token_hash UNIQUE |
 | `judging_score` | (assignment, criterion) UNIQUE |
-| `judging_review` | implicit via OneToOne (assignment) |
+| `judging_review` | implicit OneToOne (assignment) |
 | `voting_vote` | (event, project, voter_key) UNIQUE; (event, voter_key) |
 | `voting_votebudget` | (event, voter_key) UNIQUE |
 | `voting_voteaudit` | none beyond PK |
@@ -494,132 +431,77 @@ each — those count too.
 
 ### 6.1 How schema changes roll out
 
-Migrations live next to the models they describe (Django convention). Each
-Django app under `apps/<name>/migrations/` contains a numbered sequence. New
-migrations are created by:
+Migrations live next to the models (Django convention) under `apps/<name>/migrations/`. Created by `makemigrations`:
 
 ```bash
 docker compose exec web python manage.py makemigrations
 ```
 
-Once committed, a migration file is **never edited**. Reverting a bad
-migration is a new migration, not an edit. The `import_fixtures` command is
-designed to be re-run after a migration that adds nullable columns.
+Once committed, a migration file is **never edited**. Reverting is a new migration, not an edit. `import_fixtures` is designed to be re-run after a migration that adds nullable columns.
 
 ### 6.2 Cold-start vs. upgrade
-
-Two cases for `docker compose up`:
 
 **Cold start** (empty volume). `entrypoint.sh` runs:
 ```
 wait-for-db → migrate → import_fixtures → exec gunicorn config.wsgi:application
 ```
-This is the order in `entrypoint.sh`, which then hands off to the image
-`CMD`. Migrations create every table from scratch; `import_fixtures`
-populates the rows and seeds the five pre-baked sessions.
+Migrations create every table from scratch; `import_fixtures` populates rows and seeds the five pre-baked sessions.
 
-**Upgrade** (existing volume). The same entrypoint runs. `migrate` is a
-no-op when the schema is current; `import_fixtures` updates in place
-(get_or_create everywhere); the demo session tokens are deterministic
-(§3.1), so the five pre-baked sessions keep working unchanged. No
-destructive operation happens unless the new migration explicitly drops a
-column.
+**Upgrade** (existing volume). Same entrypoint. `migrate` is no-op when schema is current; `import_fixtures` updates in place; demo session tokens are deterministic (§3.1) so the pre-baked sessions keep working. No destructive operation unless the new migration explicitly drops a column.
 
-### 6.3 Backwards-compat expectations
+### 6.3 Backwards-compat
 
-Schema changes during the 72-hour window are forbidden for any column that
-the API or fixtures reference; only additive changes (new tables, new
-nullable columns, new indexes) are allowed once the event is live. Adding
-a column with a default is safe; changing a column type or dropping a
-column requires a data migration plus a coordinated fixtures update.
+Schema changes during the 72-hour window are forbidden for any column the API or fixtures reference; only additive changes (new tables, new nullable columns, new indexes) are allowed once the event is live. Adding a column with a default is safe; changing a column type or dropping requires a data migration plus a coordinated fixtures update.
 
-### 6.4 The audit immutability migration
+### 6.4 Audit immutability
 
-`apps/audit/migrations/0002_immutable.py` runs `REVOKE UPDATE, DELETE ON
-audit_auditevent FROM hack-hamster;` against the database. This is a
-**schema-effecting data migration**: it tightens grants and applies on
-every fresh database. Once applied, the application user cannot UPDATE or
-DELETE audit rows, even via raw SQL — the grants are enforced at the
-database, not the application.
+`apps/audit/migrations/0002_immutable.py` runs `REVOKE UPDATE, DELETE ON audit_auditevent FROM hack-hamster;` — a schema-effecting data migration that tightens grants on every fresh database. The app user cannot UPDATE or DELETE audit rows even via raw SQL — enforced at the DB, not the application.
 
-### 6.5 The search-vector trigger migration
+### 6.5 Search-vector trigger
 
-`apps/submissions/migrations/0002_search_vector.py` installs the Postgres
-`tsvector_update_trigger` on `submissions_submission.search_vector`. The
-trigger fires on INSERT OR UPDATE and recomputes the search vector from
-`name` and `tagline` (English config). This is the only place the search
-index is touched; the ORM never writes `search_vector` directly.
+`apps/submissions/migrations/0002_search_vector.py` installs the Postgres `tsvector_update_trigger` on `submissions_submission.search_vector`. Fires on INSERT OR UPDATE; recomputes the search vector from `name` and `tagline` (English config). ORM never writes `search_vector` directly.
 
 ---
 
 ## Part 7 — PII handling
 
-Three PII surfaces. Each gets one paragraph: passwords, session tokens, and
-what is (and is not) written to logs.
+Three PII surfaces: passwords, session/invite tokens, logs.
 
 ### 7.1 Passwords
 
-Passwords are hashed with **Argon2id** before storage. The hash parameters
-are pinned in `config/settings.py`:
-
+Argon2id before storage. Hash parameters pinned in `config/settings.py`:
 ```
 PASSWORD_HASHERS = ['django.contrib.auth.hashers.Argon2PasswordHasher', ...]
 ARGON2_PASSWORD_HASHER_MEMORY_COST = 65536   # 64 MB
 ARGON2_PASSWORD_HASHER_TIME_COST    = 3
 ARGON2_PASSWORD_HASHER_PARALLELISM  = 4
 ```
-
-The raw password is never logged, never returned by any API, never written
-to disk. The `users_user` table does not even have a `password` column in
-the model definition — Django's `AbstractUser` stores the hash in a
-separate column managed by the auth machinery. The login view calls
-`user.check_password(password)` and returns a generic 401 regardless of
-whether the email exists (no user enumeration).
+Raw password never logged, never returned, never on disk. `users_user` does not even have a `password` column — Django's `AbstractUser` stores the hash in a separate auth-managed column. Login calls `user.check_password(password)` and returns a generic 401 regardless of whether the email exists (no user enumeration).
 
 ### 7.2 Session and invite tokens
 
-Session tokens are **256-bit secrets** generated with
-`secrets.token_urlsafe(32)`. The raw token is set as the `session` cookie.
-Only the SHA-256 hash of the raw token is stored in `users_session.token_hash`:
-
+256-bit secrets from `secrets.token_urlsafe(32)`. Raw token in the `session` cookie; only SHA-256 hash stored:
 ```
 token       = secrets.token_urlsafe(32)
 token_hash  = sha256(token).hexdigest()
 Session.objects.create(user=u, token_hash=token_hash, ...)
 cookie 'session' = token     # raw
 ```
-
-A database compromise therefore leaks hashes, not session tokens. The
-hash is what the session middleware matches on every request
-(`hashlib.sha256(cookie.encode()).hexdigest()` then a B-tree lookup). The
-same pattern is used for `teams_teaminvite.token_hash` and
-`judging_judgeinvite.token_hash` — in all three cases the raw value is
-shown to the creator **once** at creation time and never again. The
-webhook subscription secret is the one exception: it is stored in
-plaintext (`api_webhook.secret`) so the organizer can re-display it;
-hashing it is explicitly future work (ARCHITECTURE.md §17.11).
+DB compromise leaks hashes, not session tokens. Middleware matches via `hashlib.sha256(cookie.encode()).hexdigest()` then B-tree lookup. Same pattern for `teams_teaminvite.token_hash` and `judging_judgeinvite.token_hash` — raw shown to creator **once**, never again. Webhook subscription secret (`api_webhook.secret`) is the one exception: stored plaintext so the organizer UI can re-display it. Hashing is future work (ARCHITECTURE §17.11).
 
 ### 7.3 Logs
 
-Logs are JSON to stdout (no file logs). The `JsonFormatter` records
-timestamp, level, logger name, message, and `extra` — never the request
-body. The audit log records `ip` and `user_agent` (truncated to 255 chars),
-which are operational metadata, not PII. No password field, no email
-field, no token value is ever passed to `logger.info(...)` from a view or
-middleware.
+JSON to stdout, no file logs. `JsonFormatter` records timestamp, level, logger name, message, `extra` — never the request body. Audit log records `ip` and `user_agent` (truncated to 255 chars), operational metadata, not PII. No password, email, or token value ever passed to `logger.info(...)` from a view or middleware.
 
-The middleware chain is the only place that reads the cookie: it hashes
-the cookie, looks up the row, attaches `request.user`. The hashed cookie
-never enters a log line.
+Middleware chain is the only place that reads the cookie: it hashes, looks up, attaches `request.user`. Hashed cookie never enters a log line.
 
-The user-visible PII surfaces (email, name, password hash, session token
-hash) are all on `users_user` and `users_session`. Both are read-restricted
-to authenticated requests; the password hash never appears in any
-serializer output.
+User-visible PII surfaces (email, name, password hash, session token hash) are on `users_user` and `users_session`. Both read-restricted to authenticated requests; the password hash never appears in any serializer output.
 
 ---
 
 ## Part 8 — Per-table detail
+
+Every column of every table. Source of truth: [`docs/BACKEND-IMPL.md` Parts 3–12](docs/BACKEND-IMPL.md).
 
 Every column of every table. Source of truth:
 [`docs/BACKEND-IMPL.md` Parts 3–12](docs/BACKEND-IMPL.md).
@@ -628,9 +510,7 @@ Every column of every table. Source of truth:
 
 #### `users_user`
 
-**Purpose.** The only auth identity. Replaces Django's default
-`auth_user` model via `AUTH_USER_MODEL = 'accounts.User'`. Every other app
-references this table for actor identity.
+**Purpose.** The only auth identity.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -649,14 +529,9 @@ references this table for actor identity.
 
 `USERNAME_FIELD = 'email'`; `REQUIRED_FIELDS = []`.
 
-**Rationale.** Email-based auth because the spec's seed users have
-predictable emails (`organizer@example.org`, etc.) and the acceptance
-mechanism matches on the cookie, not on a username. UUID PK so internal
-references never leak insertion order or count.
-
 #### `users_session`
 
-**Purpose.** Server-side session. Cookie value is hashed before storage.
+**Purpose.** Server-side session.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -671,19 +546,13 @@ references never leak insertion order or count.
 
 Index: `(user_id, last_seen_at)`.
 
-**Rationale.** Storing only the hash means a DB leak does not yield
-working sessions. The rolling 14-day expiry is bumped on every request
-(the middleware updates `last_seen_at` and `expires_at`). On logout the
-row is deleted; on expiry the middleware deletes it.
-
 ---
 
 ### 8.2 events
 
 #### `events_event`
 
-**Purpose.** One hackathon instance. The second gravitational centre —
-every per-event table fans out from here.
+**Purpose.** One hackathon instance.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -699,23 +568,11 @@ every per-event table fans out from here.
 | `created_at` | datetime | no | `auto_now_add` | — |
 | `created_by_id` | UUID FK | no | — | → `users_user.id` (PROTECT) |
 
-Validation in `clean()`: `submissions_close_at > open_at`,
-`judging_open_at >= submissions_close_at`,
-`judging_close_at > judging_open_at`. `state()` is a property that
-classifies the event into `draft | registration | submissions_closed |
-judging | results_pending | results_published | archived` from the
-clock and the four deadlines — no stored state column.
-
-**Rationale.** State is computed, not stored, so changing a deadline
-shifts the lifecycle without an explicit transition. The slug is the
-public URL; uniqueness is enforced at the DB level. Fixtures use the
-slug `sample-hack-2026` because that's what the `.hack-hamster.toml` routes
-point at.
+Validation in `clean()`: `submissions_close_at > open_at`, `judging_open_at >= submissions_close_at`, `judging_close_at > judging_open_at`. `state()` is a property that classifies the event into `draft | registration | submissions_closed | judging | results_pending | results_published | archived` from the clock and the four deadlines — no stored state column.
 
 #### `events_track`
 
-**Purpose.** Category inside an event. A submission belongs to exactly
-one track.
+**Purpose.** Category inside an event.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -726,13 +583,9 @@ one track.
 | `description` | varchar(200) | yes | `''` | — |
 | `order` | PositiveInteger | no | 0 | drives gallery ordering |
 
-**Rationale.** `(event, slug)` uniqueness means a track can be renamed
-freely without breaking the URL. `order` controls the gallery's primary
-sort; the `Submission.gallery` view orders by `track__order, name`.
-
 #### `events_prize`
 
-**Purpose.** Prize definition. Optionally attached to a track.
+**Purpose.** Prize definition.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -743,13 +596,9 @@ sort; the `Submission.gallery` view orders by `track__order, name`.
 | `value` | decimal(10,2) | no | — | display only; no payment flow |
 | `order` | PositiveInteger | no | 0 | — |
 
-**Rationale.** Nullable `track_id` means a single prize pool can be
-shared across an event, with optional per-track prizes layered on top.
-
 #### `events_membership`
 
-**Purpose.** Per-event role assignment. **Role is per-event, not global** —
-that is the load-bearing fact for the role-isolation matrix.
+**Purpose.** Per-event role assignment.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -762,15 +611,9 @@ that is the load-bearing fact for the role-isolation matrix.
 
 Index: `(user_id, event_id)` UNIQUE.
 
-**Rationale.** `(user, event)` uniqueness means a user has exactly one
-role per event. Permission classes (`IsParticipant`, `IsJudge`,
-`IsOrganizer`) filter this table on every API call — so the composite
-index is on the hot path.
-
 #### `events_rubric`
 
-**Purpose.** One rubric per event. Holds the weighted criteria a judge
-scores a project against.
+**Purpose.** One rubric per event.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -778,12 +621,9 @@ scores a project against.
 | `event_id` | UUID FK | no | — | → `events_event.id` (CASCADE), UNIQUE (OneToOne) |
 | `name` | varchar(80) | no | `'Default'` | — |
 
-**Rationale.** 1:1 because the rubric is part of the event config;
-swapping rubrics mid-event would invalidate scores.
-
 #### `events_rubriccriterion`
 
-**Purpose.** One criterion of the rubric. Weights sum to 1.0.
+**Purpose.** One criterion of the rubric.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -797,10 +637,6 @@ swapping rubrics mid-event would invalidate scores.
 | `order` | PositiveInteger | no | 0 | drives the scoring form layout |
 
 Validation in `clean()`: sum of weights across siblings = 1.0.
-
-**Rationale.** Decimal weight (not float) so the equality check in
-`clean()` is exact. Integer score range matches the PRD glossary
-definition (1–5).
 
 ---
 
@@ -821,13 +657,9 @@ definition (1–5).
 
 Index: `(event_id, name)`.
 
-**Rationale.** `(event, name)` index keeps the team-listing query cheap.
-`locked_at` freezes membership; the join-by-invite view rejects requests
-once the lock is set.
-
 #### `teams_teammember`
 
-**Purpose.** Membership in a team. One row per (team, user).
+**Purpose.** Membership in a team.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -839,13 +671,9 @@ once the lock is set.
 
 Index: `(team_id, user_id)` UNIQUE.
 
-**Rationale.** `(team, user)` uniqueness is the join-by-invite's
-no-duplicate guard. Default `captain` is convenient for the first
-member (the team creator); the seed sets this explicitly.
-
 #### `teams_teaminvite`
 
-**Purpose.** Single-use invite link. Token is hashed before storage.
+**Purpose.** Single-use invite link.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -858,19 +686,13 @@ member (the team creator); the seed sets this explicitly.
 | `consumed_at` | datetime | yes | null | set on join |
 | `consumed_by_id` | UUID FK | yes | null | → `users_user.id` (SET_NULL) |
 
-**Rationale.** Expiry is the earlier of (a) seven days and (b) the
-event's submission deadline — so an invite never outlives the window
-it is meaningful in. Token-hash storage matches the session-token
-pattern; the raw token is returned in the `invite_url` exactly once.
-
 ---
 
 ### 8.4 submissions
 
 #### `submissions_submission`
 
-**Purpose.** The team's project. The single row that ties a team to
-its track, its deadlines, its images, its tags, and its custom answers.
+**Purpose.** The team's project.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -897,13 +719,6 @@ Indexes:
 - `(event_id, status, track_id)` — gallery query.
 - GIN on `search_vector` — full-text search.
 
-**Rationale.** `(event, status, track)` is the gallery's hot query
-(filter submitted, optional track filter). `status` defaults to draft
-so creating a submission does not count it as "submitted" until the
-explicit submit action. `track_id` is PROTECT (not CASCADE) so deleting
-a track with submissions on it is blocked at the DB level. Search
-vector is owned by the DB trigger — the ORM never writes it.
-
 #### `submissions_submissionimage`
 
 **Purpose.** Gallery image for a submission.
@@ -918,10 +733,6 @@ vector is owned by the DB trigger — the ORM never writes it.
 | `order` | PositiveInteger | no | 0 | drives display order |
 | `mime_type` | varchar(50) | no | — | — |
 
-**Rationale.** No thumbnail / resize at storage time — the browser
-handles responsive sizing. Width/height are stored so the gallery can
-reserve space before the image loads.
-
 #### `submissions_submissionanswer`
 
 **Purpose.** A team's answer to one of the event's custom questions (the
@@ -935,10 +746,6 @@ question definitions live on the event, not in a second table).
 | `value` | JSONField | no | — | the typed answer |
 
 Index: `(submission_id, question_id)` UNIQUE.
-
-**Rationale.** Question definitions live with the event as JSON, so an
-answer needs only the question key. The `(submission, question)` UNIQUE is
-the submit-time check: "is there a row for every required question?"
 
 #### `submissions_comment`
 
@@ -955,20 +762,13 @@ the submit-time check: "is there a row for every required question?"
 | `is_hidden` | bool | no | false | organizer-moderated soft delete |
 | `hidden_by_id` | UUID FK | yes | null | → `users_user.id` (SET_NULL) |
 
-**Rationale.** Comments are login-gated (so the rate limiter can hold the
-author accountable). PII safety lives at the display layer: the public
-surface shows a derived handle, never the raw email. `is_hidden` is the
-organizer's Hide action — soft delete, not DELETE — and `hidden_by`
-records who did it.
-
 ---
 
 ### 8.5 judging
 
 #### `judging_judgebatch`
 
-**Purpose.** One run of the assignment algorithm. Disjoint batches per
-event (the algorithm retries on different seeds if a run fails).
+**Purpose.** One run of the assignment algorithm.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -980,15 +780,9 @@ event (the algorithm retries on different seeds if a run fails).
 | `reviews_per_project` | int | no | 3 | target coverage |
 | `projects_per_judge` | int | no | 4 | target load |
 
-**Rationale.** The seed makes the assignment reproducible — re-running
-the algorithm with the same seed produces the same `(judge, project)`
-pairs. Persisting the seed in the batch row is the audit hook for
-"what did the algorithm do".
-
 #### `judging_judgeassignment`
 
-**Purpose.** One (judge, project) pair inside a batch. The bridge table
-that connects judges to projects.
+**Purpose.** One (judge, project) pair inside a batch.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -1004,15 +798,9 @@ Indexes:
 - `(judge_id, batch_id)` — the judge's batch lookup.
 - `(project_id)` — reverse lookup (who is assigned this project).
 
-**Rationale.** `(judge, batch)` is on the hot path: every judge-console
-request (`GET me/batch`, `PUT scores`, `POST submit`) starts with this
-filter. The `(batch, judge, project)` UNIQUE is the no-double-assign
-guard at the DB level.
-
 #### `judging_judgeinvite`
 
-**Purpose.** Judge invitation record. Holds the email and a hashed token
-for an out-of-band invite link.
+**Purpose.** Judge invitation record.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -1025,13 +813,9 @@ for an out-of-band invite link.
 | `consumed_at` | datetime | yes | null | — |
 | `consumed_by_id` | UUID FK | yes | null | → `users_user.id` (SET_NULL) |
 
-**Rationale.** Same pattern as `teams_teaminvite`: hash the token,
-return raw once. `consumed_by` SET_NULL so deleting the consuming user
-doesn't cascade-delete the audit record.
-
 #### `judging_score`
 
-**Purpose.** Per-criterion score. One row per (assignment, criterion).
+**Purpose.** Per-criterion score.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -1043,15 +827,9 @@ doesn't cascade-delete the audit record.
 
 Index: `(assignment_id, criterion_id)` UNIQUE.
 
-**Rationale.** `(assignment, criterion)` UNIQUE is the `update_or_create`
-key for score save. Per-criterion granularity (not per-project) is
-required for weighted aggregation; a single integer cannot be
-renormalized.
-
 #### `judging_review`
 
-**Purpose.** A judge's submitted review. One-to-one with the
-assignment — the review holds the comment and the submission timestamp.
+**Purpose.** A judge's submitted review.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -1062,20 +840,13 @@ assignment — the review holds the comment and the submission timestamp.
 | `created_at` | datetime | no | `auto_now_add` | — |
 | `updated_at` | datetime | no | `auto_now` | — |
 
-**Rationale.** Scores are per-criterion; the review is the wrapper that
-holds the human comment and the "I've finished this one" timestamp.
-One-to-one with the assignment because a judge reviews each project
-exactly once per batch.
-
 ---
 
 ### 8.6 voting
 
 #### `voting_vote`
 
-**Purpose.** A single vote. The mode (open, email, authenticated,
-quadratic) is read from `event.voting_mode`; this table holds the
-outcome regardless of mode.
+**Purpose.** A single vote.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -1094,15 +865,9 @@ Indexes:
   (event, project, voter). Re-voting is `update_or_create`, not a new row.
 - `(event_id, voter_key)` — quadratic budget lookup.
 
-**Rationale.** The `(event, project, voter_key)` UNIQUE is the
-"you've already voted on this project" guard at the DB level.
-`voter_user` SET_NULL so deleting a user doesn't blow away the vote
-record (it would just lose the user reference; the `voter_key` survives).
-
 #### `voting_votebudget`
 
-**Purpose.** Quadratic-mode credit budget tracker. One row per (event,
-voter).
+**Purpose.** Quadratic-mode credit budget tracker.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -1112,15 +877,9 @@ voter).
 
 Index: `(event_id, voter_key)` UNIQUE.
 
-**Rationale.** Only meaningful when `event.voting_mode == 'quadratic'`.
-The cost of an `n`-vote cast is `n**2`; the table enforces "total
-spent ≤ 100" at the view layer (no DB constraint — that's by design).
-
 #### `voting_voteaudit`
 
-**Purpose.** Per-action vote log (cast, retract). Append-only by
-convention; no DB-level grants here, but the application never updates
-or deletes.
+**Purpose.** Per-action vote log (cast, retract).
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -1131,17 +890,13 @@ or deletes.
 | `ip` | GenericIPAddress | yes | null | — |
 | `user_agent` | varchar(255) | yes | `''` | — |
 
-**Rationale.** Two-action audit log keeps the history of every vote
-event, separate from the current state on `voting_vote`. A retract is
-visible in the log even after the vote's `retracted_at` is set.
-
 ---
 
 ### 8.7 audit
 
 #### `audit_auditevent`
 
-**Purpose.** Every consequential action. Append-only at the DB level.
+**Purpose.** Every consequential action.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -1162,21 +917,13 @@ Indexes:
 - `(actor_id, created_at)` — per-user drill-down.
 - `(action, created_at)` — filter by action type.
 
-**Rationale.** Both FKs are SET_NULL so deleting a user or an event
-doesn't cascade-wipe the audit trail. DB-level grants in migration
-`0002_immutable.py` revoke UPDATE and DELETE for the application user —
-the table is genuinely append-only. The three indexes match the three
-read patterns on the audit-log UI.
-
 ---
 
 ### 8.8 normalization
 
 #### `normalization_normalizationrun`
 
-**Purpose.** One normalization run. Persists the fit metadata and the
-topline sigmas. Each run produces a set of `NormalizedScore` and
-`JudgeBias` rows.
+**Purpose.** One normalization run.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -1192,11 +939,6 @@ topline sigmas. Each run produces a set of `NormalizedScore` and
 | `proof_file` | FileField | yes | null | `normalization-proof.txt` artifact |
 
 Index: `(event_id, created_at)`.
-
-**Rationale.** Runs are versioned — re-normalizing the same scores
-produces a new row rather than updating. The CSV export joins on the
-latest run (max `created_at`); the index supports that lookup. The
-proof file is the +5 Normalization Proof bonus artifact.
 
 #### `normalization_normalizedscore`
 
@@ -1227,10 +969,7 @@ Index: `(run_id, project_id)` UNIQUE.
 
 Index: `(run_id, judge_id)` UNIQUE.
 
-**Rationale (shared).** The two child tables are bulk-inserted in one
-statement after the fit, so the UNIQUE constraints are advisory
-collision guards. They make re-running a normalization safe even if
-the previous run was not deleted.
+**Rationale (shared).** The two child tables are bulk-inserted in one statement after the fit, so the UNIQUE constraints are advisory collision guards.
 
 ---
 
@@ -1238,7 +977,7 @@ the previous run was not deleted.
 
 #### `pairwise_pairwiserun`
 
-**Purpose.** One Bradley-Terry fit run. Persists the fit metadata.
+**Purpose.** One Bradley-Terry fit run.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -1252,7 +991,7 @@ the previous run was not deleted.
 
 #### `pairwise_pairwiseballot`
 
-**Purpose.** One pairwise outcome — a voter's pick of left vs. right (or tie).
+**Purpose.** One pairwise outcome — a voter's pick of left vs.
 
 | Column | Type | Nullable | Default | FK / Index |
 |---|---|---|---|---|
@@ -1267,11 +1006,6 @@ the previous run was not deleted.
 Indexes: `(event_id, left_project_id, right_project_id)` — the selection
 algorithm (in `apps/pairwise/selection.py`) skips already-seen pairs;
 `(event_id, voter_key)` — a voter's ballot history.
-
-**Rationale.** The ballot is keyed by `voter_key` (the user id, or the
-anonymous `sha256(ip + user_agent)` fingerprint), not a judge FK —
-pairwise voting is open to the community, not just judges. There is
-deliberately no (judge, event, pair) UNIQUE.
 
 #### `pairwise_pairwiseranking`
 
@@ -1308,10 +1042,6 @@ Index: `(run_id, project_id)` UNIQUE.
 | `is_active` | bool | no | true | — |
 | `created_at` | datetime | no | `auto_now_add` | — |
 
-**Rationale.** The secret is stored in plaintext — hashing it is
-explicitly future work (ARCHITECTURE.md §17.11). Every delivery is
-signed `X-Hack-Hamster-Signature: sha256=<HMAC-SHA256 of the body>`.
-
 #### `webhooks_webhookdelivery`
 
 **Purpose.** One delivery attempt (the operator retry log).
@@ -1329,13 +1059,6 @@ signed `X-Hack-Hamster-Signature: sha256=<HMAC-SHA256 of the body>`.
 | `created_at` | datetime | no | `auto_now_add` | — |
 | `last_attempt_at` | datetime | yes | null | — |
 
-**Rationale.** Delivery is synchronous and single-attempt (3-second
-timeout; a slow receiver never raises into the organizer's request
-path). Retries are an explicit operator action — `manage.py
-flush_webhooks` re-delivers failed rows in place — and the per-webhook
-log is served at `GET /api/webhooks/<uuid>/deliveries`. There is no
-exponential-backoff schedule and no background worker.
-
 #### `certificates_certificate`
 
 **Purpose.** Issued certificate — an HMAC-signed JSON record for a
@@ -1350,14 +1073,6 @@ submission, publicly verifiable by `public_id`.
 | `signature` | char(64) | no | — | HMAC-SHA256 hex over the canonical JSON |
 | `issued_at` | datetime | no | `auto_now_add` | — |
 | `issued_by_id` | UUID FK | yes | null | → `users_user.id` (SET_NULL) |
-
-**Rationale.** No signing-key table exists: the HMAC is keyed by
-`SECRET_KEY` (the same secret that protects sessions). Verification is
-verify-on-read — `GET /api/certificates/<public_id>` recomputes the
-HMAC (`hmac.compare_digest`) and returns 400 `signature_invalid` for a
-tampered row instead of serving it. Issued by the organizer via
-`POST /api/events/<slug>/certificates/issue`; only `submitted` and
-`locked` submissions are certifiable.
 
 #### `certificates_judgerecord`
 
@@ -1375,24 +1090,11 @@ snapshot, publicly verifiable by `public_id`.
 | `issued_at` | datetime | no | — | set by the issue flow |
 | `issued_by_id` | UUID FK | yes | null | → `users_user.id` (SET_NULL) |
 
-**Rationale.** Issued by the organizer (`POST
-/api/events/<slug>/records/judge` with `{"judge": "<email>"}` or
-`{"all": true}`) and verified publicly, unauthenticated, at `GET
-/api/records/judge/<public_id>`. Issuing is not idempotent by design —
-re-issuing mints a fresh `public_id`. The signed payload carries the
-judge's display name only; the organizer-side list endpoint
-(`GET /api/events/<slug>/records/judge`) is the only place emails
-appear.
-
 ---
 
 ## Cross-reference
 
-The per-model column lists in Part 8 mirror the model definitions in
-[`docs/BACKEND-IMPL.md`](docs/BACKEND-IMPL.md). Where the impl doc
-defines a model class, this doc lists every field. The schema is the
-contract; if these two disagree, the impl doc wins and this doc is
-fixed in the next commit.
+The per-model column lists in Part 8 mirror [`docs/BACKEND-IMPL.md`](docs/BACKEND-IMPL.md). Where the impl doc defines a model class, this doc lists every field. Schema is the contract; if these disagree, the impl doc wins and this doc is fixed in the next commit.
 
 | App | BACKEND-IMPL section |
 |---|---|
@@ -1403,16 +1105,8 @@ fixed in the next commit.
 | `judging` | §7.1 |
 | `voting` | §8.1 |
 | `audit` | §9.1 |
-| `normalization` | §10 (models referenced in §10.3) |
+| `normalization` | §10 |
 | `pairwise` | §11.1 |
 | `api` | §12.1 |
 
-For algorithm internals (alternating means, Bradley-Terry, pair
-selection, CSV export, session rotation, audit grants), the
-authoritative implementation lives in the corresponding BACKEND-IMPL
-section. This document is the map; the impl doc is the territory.
-
-
-
-
-
+Algorithm internals (alternating means, Bradley-Terry, pair selection, CSV export, session rotation, audit grants) live in the corresponding BACKEND-IMPL section. This document is the map; the impl doc is the territory.

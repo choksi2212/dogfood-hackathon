@@ -1,10 +1,54 @@
 # Test suite — auth
 
-`tests/auth/test_auth.py` — `@pytest.mark.auth`
+> **Session lifecycle, cookie behaviour, register/login/logout.** Tests live in `tests/auth/test_auth.py` under `@pytest.mark.auth`.
+
+## Contents
+
+- [Login handshake at a glance](#login-handshake-at-a-glance)
+- [What it covers](#what-it-covers)
+- [Known drift](#known-drift)
+- [Run](#run)
+
+## Login handshake at a glance
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as 🌐 Browser
+    participant V as ⚖️ LoginView
+    participant M as 🧱 SessionMiddleware
+    participant DB as 🗄️ Session table
+    participant A as 📜 audit_log
+
+    B->>V: POST /api/auth/login {email, password}
+    V->>V: 🐍 Django authenticate(user)
+    alt invalid creds
+        V-->>B: 401 unauthorized
+    else valid creds
+        V->>DB: INSERT session<br/>(sha256(token) → row)
+        V->>A: log(actor, "auth.login")
+        V->>M: set_cookie(name=session_id,<br/>value=token, HttpOnly,<br/>SameSite=Lax, Secure?)
+        V-->>B: 200 + Set-Cookie
+    end
+
+    B->>V: GET /api/me (Cookie: session_id=token)
+    V->>M: read_cookie → raw token
+    M->>DB: SELECT WHERE token_hash = sha256(token)
+    alt cookie tampered / unknown
+        DB-->>M: no row
+        M->>V: request.user = AnonymousUser
+        V-->>B: 401 not_authenticated
+    else session found
+        DB-->>M: Session row
+        M->>M: sliding renewal<br/>(expires_at += 14d)
+        M->>V: request.user = <User>
+        V-->>B: 200 {user: {...}}
+    end
+```
 
 ## What it covers
 
-Session lifecycle + cookie behaviour + register/login/logout.
+Session lifecycle, cookie behaviour, register/login/logout.
 
 | Test | Asserts |
 |---|---|
@@ -23,16 +67,15 @@ Session lifecycle + cookie behaviour + register/login/logout.
 
 ## Known drift
 
-- `test_login_cookie_is_not_secure_when_debug_true`: Our settings default DEBUG=false. The cookie is always Secure unless the test environment explicitly sets DEBUG=true. Either the test should set DEBUG, or our default DEBUG in tests should be true. Decision pending.
+- `test_login_cookie_is_not_secure_when_debug_true`: Settings default DEBUG=false, so the cookie is always Secure unless the test explicitly sets DEBUG=true. Decision pending — either set DEBUG in the test, or flip the test default to true.
 
 ## Run
 
 ```bash
 make test-auth
-```
-
-## Run individually
-
-```bash
 docker compose exec web pytest tests/auth/ -v
 ```
+
+---
+
+[← Back to TESTING.md](TESTING.md)

@@ -1,12 +1,57 @@
 # HACK HAMSTER Portal — Backup & Disaster Recovery
 
-**Audience:** Whoever wakes up to "the database is gone" or has to
-prove that last night's dump is restorable.
+> **Hero.** The contract for how often we back up, how long restoration takes, and what to do when the database is gone — for whoever wakes up to that page, or has to prove last night's dump is restorable. Assumes the production layout from [`docs/DEPLOY.md`](DEPLOY.md): single host, two containers (`web` + `db`), Postgres 16, named volume `pgdata`.
 
-This document is the contract for: how often we back up, how long
-restoration takes, and what to do when the worst happens. It assumes
-the production layout from [`docs/DEPLOY.md`](DEPLOY.md) — single host,
-two containers (`web` + `db`), Postgres 16, named volume `pgdata`.
+## Contents
+
+- [1. RPO / RTO](#1-rpo--rto)
+- [2. Backup strategy](#2-backup-strategy)
+- [3. Restore procedure](#3-restore-procedure)
+- [4. Disaster scenarios](#4-disaster-scenarios)
+- [5. Verification — weekly restore drill](#5-verification--weekly-restore-drill)
+- [Related docs](#related-docs)
+
+---
+
+## Backup → restore flow
+
+```mermaid
+flowchart LR
+    subgraph Source["🟢 Source host"]
+        PG[("🐘 Postgres<br/>pgdata volume")]:::store
+        Cron["⏰ nightly cron<br/>03:00 local"]:::ctl
+    end
+
+    Dump["📦 hack-hamster-YYYYMMDDTHHMMSSZ<br/>.pgdump custom -Fc"]:::data
+
+    subgraph S3["☁️ S3 bucket"]
+        Daily["daily/<br/>30-day TTL"]:::store
+        Monthly["monthly/<br/>90d → Glacier"]:::store
+    end
+
+    subgraph Drill["🟠 Fresh host (restore)"]
+        New["🐘 empty pgdata<br/>+ POSTGRES_* from .env"]:::store
+        Mig["🔧 manage.py migrate<br/>entrypoint auto-runs"]:::compute
+        Verify["✅ SELECT count + pytest<br/>or make accept"]:::compute
+    end
+
+    Cron -->|docker exec pg_dump -Fc| PG
+    PG -->|stdout .pgdump| Dump
+    Dump -->|aws s3 cp| Daily
+    Daily -.->|lifecycle rule| Monthly
+
+    Daily -->|aws s3 cp pull| New
+    New -->|pg_restore --clean --if-exists| New
+    New --> Mig
+    Mig --> Verify
+
+    classDef store fill:#A8DADC,stroke:#2A9D8F,color:#000
+    classDef data fill:#E9C46A,stroke:#6C567B,color:#000
+    classDef ctl fill:#6C567B,stroke:#E63946,color:#fff
+    classDef compute fill:#F4A261,stroke:#E63946,color:#fff
+```
+
+> **Palette** — `🟢 #2A9D8F` data-store borders, `🔵 #A8DADC` data-store fills, `🟡 #E9C46A` data files (read paths), `🟣 #6C567B` domain/control, `🟠 #F4A261` compute, `🔴 #E63946` outline only.
 
 ---
 
@@ -17,30 +62,19 @@ two containers (`web` + `db`), Postgres 16, named volume `pgdata`.
 | **RPO** (max data loss) | **1 hour** | Nightly `pg_dump` covers the routine case; for sub-hour loss we run an hourly WAL archive via `pg_basebackup --checkpoint=fast` to the same S3 bucket. Hourly is enough because the portal's write rate during an active event is dominated by votes and scores — losing <60 min of ballots is recoverable from the audit log if needed. |
 | **RTO** (time to restore service) | **4 hours** | Restoring a 50 GB `pg_dump` to a fresh Postgres on the same host takes ~20 min; running migrations takes ~5 min; smoke-testing the acceptance suite takes ~15 min. The remaining ~3 hours is buffer for: locating a clean host if the original is gone, DNS flip, TLS re-issue, and a manual review of `audit_auditevent` for the gap window. |
 
-If a tighter RPO is required (paid tier, longer events), the path is
-to enable Postgres point-in-time recovery with continuous WAL shipping
-to S3 — the scripts in `scripts/` are the starting point, but that is
-out of scope for the hackathon deploy.
+A tighter RPO (paid tier, longer events) requires Postgres point-in-time recovery with continuous WAL shipping to S3 — the scripts in `scripts/` are the starting point, but that is out of scope for the hackathon deploy.
 
 ## 2. Backup strategy
 
 ### 2.1 What gets backed up
 
-- **Postgres data** — every row, every migration's schema, plus
-  Postgres globals (roles, tablespaces). This is the only stateful
-  service in the stack; everything else (`web` container, uploads) is
-  re-creatable from source.
-- **`.env`** — copied out-of-band to a secret manager (1Password,
-  AWS Secrets Manager, Vault). It is **never** in the `pg_dump`.
-- **`audit_auditevent` rows** — included in the `pg_dump`. The
-  table is append-only and DB-level immutable
-  (`apps/audit/migrations/0002_immutable.py`), so the dump is the
-  authoritative copy.
+- **Postgres data** — every row, every migration's schema, plus Postgres globals (roles, tablespaces). The only stateful service in the stack; everything else (`web` container, uploads) is re-creatable from source.
+- **`.env`** — copied out-of-band to a secret manager (1Password, AWS Secrets Manager, Vault). It is **never** in the `pg_dump`.
+- **`audit_auditevent` rows** — included in the `pg_dump`. The table is append-only and DB-level immutable (`apps/audit/migrations/0002_immutable.py`), so the dump is the authoritative copy.
 
 ### 2.2 Nightly `pg_dump` to S3
 
-Run from the deploy host as a cron job. The command below produces a
-compressed, custom-format dump and ships it to S3 with a dated key:
+Run from the deploy host as a cron job:
 
 ```bash
 docker compose exec -T db pg_dump \
@@ -55,53 +89,34 @@ aws s3 cp "/tmp/hack-hamster-$(date -u +%Y%m%dT%H%M%SZ).pgdump" \
     "s3://<your-bucket>/hack-hamster/daily/"
 ```
 
-`-Fc` is the custom compressed format (`pg_dump -Fc`); restore with
-`pg_restore`. `--no-owner` and `--no-privileges` make the dump
-portable across hosts that have not been pre-configured with the
-matching roles. On Windows hosts without `aws` CLI, swap `aws s3 cp`
-for any equivalent (rclone, Azure Blob CLI, scp to a NAS).
+`-Fc` is the custom compressed format; restore with `pg_restore`. `--no-owner` and `--no-privileges` make the dump portable across hosts without matching roles. On Windows hosts without `aws` CLI, swap for any equivalent (rclone, Azure Blob CLI, scp to a NAS).
 
 ### 2.3 Cron line
 
-On Linux:
+Linux:
 
 ```cron
 # m   h   dom mon dow   command
   0   3   *   *   *     /usr/local/bin/hack-hamster-backup.sh >> /var/log/hack-hamster-backup.log 2>&1
 ```
 
-The wrapper script contains the `docker compose exec ... pg_dump` and
-`aws s3 cp` lines from §2.2. Run nightly at **03:00 host local time**
-— late enough that no event is mid-window, early enough to finish
-before any morning traffic.
+The wrapper contains the `docker compose exec ... pg_dump` and `aws s3 cp` lines from §2.2. Run nightly at **03:00 host local time** — late enough that no event is mid-window, early enough to finish before morning traffic.
 
-On Windows, register the same script as a Scheduled Task that runs
-under a service account with access to the Docker socket and the AWS
-credentials. Trigger daily, retry on failure, alert on three
-consecutive misses.
+On Windows, register the same script as a Scheduled Task under a service account with access to the Docker socket and AWS credentials. Trigger daily, retry on failure, alert on three consecutive misses.
 
 ### 2.4 Retention
 
 - **30 days** of daily dumps in `s3://<bucket>/hack-hamster/daily/`.
-- **12 months** of monthly snapshots, kept by a separate lifecycle
-  rule that copies the first-of-the-month dump to
-  `s3://<bucket>/hack-hamster/monthly/`.
-- An S3 lifecycle rule expires the `daily/` prefix after 30 days and
-  moves `monthly/` to Glacier after 90 days.
+- **12 months** of monthly snapshots, kept by a lifecycle rule that copies the first-of-the-month dump to `s3://<bucket>/hack-hamster/monthly/`.
+- An S3 lifecycle rule expires `daily/` after 30 days and moves `monthly/` to Glacier after 90 days.
 
 ## 3. Restore procedure
 
-Restoring the database from a `pg_dump` to a fresh Postgres on the
-same or a replacement host. **Seed fixtures are NOT needed** —
-`seed_fixtures` is dev-only and creates demo rows that would
-clobber real data (see
-[`apps/accounts/management/commands/seed_fixtures.py`](../../apps/accounts/management/commands/seed_fixtures.py)).
-For a production restore, you only need `migrate` to apply any
-schema drift between the dump and the current code.
+Restoring from a `pg_dump` to a fresh Postgres on the same or replacement host. **Seed fixtures are NOT needed** — `seed_fixtures` is dev-only and would clobber real data (see [`apps/accounts/management/commands/seed_fixtures.py`](../../apps/accounts/management/commands/seed_fixtures.py)). For a production restore, only `migrate` is needed for schema drift between the dump and the current code.
 
 ### 3.1 Restore into a scratch DB (verification drill)
 
-Use this for the weekly drill in §5:
+Use for the weekly drill in §5:
 
 ```bash
 docker compose exec -T db createdb -U hack-hamster hack-hamster_restore
@@ -117,13 +132,11 @@ docker compose exec -T db psql -U hack-hamster -d hack-hamster_restore \
     -c "SELECT COUNT(*) FROM audit_auditevent;"
 ```
 
-If the count looks plausible (compared to yesterday's `pg_dump`
-size), the dump is valid.
+If the count looks plausible (compared to yesterday's `pg_dump` size), the dump is valid.
 
 ### 3.2 Restore into the live DB
 
-This is the destructive path. **Stop `web` first** so no request
-hits a half-restored DB:
+Destructive path. **Stop `web` first** so no request hits a half-restored DB:
 
 ```bash
 cd /n/hack-hamster-hackathon
@@ -152,20 +165,15 @@ docker compose up -d web
 curl -fsS http://127.0.0.1:8001/healthz
 ```
 
-Step 4 is the safety net: `entrypoint.sh` runs
-`python manage.py migrate --noinput` on every container start, so if
-the dump is from a slightly older schema, Django will reconcile.
+Step 4 is the safety net: `entrypoint.sh` runs `python manage.py migrate --noinput` on every container start, so a dump from a slightly older schema gets reconciled.
 
 ### 3.3 Restore onto a brand-new host
 
-Same as §3.2 but with these extra steps:
+Same as §3.2 with these extras:
 
 1. Bring up a fresh `db` container (the `pgdata` volume starts empty).
 2. Copy the chosen `.pgdump` file onto the host.
-3. Run §3.2 from step 2 onward. The DB role and DB name both come
-   from `POSTGRES_USER` and `POSTGRES_DB` in `.env`, which must match
-   what the dump expects (the `--no-owner --no-privileges` flags mean
-   the dump does not try to recreate them).
+3. Run §3.2 from step 2 onward. The DB role and DB name come from `POSTGRES_USER` and `POSTGRES_DB` in `.env`, which must match what the dump expects (the `--no-owner --no-privileges` flags mean the dump does not recreate them).
 4. Bring up `web` and re-point the proxy / DNS.
 
 ## 4. Disaster scenarios
@@ -179,8 +187,7 @@ Same as §3.2 but with these extra steps:
 
 ## 5. Verification — weekly restore drill
 
-A backup you have never restored is a backup you do not have. Every
-**Monday at 10:00 host local time**, run the following:
+A backup you have never restored is a backup you do not have. Every **Monday at 10:00 host local time**, run:
 
 ```bash
 # 1. Pick yesterday's dump
@@ -211,17 +218,22 @@ docker compose exec -T db psql -U hack-hamster -d postgres \
     -c "DROP DATABASE hack-hamster_drill;"
 ```
 
-The pytest line is a stand-in for the production smoke test; the
-project's acceptance suite (`make accept`) is the stronger check
-when you have time. If the drill fails, the on-call channel gets
-paged — see [`docs/RUNBOOK.md`](RUNBOOK.md) §5.
+The pytest line is a stand-in for the production smoke test; `make accept` is the stronger check when time permits. If the drill fails, the on-call channel gets paged — see [`docs/RUNBOOK.md`](RUNBOOK.md) §5.
 
-Schedule the drill as a weekly cron:
+Schedule as a weekly cron:
 
 ```cron
 # m   h   dom mon dow   command
   0  10   *   *   1     /usr/local/bin/hack-hamster-restore-drill.sh >> /var/log/hack-hamster-drill.log 2>&1
 ```
 
-Successful drills are logged; three consecutive failures is a
-PagerDuty-grade event — the backup pipeline is broken.
+Successful drills are logged; three consecutive failures is a PagerDuty-grade event — the backup pipeline is broken.
+
+---
+
+## Related docs
+
+- [`docs/DEPLOY.md`](DEPLOY.md) — production deploy guide (the layout assumed above).
+- [`docs/RUNBOOK.md`](RUNBOOK.md) — on-call runbook for the alert side of the same incidents.
+- [`docs/BACKEND-IMPL.md`](BACKEND-IMPL.md) — request lifecycle; explains why `web` is the layer that needs to stop during a destructive restore.
+- [`README.md`](../README.md) · [`ARCHITECTURE.md`](../ARCHITECTURE.md) — pitch + system diagram.

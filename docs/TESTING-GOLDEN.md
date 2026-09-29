@@ -1,8 +1,8 @@
 # Golden-file tests
 
-**Role:** Pins the platform's behaviour against known-good outputs. When an algorithm drifts (the additive fit converging to the wrong q, the BT fit landing in a different ordering, the CSV header silently renamed), this suite fails CI loudly instead of silently corrupting a downstream judge's report.
+**Role:** Pins the platform's behaviour against known-good outputs. When an algorithm drifts (additive fit converging to the wrong q, BT fit landing in a different ordering, CSV header silently renamed), this suite fails CI loudly instead of silently corrupting a downstream judge's report.
 
-> **`tests/golden/` is the suite that pins the platform's behaviour against known-good outputs.** It exists so that an algorithmic drift (the additive fit converging to the wrong q, the BT fit landing in a different ordering, the CSV header silently renamed) fails CI loudly instead of silently corrupting a downstream judge's report.
+> `tests/golden/` is the suite that pins the platform's behaviour against known-good outputs. It exists so that algorithmic drift fails CI loudly instead of corrupting a downstream report.
 
 ---
 
@@ -88,13 +88,13 @@ tests/golden/test_golden.py .........                                    [100%]
 9 passed
 ```
 
-The suite is pure-Python. It does not need a Postgres database, a running portal, or any HTTP fixtures from the root `tests/conftest.py` — a local `conftest.py` in `tests/golden/` overrides the autouse DB fixture to a no-op. Run time is well under a second.
+Pure-Python. No Postgres, no running portal, no HTTP fixtures from the root `tests/conftest.py` — a local `conftest.py` overrides the autouse DB fixture to a no-op. Run time is well under a second.
 
 ---
 
 ## How to regenerate a golden
 
-Golden files are checked in. The regenerate script lives at `tests/golden/_regenerate.py`; it is the **only** supported way to refresh a fixture.
+Golden files are checked in. The regenerate script at `tests/golden/_regenerate.py` is the **only** supported way to refresh a fixture.
 
 ```sh
 docker compose exec -T web python tests/golden/_regenerate.py
@@ -102,24 +102,24 @@ docker compose exec -T web python tests/golden/_regenerate.py
 
 What it does:
 
-1. Runs `normalize()` on the deterministic 30-review input and writes `normalization_output.json`.
-2. Runs `bradley_terry()` on the 20-ballot input and writes `bt_output.json`.
-3. Parses the existing `role-isolation-matrix.txt` and writes `role_isolation.json`.
-4. Parses the existing `acceptance-report.txt` and writes `acceptance.json`.
-5. Calls `apps.api.views._openapi_spec()` and writes `openapi_minimal.json`.
-6. Re-asserts the CSV header literal against `apps/judging/views.py` and writes `csv_header.txt`.
+1. `normalize()` on the 30-review input → `normalization_output.json`.
+2. `bradley_terry()` on the 20-ballot input → `bt_output.json`.
+3. Parse `role-isolation-matrix.txt` → `role_isolation.json`.
+4. Parse `acceptance-report.txt` → `acceptance.json`.
+5. `apps.api.views._openapi_spec()` → `openapi_minimal.json`.
+6. Re-assert CSV header literal against `apps/judging/views.py` → `csv_header.txt`.
 
-The script is idempotent. Re-running overwrites every fixture.
+Idempotent. Re-running overwrites every fixture.
 
 ---
 
 ## When to regenerate
 
-You regenerate a golden only when the underlying behaviour has **intentionally** changed. Each case is different:
+Only when the underlying behaviour has **intentionally** changed.
 
 ### Algorithm changed (legit)
 
-If `apps/normalization/fit.py` or `apps/pairwise/fit.py` was edited to fix a real bug, change the convergence criterion, or switch to a different regularisation, the goldens will fail in CI. Investigate the diff, confirm the change is correct, then regenerate:
+Edits to `apps/normalization/fit.py` or `apps/pairwise/fit.py` (bug fix, convergence criterion, regularisation change) cause goldens to fail CI. Investigate the diff, confirm correctness, then regenerate:
 
 ```sh
 docker compose exec -T web python tests/golden/_regenerate.py
@@ -129,46 +129,44 @@ git commit -m "test(golden): regenerate after <change>"
 
 ### Schema drift (cosmetic, allowed)
 
-OpenAPI descriptions, example values, and minor wording changes **do not** require a golden update — the minimal schema fixture only checks paths and response-shape keys. If a test starts failing on a description change, fix the test to be less strict; do not regenerate.
+OpenAPI descriptions, examples, minor wording — **do not** require a golden update. The minimal schema fixture only checks paths and response-shape keys. If a test fails on a description change, fix the test to be less strict; do not regenerate.
 
 ### Role or route change (substantive)
 
-If a permission or route is added/removed, the role-isolation golden **does** need to be re-parsed. Regenerate after re-running the live `role_isolation_matrix.py` and `acceptance.py` against the new portal.
+A permission or route add/remove requires re-parsing the role-isolation golden. Regenerate after re-running `role_isolation_matrix.py` and `acceptance.py` against the new portal.
 
 ---
 
 ## When a failure is a regression (not a regenerate)
 
-The goldens are designed to fail loudly on real regressions. The failure modes:
+- `normalize()` converges to a different q (different rank ordering, different bias estimates) → real algorithm regression.
+- `bradley_terry()` recovers different theta or ranking → real regression in MM iteration or phantom-prior.
+- `role_isolation.json` shows an actor missing/added → test event changed; investigate before regenerating.
+- `acceptance.json` shows a check flipped to FAIL → platform regression; do not regenerate, fix the check.
+- `openapi_minimal.json` shows a path missing → route removed; breaking change for integrators. Investigate.
+- `csv_header.txt` shows column drift → CSV consumers will break. Investigate before regenerating.
 
-- `normalize()` converges to a different q (different rank ordering, different bias estimates) → real regression in the algorithm.
-- `bradley_terry()` recovers a different theta or different ranking → real regression in the MM iteration or the phantom-prior.
-- `role_isolation.json` shows an actor missing/added → the test event changed; investigate before regenerating.
-- `acceptance.json` shows a check flipped to FAIL → the platform has regressed; do not regenerate, fix the underlying check.
-- `openapi_minimal.json` shows a path missing → a route was removed; this is a breaking change for integrators. Investigate.
-- `csv_header.txt` shows the columns drifted → CSV consumers will break. Investigate before regenerating.
-
-The rule: **if a test fails, the algorithm or surface changed in a way that is wrong until proven otherwise.** Regenerating is the proof.
+Rule: **if a test fails, the algorithm or surface changed in a way that is wrong until proven otherwise.** Regenerating is the proof.
 
 ---
 
 ## Tie-breaking note
 
-`apps.normalization.fit.normalize()` iterates `projects: set[str]` when computing ranks. Python sets are hash-randomised across processes (`PYTHONHASHSEED`), so the iteration order — and therefore the within-tie-group rank assignment — varies between runs.
+`apps.normalization.fit.normalize()` iterates `projects: set[str]` when computing ranks. Python sets are hash-randomised across processes (`PYTHONHASHSEED`), so iteration order — and within-tie-group rank assignment — varies.
 
-The golden test handles this by asserting **rank consistency**, not exact rank equality: a project with a strictly higher adjusted score must have a strictly lower rank number; projects with equal adjusted may have any rank ordering within their tie group. This means the suite is stable across `PYTHONHASHSEED=0` and `PYTHONHASHSEED=42`, which we verify before committing.
+The golden asserts **rank consistency**, not exact rank equality: a project with strictly higher adjusted score gets a strictly lower rank number; projects with equal adjusted may have any rank ordering within their tie group. Stable across `PYTHONHASHSEED=0` and `PYTHONHASHSEED=42`, verified before committing.
 
 ---
 
 ## Marker discipline
 
-Every test in this suite carries `@pytest.mark.golden`. The marker is registered in `pytest.ini`. To run only the golden suite, invoke pytest with the marker selector:
+Every test carries `@pytest.mark.golden` (registered in `pytest.ini`). Run only the golden suite:
 
 ```sh
 docker compose exec web pytest -m golden -v
 ```
 
-To skip the golden suite (e.g., during a long refactor):
+Skip during long refactors:
 
 ```sh
 docker compose exec web pytest -m "not golden" -v

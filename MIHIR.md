@@ -1,35 +1,83 @@
 # HACK HAMSTER 2026 — MIHIR: FRONTEND, PUBLIC SURFACE, THREAT MODEL
 
+**Role:** Frontend, public surface, threat model, demo video.
+
 **Owner:** Mihir (`Mihir-Rabari`)
 **Partner:** Manas (`choksi2212`) — backend, data, judging maths
 **Plan:** `HACK HAMSTER-PLAN.md` · **Partner's doc:** `HACK HAMSTER-MANAS.md` · **Machine setup:** `HACK HAMSTER-SETUP-MIHIR.md`
 **Scope:** T1 + T2 + T3 + T4, all four bonuses. Nothing cut.
 
-**Read this whole file before Sep 26 (kickoff day).** Do your machine setup from `HACK HAMSTER-SETUP-MIHIR.md`
-this week, not on kickoff day.
+**Read this whole file before Sep 26.** Machine setup this week, not on kickoff day.
 
-> **SPEC IS LIVE (Sep 23, a day early).** This doc has been rewritten against the real
-> spec — the biggest change is that `.hack-hamster.toml` is the seam, not `openapi.yaml`.
-> The acceptance mechanism is `run.py`, seven HTTP checks. T3 and T4 have zero checks
-> in run.py; they are scored on docs + demo video only. Anything that conflicts with
-> the spec is wrong by definition — the spec is what runs.
+> **SPEC IS LIVE (Sep 23).** `.hack-hamster.toml` is the seam, not `openapi.yaml`. Acceptance is `run.py`, seven HTTP checks. T3 and T4 have zero checks; scored on docs + demo video.
 
 ---
 
-# PART I — THE CONFLICT-ZERO CONTRACT
+## Contents
 
-## 1.1 Why this matters more than it sounds
+- [The ownership tree](#the-ownership-tree-top-to-bottom)
+- [Part I — The conflict-zero contract](#part-i--the-conflict-zero-contract)
+- [Part II — Your build](#part-ii--your-build)
 
-Two people, 72 hours, one repo. The failure mode that kills teams is not a hard bug — it is a
-merge conflict at hour 60 in a file both people edited, resolved badly by a tired person, that
-silently breaks something that was green an hour earlier.
+---
 
-We avoid this by construction, not by care: **no file has two owners.** If you never edit a
-file Manas owns, and he never edits one of yours, git has nothing to conflict.
+## The ownership tree
+
+```mermaid
+flowchart TB
+    subgraph MY["🌐 Mihir (only editor)"]
+        direction TB
+        WEB["⚛️ web/**<br/>Next.js app"]
+        VOT["🗳️ apps/voting/**<br/>community + quadratic"]
+        ABU["🛡️ apps/abuse/**<br/>rate limit + dup detect"]
+        CRT["🏅 apps/certificates/**<br/>rendering"]
+        WGT["📦 apps/widget/**<br/>embeddable gallery"]
+        TH["📜 THREAT-MODEL.md<br/>(+3 bonus)"]
+        UI["📘 docs/UI.md"]
+    end
+
+    subgraph HIS["🐍 Manas (never edit)"]
+        direction TB
+        CONF["⚙️ config/**<br/>Django settings, URLs, WSGI"]
+        ACC["🔐 apps/accounts/**<br/>auth, roles, permissions"]
+        EVT["📅 apps/events/**<br/>events, tracks, prizes, teams"]
+        SUB["📝 apps/submissions/**<br/>models + endpoints"]
+        JUD["⚖️ apps/judging/**<br/>rubric, assignment, scoring"]
+        API["📡 apps/api/**<br/>REST surface"]
+        NRM["🧮 apps/normalization/**<br/>estimator"]
+        BT["🥊 apps/pairwise/**<br/>Bradley-Terry"]
+        OPS["🐳 docker-compose.yml<br/>Dockerfile*<br/>Makefile"]
+        OA["📄 openapi.yaml<br/>ARCHITECTURE.md<br/>DATA-MODEL.md<br/>JUDGING.md<br/>README.md<br/>.hack-hamster.toml"]
+    end
+
+    subgraph SEAM["🧷 Seam (frozen H+20)"]
+        direction TB
+        TOML["📑 .hack-hamster.toml<br/>5 routes · 5 headers"]
+    end
+
+    MY -.reads.-> SEAM
+    HIS -.publishes.-> SEAM
+    SEAM -.connects.-> MY
+    SEAM -.connects.-> HIS
+    WEB -.calls.-> API
+    API -.serves.-> WEB
+
+    style MY fill:#FFE8D6,stroke:#F4A261,color:#1D3557
+    style HIS fill:#EDE7F6,stroke:#6C567B,color:#1D3557
+    style SEAM fill:#FDF6E3,stroke:#E9C46A,color:#1D3557
+```
+
+---
+
+# Part I — The conflict-zero contract
+
+## 1.1 Why it matters
+
+A merge conflict at hour 60, resolved badly by a tired person, silently breaks something that was green an hour earlier. Avoided by construction: **no file has two owners.** Disjoint edits → no conflict.
 
 ## 1.2 Ownership
 
-**YOURS — you are the only person who edits these:**
+**YOURS — only you edit these:**
 
 ```
 web/**                      the entire Next.js app
@@ -41,7 +89,7 @@ THREAT-MODEL.md             the bonus
 docs/UI.md                  your architecture notes
 ```
 
-**MANAS'S — you never open these in an editor:**
+**MANAS'S — never open these in an editor:**
 
 ```
 config/**                   Django settings, URLs, WSGI
@@ -57,32 +105,20 @@ openapi.yaml
 ARCHITECTURE.md  DATA-MODEL.md  JUDGING.md  README.md  .hack-hamster.toml
 ```
 
-**If you need a change in a file he owns, you ask. You never edit it "just quickly".**
-That rule has no exceptions, including at hour 70, especially at hour 70.
+If you need a change in a file he owns, you ask. Never edit it "just quickly" — including at hour 70, especially at hour 70.
 
-## 1.3 The seven git rules
+## 1.3 Git rules
 
-1. **Never `git add .` or `git add -A`.** Explicit paths, every time. This is the single rule
-   that most often saves a repo.
-2. **Commit after every change.** Judges read commit history as an artifact. Many small honest
-   commits beat six giant ones.
+1. **Never `git add .` or `git add -A`.** Explicit paths, every time.
+2. **Commit after every change.** Many small honest commits beat six giant ones.
 3. **Never force-push a shared branch.**
 4. **Never commit on `main` directly.** You work on `mihir`, Manas works on `manas`.
 5. **Pull before you push, every time.**
-6. **Nothing is pushed to `hack-hamster-hackathon` before Sep 26 18:00 UTC.** Rule 04 of the hackathon:
-   any project code committed before kickoff is **disqualification**, not a penalty. Practice
-   work lives in a separate throwaway repo that never gets pushed there.
+6. **Nothing pushed to `hack-hamster-hackathon` before Sep 26 18:00 UTC.** Rule 04: project code committed before kickoff is **disqualification**.
 
-## 1.4 The frozen contract — `.hack-hamster.toml`, not `openapi.yaml`
+## 1.4 The frozen contract — `.hack-hamster.toml`
 
-`.hack-hamster.toml` is the seam between us. It is a ~15-line config file at the repo root,
-**published by Manas at H+20** and frozen after that except by explicit agreement in a
-checkpoint call. The spec is explicit: *"No fixed API routes. Yours are yours."* We pick
-the names; run.py reads them from this file.
-
-The file declares five route names (the URLs run.py will hit) and five pre-baked session
-headers (what run.py attaches to impersonate each role). The checker **never logs in**;
-we hand it the headers and it attaches them.
+`.hack-hamster.toml` is the seam: a ~15-line config at the repo root, **published by Manas at H+20** and frozen after that except by checkpoint-call agreement. Spec: *"No fixed API routes. Yours are yours."* The file declares five route names and five pre-baked session headers. The checker **never logs in**.
 
 **The five routes:**
 
@@ -104,25 +140,15 @@ we hand it the headers and it attaches them.
 | `judge_c` | A third seeded judge (`priya.nair@example.org`). |
 | `participant` | A participant on a team. |
 
-**Your frontend hits only the URLs declared in `[routes]`.** No special backdoor route,
-no server-side template shortcut, no reading the database directly. This is not
-bureaucracy — it is *how we earn the API First bonus*. If every UI action provably goes
-through the public API, the bonus is demonstrated rather than asserted. Your discipline
-is the evidence.
+Your frontend hits only URLs declared in `[routes]`. No special backdoor, no server-side template shortcut, no direct DB reads — **this is how we earn the API First bonus.**
 
-`openapi.yaml` is still useful: every UI action → a documented endpoint → a published
-spec is the literal definition of the bonus. But it is no longer load-bearing for run.py
-— the spec hands us the freedom to name our own routes.
-
-The brief justifies the bonus from the other direction too: its footnote [14] cites an
-*unofficial* Devpost API scraper as evidence that no major judging platform publishes an
-official API. We do. That gap *is* the bonus.
+`openapi.yaml` is still useful for the bonus but no longer load-bearing for run.py.
 
 ## 1.5 Branch model — you are the integrator
 
 ```
-main      ← LICENSE + README only, until the first integration.
-  ▲          Everything reaches main through YOUR branch. Judges clone this.
+main      ← LICENSE + README only, until the first integration. Judges clone this.
+  ▲          Everything reaches main through YOUR branch.
   │
 mihir     ← you live here. You are the integration point.
   ▲
@@ -130,121 +156,58 @@ mihir     ← you live here. You are the integration point.
 manas     ← he lives here. He never merges to main himself.
 ```
 
-**The flow, in one direction only:**
-
-1. Manas works on `manas` and pushes there.
-2. **You merge `manas` into `mihir`.** This is your job, not his.
-3. **You merge `mihir` into `main`.** This is the only path into `main`.
-
-Nobody else merges into `main`. Ever. That is what makes this safe — `main` has exactly one
-upstream, so it can never receive two conflicting merges.
-
-**At kickoff `main` gets only `LICENSE` and `README.md`,** then nothing until the first
-integration.
-
-### The daily rhythm
+**One direction only:** Manas pushes to `manas`. **You merge `manas` → `mihir`** (your job, not his). **You merge `mihir` → `main`** (the only path into `main`). `main` has exactly one upstream, so it can never receive two conflicting merges.
 
 ```bash
-# 1. take his work into yours
+# take his work into yours
 git checkout mihir
 git pull origin mihir
 git fetch origin
 git merge origin/manas          # resolve in YOUR branch, never in main
-# build, test, confirm it runs
 git push origin mihir
 ```
 
 ```bash
-# 2. publish to main — at every gate, with Manas present
+# publish to main — at every gate, with Manas present
 git checkout main
 git pull origin main
 git merge --no-ff mihir
 make up && make accept          # main must be green before you push it
-git add acceptance-report.txt   #   suite output is a published deliverable
+git add acceptance-report.txt
 git commit -m "docs: publish acceptance-report.txt for <gate>"
 git push origin main
 git checkout mihir              # go straight back; never work on main
 ```
 
-### How often you merge to `main`
+**At every gate, not once at the end.** G2, G3, G4, G5, G6, G7 — each ends with `main` updated and green. A first merge at hour 68 is how a hackathon ends with finished code on a branch nobody looked at.
 
-**At every gate, not once at the end.** G2, G3, G4, G5, G6, G7 — each one ends with `main`
-updated and green.
+Manas stays current by merging `main` back into `manas` after each integration. Disjoint ownership → conflict-free by construction.
 
-This matters more here than in a normal project. Judges clone `main`. The acceptance suite and
-`docker compose up` are graded on `main`. If `main` is empty until hour 68, then the first time
-the graded branch is ever tested is an hour before the freeze, with no time to fix what breaks.
+G2 (H+20) matters most — the first time his backend and your frontend have ever been in the same tree, and the first time `main` is more than a licence file. Do it early and together. Everything after G2 is a repeat.
 
-A merge you have done six times is routine. A first merge at hour 68 is how a hackathon ends
-with a broken submission and finished code sitting on a branch nobody looked at.
+## 1.6 Line endings and commit hygiene
 
-### Why Manas never merges to main
-
-Because two people merging into one branch is how you get a conflict *in* `main` — the one
-branch that must always be clean. With a single integrator, `main` only ever fast-forwards or
-takes one well-tested merge. If something is wrong, it is wrong in `mihir`, where you can fix
-it without the graded branch being broken while you do.
-
-**Manas stays current** by merging `main` back into `manas` after each integration. Because
-ownership is disjoint, that merge touches no file he owns and is conflict-free by construction.
-
-
-## 1.6 The first integration is the dangerous one
-
-Every gate ends with an integration, but **G2 (H+20) is the one that matters most** — it is the
-first time his backend and your frontend have ever been in the same tree, and the first time
-`main` is more than a licence file.
-
-Do it early and do it together. The purpose is not the merge itself; it is discovering the
-integration problem while there is still time to fix it calmly. Everything after G2 is a repeat
-of a thing you have already done once.
-
-A first merge attempted at hour 68 has ended more hackathons than any bug.
-
-**Before every merge to `main`:**
-```bash
-make up && make accept     # main is never pushed red
-```
-If it fails, `main` does not move. Fix it in `mihir`, where a broken state costs nothing.
-
-## 1.7 Line endings — kill this before it starts
-
-You are on Windows. Git's default will rewrite line endings and manufacture conflicts in files
-neither of us touched.
+You are on Windows. Git's default will rewrite line endings and manufacture conflicts in files neither of us touched.
 
 ```bash
 git config --global core.autocrlf false
 ```
 
-And in the repo, `.gitattributes` (Manas commits this at G1):
+Repo `.gitattributes` (Manas commits this at G1):
+
 ```
 * text=auto eol=lf
 ```
 
-If you ever see a diff where "every line changed" and you changed nothing — this is why. Stop
-and tell Manas rather than committing it.
+If you see a diff where "every line changed" and you changed nothing — this is why. Stop and tell Manas.
 
-## 1.8 Commit message format
+**Commit format:** imperative, scoped by area, body explains *why* when it is not obvious.
 
-```
-voting: add quadratic ballot with credit budget validation
-
-Voters get 100 credits; cost of n votes on one project is n^2.
-Rejects over-budget ballots server-side, not just in the form.
-```
-
-Imperative, scoped by area, body explains *why* when it is not obvious. No tool names, no
-emoji-free.
-
-## 1.9 If you hit a conflict anyway
-
-Stop. Do not resolve it alone under time pressure. `git merge --abort`, message Manas, fix it
-together in 5 minutes. A badly resolved conflict at hour 60 can silently delete work that was
-already green.
+**If you hit a conflict:** stop. Do not resolve it alone under time pressure. `git merge --abort`, message Manas, fix it together in 5 minutes.
 
 ---
 
-# PART II — YOUR BUILD
+# Part II — Your build
 
 ## 2. Mandate
 
@@ -262,34 +225,26 @@ You own everything a human looks at, plus the security story.
 | Certificates, embeddable widget | T4 | |
 | **`THREAT-MODEL.md`** | Bonus | **+3** |
 | Pairwise compare console | Bonus | Half of **+5** |
-| **The demo video** | Deliverable | No partial credit exists for this |
+| **The demo video** | Deliverable | No partial credit |
 
-**The trap to avoid:** the brief explicitly lists *"a beautiful frontend over hardcoded data"*
-as scoring **zero** on the 40%. Never build a screen against fake data and move on. A screen
-is done when it is talking to the real API.
+**Trap:** the brief lists *"a beautiful frontend over hardcoded data"* as scoring **zero** on the 40%. A screen is done when it is talking to the real API, never earlier.
 
-## 3. Pre-kickoff work (Sep 13 → Sep 26)
+## 3. Pre-kickoff work
 
-All legal — none of it is committed to the competition repo.
+All legal — none committed to the competition repo.
 
 | Dates | Do this |
 |---|---|
 | Sep 13–15 | Join the Discord (this *is* registration). Use Devpost and Devfolio **as a judge and as a participant** — note every friction point; they are our feature list. |
-| Sep 16–18 | Wireframe on paper: gallery, submission form, judge console, organizer dashboard, voting, pairwise compare. Start `THREAT-MODEL.md` — it is paper work, you can have a full draft before kickoff. |
-| Sep 19–21 | Next.js + API-client fluency in a **throwaway repo**. Build a component inventory: button, field, card, table, modal, toast, empty state, skeleton. You will retype these at kickoff from memory. |
-| Sep 22–23 | Write the demo video script. Attend Raptors Conference (Sep 23, free). Machine setup done and verified. |
-| ~~Sep 23~~ *(past)* | Spec dropped a day early. Re-read §1–§11. Update this doc and the partner doc. |
-| ~~Sep 24~~ *(past)* | Re-read spec once more separately. Reconcile at 22:00. Pre-pull base images. |
-| ~~Sep 25~~ *(past)* | Final pre-kickoff pass. Rest. |
+| Sep 16–18 | Wireframe on paper: gallery, submission form, judge console, organizer dashboard, voting, pairwise compare. Start `THREAT-MODEL.md` — paper work; full draft before kickoff. |
+| Sep 19–21 | Next.js + API-client fluency in a **throwaway repo**. Build a component inventory: button, field, card, table, modal, toast, empty state, skeleton. Retype at kickoff from memory. |
+| Sep 22–23 | Demo video script. Attend Raptors Conference (Sep 23, free). Machine setup done and verified. |
+| ~~Sep 23–25~~ *(past)* | Spec dropped a day early. Re-read §1–§11. Update this doc and the partner doc. Reconcile at 22:00. Pre-pull base images. Rest. |
 | **Sep 26 ← we are here** | **KICKOFF. Build begins.** |
 
 ### 3.1 Draft the threat model now
 
-This is a +3 bonus that is almost entirely writing, and you can do 80% of it before kickoff.
-Structure it as: assets → actors → trust boundaries → threats → mitigations → **residual
-risk**.
-
-Threats a hackathon judging platform actually faces:
+A +3 bonus that is almost entirely writing — 80% doable before kickoff. Structure: assets → actors → trust boundaries → threats → mitigations → **residual risk**.
 
 | Threat | Mitigation |
 |---|---|
@@ -297,70 +252,47 @@ Threats a hackathon judging platform actually faces:
 | Judge sees peer scores and anchors | Backend isolation (FIG. 02); scores unreadable cross-judge |
 | Participant edits a submission after the deadline | Server-side deadline check; `submitted_at` immutable |
 | Ballot stuffing in community voting | Rate limits, email gating, duplicate detection, audit trail |
-| Sybil voting from one person, many identities | Fingerprint + rate limit + review queue; **be honest that this is mitigated, not solved** |
+| Sybil voting from one person, many identities | Fingerprint + rate limit + review queue; **mitigated, not solved** |
 | Organizer silently edits scores | Audit log, append-only, visible |
 | Results leaked during the voting window | Aggregates gated server-side until publication |
 | Vote order bias | Randomised ballot ordering, seeded per voter |
 
-**The section that wins the bonus is "Residual risk."** Name what you did *not* solve. In the
-last hackathon we lost points for having no limitations section anywhere. The winning entries
-all conceded their own weaknesses before a judge could find them. Do that here deliberately.
+**The section that wins the bonus is "Residual risk."** Name what you did *not* solve. Winning entries concede their own weaknesses before a judge finds them.
 
 ## 4. Build order
 
-You are blocked on the API until H+20. That gap is deliberate and you use it well.
+Blocked on the API until H+20.
 
-### H+0 → H+20 · Shell and components, against the five routes not the server
+**H+0 → H+20 · Shell and components**
 
-- Next.js app in `web/`, routing, layout, design tokens
-- Component inventory built and working
-- API client layer written against the **five route names** that will appear in `.hack-hamster.toml`'s `[routes]` block — with a mock adapter behind the same interface
-- Every screen scaffolded with loading, empty, and error states
+Next.js app in `web/`, routing, layout, design tokens. Component inventory built and working. API client layer written against the **five route names** with a mock adapter behind the same interface. Every screen scaffolded with loading, empty, and error states.
 
-The five route keys are: `gallery`, `submit`, `judge_scores`, `peer_scores`, `csv_export`.
-The five are the only URLs run.py ever hits. If you build against these names and the
-client layer is right, **the H+20 switch is a one-line change to the base URL**. If you
-scatter `fetch` calls through components against draft paths, it is four hours. Build
-the layer.
+The five are the only URLs run.py hits. If you build against these names, **the H+20 switch is a one-line change to the base URL**. If you scatter `fetch` calls against draft paths, it is four hours.
 
-### H+20 → H+34 · T1 screens on real data
+**H+20 → H+34 · T1 screens on real data**
 
-Gallery with search and filter · submission create/edit with draft state and deadline
-behaviour · team formation and invite links · auth screens · custom questions rendered
-dynamically from the organizer's config (do not hardcode the field list — the spec says
-organizers define their own questions).
+Gallery with search and filter · submission create/edit with draft state and deadline behaviour · team formation and invite links · auth screens · custom questions rendered dynamically from the organizer's config (do not hardcode the field list).
 
-### H+34 → H+48 · Judge console + organizer dashboard, then T3
+**H+34 → H+48 · Judge console + organizer dashboard, then T3**
 
-**The judge console is the most important screen in the product.** This hackathon is about
-judging; this is the screen that shows we understood the assignment. It needs: the judge's
-batch, the weighted rubric rendered from config, per-criterion scoring, save-as-draft, submit,
-progress. And it must show the judge *only their own* work — verify by trying to load a peer's
-score in the console and confirming the API refuses you.
+**The judge console is the most important screen in the product.** This hackathon is about judging. Needs: the judge's batch, the weighted rubric rendered from config, per-criterion scoring, save-as-draft, submit, progress. Must show the judge *only their own* work — verify by trying to load a peer's score in the console and confirming the API refuses you.
 
-Then T3: voting (open / email-gated / authenticated), quadratic mode, comments, results hidden
-during the window, randomised ballot order, and your anti-abuse layer with a **human-readable**
-audit trail. "Readable" is the brief's word — a judge should be able to skim it and understand
-what happened.
+Then T3: voting (open / email-gated / authenticated), quadratic mode, comments, results hidden during the window, randomised ballot order, anti-abuse layer with a **human-readable** audit trail.
 
-### H+48 → H+62 · Pairwise console, certificates, widget
+**H+48 → H+62 · Pairwise console, certificates, widget**
 
-Pairwise compare: two projects, pick one, next pair. Fast keyboard flow — a judge doing 40
-comparisons should never touch the mouse. Certificates and the embeddable widget follow.
+Pairwise compare: two projects, pick one, next pair. Fast keyboard flow — a judge doing 40 comparisons should never touch the mouse. Certificates and the embeddable widget follow.
 
-### H+62 → H+68 · Freeze, then the video
+**H+62 → H+68 · Freeze, then the video**
 
 **Feature freeze at H+62.** `THREAT-MODEL.md` and `docs/UI.md` finished.
 
-**Record the video at H+68. Not later.** Five minutes, one full lifecycle: create event →
-submit project → judge scores → results published. Script it in advance, do a dry run, then
-record. Show the *product working*, not slides. If normalization changed the ranking, show
-that — it is the most interesting thing we built.
+**Record the video at H+68. Not later.** Five minutes, one full lifecycle: create event → submit project → judge scores → results published. Script in advance, dry run, then record. Show the *product working*, not slides.
 
 ## 5. Definition of done
 
 - [ ] Every screen talks to the real API — zero hardcoded data anywhere
-- [ ] Every API call goes through documented endpoints only (this is the API First proof)
+- [ ] Every API call goes through documented endpoints only (API First proof)
 - [ ] Judge console shows only the judge's own work, and the API refuses the rest
 - [ ] Loading, empty, and error states exist on every screen
 - [ ] Anti-abuse: rate limits, duplicate detection, readable audit trail
@@ -368,13 +300,12 @@ that — it is the most interesting thing we built.
 - [ ] Zero console errors, zero build warnings
 - [ ] Demo video recorded, under 5 minutes, shows a full lifecycle
 
-
 ## 6. Checkpoints
 
 | When | Gate | What you do |
 |---|---|---|
 | H+3 | G1 | Confirm the repo runs on your machine |
-| **H+20** | **G2** | **`.hack-hamster.toml` handover — switch off mocks against the five real routes. First real merge to `main`.** |
+| **H+20** | **G2** | **`.hack-hamster.toml` handover — switch off mocks. First real merge to `main`.** |
 | H+34 | G3 | Merge `manas` → `mihir` → `main`. Suite green on `main`. |
 | H+40 | G4 | Same. |
 | H+48 | G5 | Same. Video script locked. |
@@ -387,10 +318,9 @@ Every row ends with `main` green and pushed. You are the only person who moves i
 
 ## 7. The two things most likely to go wrong
 
-1. **You build ahead of the API and integrate late.** Mitigation: the mock adapter must sit
-   behind the same interface as the real client, so the switch is one line. Test the switch at
-   H+20 even if only one route is ready.
-2. **The video gets left to the last hour.** It is the one deliverable with no partial credit
-   and it is always underestimated. **It is also the only thing scoring T3 and T4** —
-   run.py has zero checks for either tier. If the video is weak, T3 and T4 are weak, full
-   stop. H+68 is a hard commitment.
+1. **You build ahead of the API and integrate late.** The mock adapter sits behind the same interface as the real client; switch is one line. Test the switch at H+20 even if only one route is ready.
+2. **The video gets left to the last hour.** The one deliverable with no partial credit, always underestimated. It is also **the only thing scoring T3 and T4** — run.py has zero checks for either tier. H+68 is a hard commitment.
+
+---
+
+[← Back to README.md](README.md)

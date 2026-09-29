@@ -1,8 +1,8 @@
 # Concurrency tests
 
-**Role:** Race-condition probes for the hackathon judging portal's save endpoints. Seven tests in `tests/concurrency/test_concurrency.py`, all marked `@pytest.mark.concurrency`. What they prove: the ORM's `update_or_create` is sufficient under contention, no test mocks the lock manager, and every state change is audited.
+**Role:** Race-condition probes for the portal's save endpoints. Seven tests in `tests/concurrency/test_concurrency.py`, all `@pytest.mark.concurrency`. Proves: `update_or_create` is sufficient under contention, the lock manager is never mocked, every state change is audited.
 
-> **The dev server is process-serial (one Django worker), but the test client and the ORM both run concurrently when we fan two requests out on a thread pool — so the patterns these tests exercise are exactly the ones that would break under real concurrent load.**
+> Dev server is process-serial (one Django worker), but the test client and ORM both run concurrently when two requests fan out on a thread pool — so the patterns these tests exercise are exactly what would break under real concurrent load.
 
 ---
 
@@ -62,13 +62,13 @@ sequenceDiagram
 docker compose exec web pytest tests/concurrency/ -v
 ```
 
-All seven tests are expected to pass on a fresh database.
+All seven tests pass on a fresh database.
 
 ---
 
 ## How concurrency is faked
 
-`ThreadPoolExecutor` runs two callables in parallel. Each callable sends a request through a Django test `Client`. Django's in-process WSGI dispatch means we're not getting true socket-level races, but the ORM **is** shared between threads, and the assertions below are valid under any reasonable interleaving that real production concurrency would produce.
+`ThreadPoolExecutor` runs callables in parallel; each sends a request through a Django test `Client`. In-process WSGI dispatch means no true socket-level races, but the ORM is shared between threads — assertions are valid under any interleaving real concurrency would produce.
 
 ```python
 def _run_in_threads(callables):
@@ -78,7 +78,7 @@ def _run_in_threads(callables):
             f.result()
 ```
 
-After every parallel block we call `connections.close_all()` so pytest-django's transaction rollback isn't fighting open cursors on worker threads.
+After every parallel block, `connections.close_all()` so pytest-django's transaction rollback isn't fighting open cursors on worker threads.
 
 ---
 
@@ -88,72 +88,72 @@ After every parallel block we call `connections.close_all()` so pytest-django's 
 
 **Scenario.** `judge_a` fires two PUTs to `/api/events/<slug>/me/batch/<project>/scores` in parallel, both updating the same `(assignment, criterion)` cell.
 
-**Race simulated.** Two threads race on `Score.objects.update_or_create(assignment=..., criterion=...)`. The table has `unique_together=(assignment, criterion)`. Without the internal `atomic()` block that `update_or_create` carries since Django 1.11, both threads could find no row, both could insert, and one insert would silently fail.
+**Race.** Two threads race on `Score.objects.update_or_create(assignment=..., criterion=...)`. `unique_together=(assignment, criterion)`. Without `update_or_create`'s internal `atomic()` (Django ≥ 1.11), both threads could find no row, both insert, one silently fails.
 
-**Expected invariant.** Exactly one `Score` row exists after both PUTs. Both responses are HTTP 200.
+**Invariant.** Exactly one `Score` row. Both responses 200.
 
 ### 2. `test_concurrent_score_save_last_write_wins`
 
-**Scenario.** Same setup as test 1, but the two PUTs carry *different* values (5 and 1) for the same criterion.
+**Scenario.** Same setup as test 1, but values are 5 and 1.
 
-**Race simulated.** The classic lost-update: thread A reads, thread B reads, both write — the final value is whichever `.save()` ran last, not a blended or default value.
+**Race.** Lost-update: A reads, B reads, both write — final value is whichever `.save()` ran last.
 
-**Expected invariant.** The persisted `value` is one of {1, 5}. Not a default like `None`, not the arithmetic mean. We don't assert *which* value wins — the assertion is the weaker (and only meaningful) one: there is no corruption.
+**Invariant.** Persisted `value` ∈ {1, 5}. Not `None`, not the mean. We don't assert which wins — only that there is no corruption.
 
 ### 3. `test_concurrent_vote_same_voter_key_collapses`
 
-**Scenario.** Two anonymous POSTs to `/api/events/<slug>/submissions/<id>/vote` from the same `REMOTE_ADDR` and `User-Agent`. In `VoteView._voter_key`, both collapse to the same `fp:<sha256(ip + ua)[:32]>` string.
+**Scenario.** Two anonymous POSTs to `/api/events/<slug>/submissions/<id>/vote` from the same `REMOTE_ADDR` + `User-Agent`. `VoteView._voter_key` collapses both to `fp:<sha256(ip + ua)[:32]>`.
 
-**Race simulated.** The vote table has `unique_together=(event, project, voter_key)`. Two threads each call `Vote.objects.update_or_create(...)` with the same key — the second one would race the first's INSERT.
+**Race.** `unique_together=(event, project, voter_key)`. Two threads each call `Vote.objects.update_or_create(...)` with the same key — the second races the first's INSERT.
 
-**Expected invariant.** Exactly one `Vote` row exists with `votes == 1`. The `VoteAudit` table holds **two** rows — every successful state change appends an audit entry, regardless of whether the underlying ballot row is fresh or pre-existing.
+**Invariant.** Exactly one `Vote` row with `votes == 1`. `VoteAudit` holds **two** rows — every successful state change appends an entry, regardless of fresh vs pre-existing.
 
 ### 4. `test_concurrent_vote_different_voter_keys_creates_two_rows`
 
-**Scenario.** Two anonymous POSTs from different `REMOTE_ADDR` values.
+**Scenario.** Two anonymous POSTs from different `REMOTE_ADDR`.
 
-**Race simulated.** Same `update_or_create` path as test 3, but the `voter_key` differs, so the rows are distinct.
+**Race.** Same path as test 3, but `voter_key` differs.
 
-**Expected invariant.** Two `Vote` rows exist, both with the same project. The `voter_key` column differs between them.
+**Invariant.** Two `Vote` rows, same project, distinct `voter_key`.
 
 ### 5. `test_normalize_two_posts_each_internally_consistent`
 
-**Scenario.** With the bipartite `(projects × judges)` connected (judge_a on project_0, judge_b on project_0 + project_1, judge_c on project_1, all criteria scored), two POSTs to `/api/events/<slug>/normalize` are fired in parallel from the organizer's client.
+**Scenario.** Bipartite `(projects × judges)` connected (judge_a→project_0, judge_b→project_0+1, judge_c→project_1, all criteria scored). Two POSTs to `/api/events/<slug>/normalize` in parallel from the organizer client.
 
-**Race simulated.** `NormalizeView` runs the additive alternating-means fit inside `transaction.atomic`. Two concurrent POSTs each create their own `NormalizationRun` row (no row-level contention, since the runs are append-only by design). The risk is not a write conflict — it's a *consistency* one: do both runs produce the same numbers, and do the per-run row counts (`NormalizedScore`, `JudgeBias`) line up with the run-level counters?
+**Race.** `NormalizeView` runs the additive alternating-means fit inside `transaction.atomic`. Each POST creates its own `NormalizationRun` (append-only — no row-level contention). Risk is consistency: identical numbers, per-run counts matching run-level counters.
 
-**Expected invariant.**
+**Invariant.**
 
-- Two `NormalizationRun` rows exist.
-- Each run's `NormalizedScore.count() == run.n_projects` and `JudgeBias.count() == run.n_judges`.
-- Both runs report identical `raw_sigma`, `normalized_sigma`, `n_reviews`, `n_projects`, `n_judges` (same input -> same fit).
-- Both runs have `is_connected = True`.
+- Two `NormalizationRun` rows.
+- Each run's `NormalizedScore.count() == run.n_projects`, `JudgeBias.count() == run.n_judges`.
+- Both runs report identical `raw_sigma`, `normalized_sigma`, `n_reviews`, `n_projects`, `n_judges` (same input → same fit).
+- Both runs `is_connected = True`.
 
 ### 6. `test_webhook_get_during_post_returns_200`
 
-**Scenario.** From the organizer's client, a GET on `/api/webhooks` is fired in parallel with a POST that creates a new webhook for the sample event.
+**Scenario.** Organizer client: GET `/api/webhooks` in parallel with POST creating a new webhook for the sample event.
 
-**Race simulated.** The GET does `SELECT ... FROM webhooks`; the POST does an INSERT. They touch disjoint rows in the table, so the GET must not block behind the POST's row lock.
+**Race.** GET `SELECT ... FROM webhooks`; POST INSERT. Disjoint rows; GET must not block on POST's row lock.
 
-**Expected invariant.** GET returns 200, POST returns 201, no deadlock or lock-wait timeout.
+**Invariant.** GET 200, POST 201, no deadlock / lock-wait timeout.
 
 ### 7. `test_concurrent_logins_create_n_sessions`
 
 **Scenario.** Five concurrent POSTs to `/api/login` for the same `participant` user.
 
-**Race simulated.** `LoginView` does `Session.objects.filter(user=user).delete()` and then `Session.create(...)` (which inserts a new row with a fresh `token_hash`). Each login issues a *new* random token — so the unique constraint on `token_hash` is not a contention point. The risk is that the sequential delete+insert might silently drop a write if one thread's delete sweeps the row another thread is about to insert.
+**Race.** `LoginView` does `Session.objects.filter(user=user).delete()` then `Session.create(...)` (new `token_hash`). Each login issues a new random token — `token_hash` unique constraint is not the contention point. Risk: delete+insert might drop a write if one thread's delete sweeps another thread's pending insert.
 
-**Expected invariant.**
+**Invariant.**
 
-- Exactly five `Session` rows exist for the user.
-- The five `token_hash` values are pairwise distinct.
-- Each round-trip's `Set-Cookie` value is accepted by a follow-up GET on `/api/me` (returns 200).
+- Exactly five `Session` rows for the user.
+- `token_hash` values pairwise distinct.
+- Each `Set-Cookie` accepted by a follow-up GET `/api/me` (200).
 
 ---
 
 ## Why we don't mock the lock manager
 
-The hackathon's threat model relies on the ORM's `update_or_create` (and its internal `atomic()`) being sufficient for the upserts we do. Mocking the lock manager would let a test pass while the production code still has a real race; we want to exercise the actual DB-level behavior, so the tests run against the real Postgres container with `transaction=True` so each test gets its own DB transaction (rather than the single-transaction default that wouldn't tolerate the parallel commits the threads issue).
+The threat model relies on `update_or_create` (and its `atomic()`) being sufficient. Mocking the lock manager would let a test pass while production code still has a real race. Tests run against the real Postgres container with `transaction=True` so each test gets its own DB transaction — rather than the single-transaction default that wouldn't tolerate the threads' parallel commits.
 
 ---
 

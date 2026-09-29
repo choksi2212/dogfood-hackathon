@@ -1,11 +1,66 @@
 # Test suite — certificates
 
-`tests/certificates/test_certificates.py` — `@pytest.mark.certificates`
+> **HMAC-SHA256-signed per-submission certificates: sign, verify, tamper detection, canonical-JSON stability.** Tests live in `tests/certificates/test_certificates.py` under `@pytest.mark.certificates`.
+
+## Contents
+
+- [Issue → sign → verify → tamper at a glance](#issue--sign--verify--tamper-at-a-glance)
+- [What it covers](#what-it-covers)
+- [HMAC scheme](#hmac-scheme)
+- [Known drift](#known-drift)
+- [Run](#run)
+
+## Issue → sign → verify → tamper at a glance
+
+```mermaid
+flowchart LR
+    subgraph I["📥 Issue"]
+        direction TB
+        O["🧑‍💼 Organizer<br/>POST /api/events/&lt;slug&gt;/certificates/issue"]
+        PAY["📦 {submission_id,<br/>team_name, event_slug}"]
+    end
+
+    subgraph S["🔏 Sign"]
+        direction TB
+        CAN["⚖️ canonical_json(payload)<br/>sort_keys + no whitespace"]
+        HMAC["⚖️ HMAC-SHA256(<br/>SECRET_KEY, payload)"]
+        SIG["📜 signature = hex digest"]
+    end
+
+    subgraph DB["🗄️ Postgres"]
+        direction TB
+        ROW[("certificate row<br/>(public_id, signed_payload,<br/>signature, algorithm)")]
+    end
+
+    subgraph V["🔍 Verify"]
+        direction TB
+        V1["🌐 GET /api/certificates/&lt;public_id&gt;"]
+        V2["⚖️ recompute HMAC over stored payload"]
+        V3["⚖️ hmac.compare_digest()<br/>(constant-time)"]
+    end
+
+    subgraph T["🧪 Tamper test"]
+        direction TB
+        T1["⚖️ mutate one byte of<br/>signed_payload in DB"]
+        T2["🔴 HMAC mismatch → 400<br/>signature_invalid"]
+    end
+
+    O --> PAY --> CAN --> HMAC --> SIG --> ROW
+    ROW --> V1 --> V2 --> V3
+    V3 -->|match| OK["✅ 200 + signature"]
+    V3 -->|mismatch| T1 --> T2
+
+    style I fill:#FFE8D6,stroke:#F4A261,color:#1D3557
+    style S fill:#EDE7F6,stroke:#6C567B,color:#1D3557
+    style DB fill:#A8DADC,stroke:#2A9D8F,color:#1D3557
+    style V fill:#FDF6E3,stroke:#E9C46A,color:#1D3557
+    style T fill:#F1FAEE,stroke:#E63946,color:#1D3557
+    style OK fill:#A8DADC,stroke:#2A9D8F,color:#1D3557
+```
 
 ## What it covers
 
-HMAC-SHA256-signed per-submission certificates. Sign, verify, tamper
-detection, canonical-JSON stability, view-level roundtrip.
+HMAC-SHA256-signed per-submission certificates: sign, verify, tamper detection, canonical-JSON stability, view-level roundtrip.
 
 | Test | Asserts |
 |---|---|
@@ -34,15 +89,14 @@ verify   = constant-time hmac.compare_digest(sig, sign_payload(payload))
 
 ## Known drift
 
-- Fixed: `config/urls.py` mounted `apps.certificates.urls` under
-  `path("api/", ...)` instead of `path("api/certificates/", ...)`,
-  so the route was actually `/api/<public_id>` — missing the
-  `certificates/` prefix every other doc reference assumed. The
-  frontend's certificate lookup screen (web/app/certificates/) hit
-  this live while wiring against the real backend.
+- Fixed: `config/urls.py` mounted `apps.certificates.urls` under `path("api/", ...)` instead of `path("api/certificates/", ...)` — route was `/api/<public_id>`, missing the `certificates/` prefix every other doc reference assumed. The frontend's certificate lookup screen (`web/app/certificates/`) hit this live while wiring against the real backend.
 
 ## Run
 
 ```bash
 make test-certificates
 ```
+
+---
+
+[← Back to TESTING.md](TESTING.md)

@@ -1,6 +1,54 @@
 # Test suite — CSV
 
-`tests/csv/test_csv_export.py` — `@pytest.mark.csv`
+> **Streaming CSV export from `apps.judging.views.CSVExportView`.** Tests live in `tests/csv/test_csv_export.py` under `@pytest.mark.csv`. Comma-separated, RFC 4180 quoting, unicode-preserving, organizer-only.
+
+## Contents
+
+- [Stream at a glance](#stream-at-a-glance)
+- [What it covers](#what-it-covers)
+- [Known drift](#known-drift)
+- [Run](#run)
+
+## Stream at a glance
+
+```mermaid
+flowchart LR
+    subgraph REQ["📥 Request"]
+        direction TB
+        ORG["🧑‍💼 Organizer<br/>GET /api/csv_export?event_slug=…"]
+        ANON["🌐 Anonymous"]
+        JUDGE["👤 Judge"]
+    end
+
+    subgraph GATE["🔒 Permission gate"]
+        direction TB
+        AUTH["⚖️ IsAuthenticated?"]
+        ORG2["⚖️ IsOrganizer?"]
+    end
+
+    subgraph STREAM["📤 Streaming export"]
+        direction TB
+        Q["⚖️ NormalizedScore<br/>.select_related(*)<br/>.order_by(...)"]
+        HDR["📝 Header row<br/>event_slug, project_id,<br/>project_name, judge_email,<br/>criterion_name, score, weight"]
+        ROW["📝 N×M×K data rows<br/>RFC 4180 quoting"]
+        UTF["🌐 UTF-8 preserved<br/>(→, emoji, 中文)"]
+        RESP["📡 StreamingHttpResponse<br/>Content-Type: text/csv<br/>Content-Disposition: attachment"]
+    end
+
+    ORG --> AUTH --> ORG2 --> Q
+    Q --> HDR --> ROW --> UTF --> RESP
+    ANON --> AUTH
+    AUTH -->|no| R401["🔴 401"]
+    JUDGE --> AUTH
+    AUTH -->|yes| ORG2
+    ORG2 -->|no| R403["🔴 403"]
+
+    style REQ fill:#FDF6E3,stroke:#E9C46A,color:#1D3557
+    style GATE fill:#FFE8D6,stroke:#F4A261,color:#1D3557
+    style STREAM fill:#A8DADC,stroke:#2A9D8F,color:#1D3557
+    style R401 fill:#F1FAEE,stroke:#E63946,color:#1D3557
+    style R403 fill:#F1FAEE,stroke:#E63946,color:#1D3557
+```
 
 ## What it covers
 
@@ -24,15 +72,15 @@ Streaming CSV export from `apps.judging.views.CSVExportView`.
 
 ## Known drift
 
-- `test_unicode_arrow_in_project_name`: The csv module's writer
-  default may quote the `→` differently. Use `utf-8` encoding
-  explicitly in writer if needed.
-- `test_non_organizer_gets_403`: Our view returns 422 (validation
-  error from missing `?event_slug` for non-organizers) before the
-  organizer check. Reorder: organizer first, then event resolution.
+- `test_unicode_arrow_in_project_name`: csv writer may quote `→` differently; pass `utf-8` explicitly if needed.
+- `test_non_organizer_gets_403`: View returns 422 (validation, missing `?event_slug` for non-organizers) before the organizer check. Reorder: organizer first, then event resolution.
 
 ## Run
 
 ```bash
 make test-csv
 ```
+
+---
+
+[← Back to TESTING.md](TESTING.md)

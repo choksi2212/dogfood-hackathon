@@ -1,5 +1,7 @@
 # HACK HAMSTER 2026 — Backend & DB Implementation
 
+> **Hero.** The exact code, configs, and migrations behind the backend — for whoever is typing the next commit. The PRD says *what*. The TRD says *how*. The architecture says *how the how is shaped*. This document says *exactly what to type*.
+
 **Event:** hackhamster.com · Hackathon Raptors · "Build the platform that will judge you"
 **Window:** Sep 26 18:00 UTC → Sep 29 18:00 UTC, 2026 (72h)
 **Team:** Manas (`choksi2212`) + Mihir (`Mihir-Rabari`)
@@ -8,8 +10,63 @@
 **Stack:** Django 5 + DRF + PostgreSQL 16 + Next.js 15, all in `docker compose up`
 **Companion docs:** [PRD](PRD.md), [TRD](TRD.md), [Architecture](../ARCHITECTURE.md)
 
-> The PRD says *what*. The TRD says *how*. The architecture says *how the how is
-> shaped*. This document says *exactly what to type*.
+## Contents
+
+- [Request lifecycle](#request-lifecycle)
+- [Part 1 — Project Setup](#part-1--project-setup)
+- [Part 2 — Django Project Setup](#part-2--django-project-setup)
+- [Part 3 — Auth App (apps/accounts)](#part-3--auth-app-appsaccounts)
+- [Part 4 — Events App (apps/events)](#part-4--events-app-appsevents)
+- [Part 5 — Teams App (apps/teams)](#part-5--teams-app-appsteams)
+- [Part 6 — Submissions App (apps/submissions)](#part-6--submissions-app-appssubmissions)
+- [Part 7 — Judging App (apps/judging)](#part-7--judging-app-appsjudging)
+- [Part 8 — Voting App (apps/voting)](#part-8--voting-app-appsvoting)
+- [Part 9 — Audit App (apps/audit)](#part-9--audit-app-appsaudit)
+- [Part 10 — Normalization App (apps/normalization)](#part-10--normalization-app-appsnormalization)
+- [Part 11 — Pairwise App (apps/pairwise)](#part-11--pairwise-app-appspairwise)
+- [Part 12 — API App (apps/api)](#part-12--api-app-appsapi)
+- [Part 13 — CSV Export](#part-13--csv-export)
+- [Part 14 — The Role-Isolation Matrix Test](#part-14--the-role-isolation-matrix-test)
+- [Part 15 — The .hack-hamster.toml](#part-15--the-hack-hamstertoml)
+- [Part 16 — URLs Cross-Reference](#part-16--urls-cross-reference)
+- [Related docs](#related-docs)
+
+---
+
+## Request lifecycle
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Browser as 🟦 Browser
+    participant Nginx as 🟠 Nginx<br/>(TLS + X-Forwarded-For)
+    participant MW as 🟣 Django Middleware Stack
+    participant View as 🟣 DRF View
+    participant ORM as 🟡 Django ORM
+    participant PG as 🔵 PostgreSQL 16<br/>(pgdata)
+    participant Audit as 🔵 audit_auditevent<br/>(append-only)
+
+    Browser->>Nginx: HTTPS GET /api/events/sample-hack-2026/...
+    Nginx->>MW: HTTP request<br/>X-Forwarded-For set
+    MW->>MW: SessionMiddleware<br/>resolve cookie → user
+    MW->>MW: RateLimitMiddleware<br/>check bucket per IP+class
+    MW->>MW: AuditMiddleware<br/>(post-response, see below)
+    MW->>View: dispatch resolved URL
+    View->>View: Permission classes<br/>(IsAuthenticated, IsOrganizer…)
+    View->>View: @deadline_gated(...)<br/>compare now vs Event.<field>
+    View->>ORM: serializer + queryset
+    ORM->>PG: SELECT / INSERT / UPDATE
+    PG-->>ORM: result rows
+    ORM-->>View: model instances
+    View-->>MW: Response (2xx / 4xx / 5xx)
+    alt response is 401 or 403 on /api/*
+        MW->>Audit: INSERT row<br/>(actor, action, ip, result='denied')
+    end
+    MW-->>Nginx: HTTP response
+    Nginx-->>Browser: HTTPS response<br/>(Set-Cookie if login)
+```
+
+> **Palette** — `🟠 #F4A261` compute (nginx), `🟣 #6C567B` domain layer (middleware, views), `🟡 #E9C46A` read paths (ORM), `🔵 #A8DADC` state/data stores (Postgres, audit), `🟢 #2A9D8F` data-store borders, `🔴 #E63946` outline only.
 
 ---
 
@@ -151,12 +208,7 @@ ci:          lint
 down-clean:  $(COMPOSE) down -v
 ```
 
-The `accept` target runs the vendored `acceptance.py` (byte-for-byte the
-spec's `run.py`, only the filename differs) directly — no wrapper script,
-no separate user-seeder command — and seeding is the single idempotent
-`manage.py import_fixtures`. The real Makefile also has `accept-fresh`
-(re-seed then accept), `test-<category>`, `test-cov`, `types`, and the
-`metrics-*` targets for the observability stack.
+The `accept` target runs the vendored `acceptance.py` (byte-for-byte the spec's `run.py`, only the filename differs) directly — no wrapper script, no separate user-seeder command — and seeding is the single idempotent `manage.py import_fixtures`. The real Makefile also has `accept-fresh` (re-seed then accept), `test-<category>`, `test-cov`, `types`, and the `metrics-*` targets for the observability stack.
 
 ### 1.7 docker-compose.yml
 
@@ -237,11 +289,7 @@ CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000",
      "--access-logfile", "-", "--error-logfile", "-"]
 ```
 
-The entrypoint waits for postgres (`pg_isready`), runs `migrate --noinput`,
-runs `import_fixtures` (skippable with `SKIP_SEED=1`; it falls back to the
-legacy `seed_fixtures` only when `fixtures.json` is missing), then `exec`s
-the CMD. There is no `Dockerfile.backend`, no separate user-seeder
-command, and no `backend.wsgi` — the Django project package is `config/`.
+The entrypoint waits for postgres (`pg_isready`), runs `migrate --noinput`, runs `import_fixtures` (skippable with `SKIP_SEED=1`; falls back to legacy `seed_fixtures` only when `fixtures.json` is missing), then `exec`s the CMD. There is no `Dockerfile.backend`, no separate user-seeder command, no `backend.wsgi` — the Django project package is `config/`.
 
 ### 1.9 Dockerfile.web
 
@@ -869,17 +917,8 @@ class Command(BaseCommand):
             self.stdout.write(f'{label.upper()}_HEADER = "Cookie: session={token}"')
 ```
 
-The five demo sessions are bound to the first three **fixture** judges —
-`judge_a` → `tomas.varga@example.org`, `judge_b` → `wei.lindqvist@example.org`,
-`judge_c` → `priya.nair@example.org` — plus the organizer and participant
-accounts, all with the dev password `hack-hamster-dev-password`. Because each
-token is `HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`,
-the five committed `.hack-hamster.toml` `[auth]` headers are valid on every fresh
-volume; they change only if `DJANGO_SECRET_KEY` changes (re-run `make seed` to
-print the new values). The command is idempotent, and `entrypoint.sh` runs it
-automatically after `migrate`. There is no separate user-seeder command; a
-legacy `seed_fixtures` (synthetic data) is only a fallback when
-`fixtures.json` is missing.
+The five demo sessions bind to the first three **fixture** judges — `judge_a` → `tomas.varga@example.org`, `judge_b` → `wei.lindqvist@example.org`, `judge_c` → `priya.nair@example.org` — plus the organizer and participant accounts, all with the dev password `hack-hamster-dev-password`. Each token is `HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`, so the five committed `.hack-hamster.toml` `[auth]` headers are valid on every fresh volume; they change only if `DJANGO_SECRET_KEY` changes (re-run `make seed` to print the new values). The command is idempotent, and `entrypoint.sh` runs it automatically after `migrate`. No separate user-seeder command; legacy `seed_fixtures` (synthetic data) is only a fallback when `fixtures.json` is missing.
+
 
 ## Part 4 — Events App (apps/events)
 
@@ -906,11 +945,11 @@ class Event(models.Model):
     results_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='created_events')
-    
+
     class Meta:
         db_table = 'events_event'
         indexes = [models.Index(fields=['slug'])]
-    
+
     def clean(self):
         if self.submissions_close_at <= self.open_at:
             raise ValidationError('submissions_close_at must be after open_at')
@@ -918,7 +957,7 @@ class Event(models.Model):
             raise ValidationError('judging_open_at must be after submissions_close_at')
         if self.judging_close_at <= self.judging_open_at:
             raise ValidationError('judging_close_at must be after judging_open_at')
-    
+
     def state(self, now=None):
         from django.utils import timezone
         now = now or timezone.now()
@@ -938,7 +977,7 @@ class Track(models.Model):
     slug = models.SlugField(max_length=40)
     description = models.CharField(max_length=200, blank=True)
     order = models.PositiveIntegerField(default=0)
-    
+
     class Meta:
         db_table = 'events_track'
         unique_together = ('event', 'slug')
@@ -952,7 +991,7 @@ class Prize(models.Model):
     name = models.CharField(max_length=80)
     value = models.DecimalField(max_digits=10, decimal_places=2)
     order = models.PositiveIntegerField(default=0)
-    
+
     class Meta:
         db_table = 'events_prize'
         ordering = ['order', 'name']
@@ -966,14 +1005,14 @@ class Membership(models.Model):
         ('organizer', 'Organizer'),
         ('admin', 'Admin'),
     ]
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='memberships')
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='memberships')
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='created_memberships')
-    
+
     class Meta:
         db_table = 'events_membership'
         unique_together = ('user', 'event')
@@ -986,7 +1025,7 @@ class Rubric(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     event = models.OneToOneField(Event, on_delete=models.CASCADE, related_name='rubric')
     name = models.CharField(max_length=80, default='Default')
-    
+
     class Meta:
         db_table = 'events_rubric'
 
@@ -1000,11 +1039,11 @@ class RubricCriterion(models.Model):
     min = models.IntegerField(default=1)
     max = models.IntegerField(default=5)
     order = models.PositiveIntegerField(default=0)
-    
+
     class Meta:
         db_table = 'events_rubriccriterion'
         ordering = ['order', 'name']
-    
+
     def clean(self):
         from decimal import Decimal
         siblings = RubricCriterion.objects.filter(rubric=self.rubric).exclude(pk=self.pk)
@@ -1111,7 +1150,7 @@ class RubricCriterionSerializer(serializers.ModelSerializer):
 
 class RubricSerializer(serializers.ModelSerializer):
     criteria = RubricCriterionSerializer(many=True)
-    
+
     class Meta:
         model = Rubric
         fields = ['id', 'name', 'criteria']
@@ -1122,7 +1161,7 @@ class EventSerializer(serializers.ModelSerializer):
     prizes = PrizeSerializer(many=True, read_only=True)
     rubric = RubricSerializer(read_only=True)
     state = serializers.CharField(read_only=True)
-    
+
     class Meta:
         model = Event
         fields = [
@@ -1137,7 +1176,7 @@ class EventSerializer(serializers.ModelSerializer):
 class MembershipSerializer(serializers.ModelSerializer):
     user_email = serializers.EmailField(source='user.email', read_only=True)
     user_name = serializers.CharField(source='user.name', read_only=True)
-    
+
     class Meta:
         model = Membership
         fields = ['id', 'user', 'user_email', 'user_name', 'role', 'created_at']
@@ -1160,7 +1199,7 @@ from apps.audit.helpers import log as audit_log
 
 class EventCreateView(APIView):
     permission_classes = [IsAuthenticated, IsOrganizer]
-    
+
     def post(self, request):
         serializer = EventSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1173,7 +1212,7 @@ class EventDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = EventSerializer
     lookup_field = 'slug'
     queryset = Event.objects.all()
-    
+
     def get_permissions(self):
         if self.request.method == 'GET':
             return [IsAuthenticated(), IsInEvent()]
@@ -1182,7 +1221,7 @@ class EventDetailView(generics.RetrieveUpdateAPIView):
 
 class TrackCreateView(APIView):
     permission_classes = [IsAuthenticated, IsOrganizer]
-    
+
     def post(self, request, slug):
         event = Event.objects.get(slug=slug)
         serializer = TrackSerializer(data={**request.data, 'event': event.id})
@@ -1194,11 +1233,11 @@ class TrackCreateView(APIView):
 
 class RubricCreateView(APIView):
     permission_classes = [IsAuthenticated, IsOrganizer]
-    
+
     def post(self, request, slug):
         event = Event.objects.get(slug=slug)
         criteria_data = request.data.get('criteria', [])
-        
+
         from decimal import Decimal
         total = sum(Decimal(str(c.get('weight', 0))) for c in criteria_data)
         if abs(total - Decimal('1.000')) > Decimal('0.001'):
@@ -1206,13 +1245,13 @@ class RubricCreateView(APIView):
                 {'error': {'code': 'validation_failed', 'message': f'Weights sum to {total}, not 1.0.'}},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
-        
+
         # Replace existing rubric
         Rubric.objects.filter(event=event).delete()
         rubric = Rubric.objects.create(event=event, name=request.data.get('name', 'Default'))
         for c in criteria_data:
             RubricCriterion.objects.create(rubric=rubric, **c)
-        
+
         audit_log(request.user, 'rubric.set', rubric, request=request)
         return Response(RubricSerializer(rubric).data, status=status.HTTP_201_CREATED)
 ```
@@ -1237,7 +1276,7 @@ def deadline_gated(field_name: str):
                 event = Event.objects.get(slug=event_slug)
             except Event.DoesNotExist:
                 return HttpResponse(status=404)
-            
+
             from django.utils import timezone
             deadline = getattr(event, field_name)
             if timezone.now() > deadline:
@@ -1252,7 +1291,7 @@ def deadline_gated(field_name: str):
                     }),
                     content_type='application/json',
                 )
-            
+
             return view_func(self, request, *args, **kwargs)
         return wrapped
     return decorator
@@ -1274,7 +1313,6 @@ urlpatterns = [
 ]
 ```
 
----
 
 ## Part 5 — Teams App (apps/teams)
 
@@ -1303,7 +1341,7 @@ class Team(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='created_teams')
     created_at = models.DateTimeField(auto_now_add=True)
     locked_at = models.DateTimeField(null=True, blank=True)
-    
+
     class Meta:
         db_table = 'teams_team'
         indexes = [models.Index(fields=['event', 'name'])]
@@ -1311,13 +1349,13 @@ class Team(models.Model):
 
 class TeamMember(models.Model):
     ROLE_CHOICES = [('member', 'Member'), ('captain', 'Captain')]
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='members')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='team_memberships')
     joined_at = models.DateTimeField(auto_now_add=True)
     role_in_team = models.CharField(max_length=20, choices=ROLE_CHOICES, default='captain')
-    
+
     class Meta:
         db_table = 'teams_teammember'
         unique_together = ('team', 'user')
@@ -1332,11 +1370,11 @@ class TeamInvite(models.Model):
     expires_at = models.DateTimeField()
     consumed_at = models.DateTimeField(null=True, blank=True)
     consumed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='consumed_invites')
-    
+
     class Meta:
         db_table = 'teams_teaminvite'
         indexes = [models.Index(fields=['token_hash'])]
-    
+
     @classmethod
     def create(cls, team, created_by):
         from datetime import timedelta
@@ -1370,16 +1408,16 @@ from apps.audit.helpers import log as audit_log
 
 class TeamCreateView(APIView):
     permission_classes = [IsAuthenticated, IsParticipant]
-    
+
     def post(self, request, slug):
         event = Event.objects.get(slug=slug)
-        
+
         if TeamMember.objects.filter(user=request.user, team__event=event).exists():
             return Response(
                 {'error': {'code': 'conflict', 'message': 'You are already in a team for this event.'}},
                 status=status.HTTP_409_CONFLICT,
             )
-        
+
         team = Team.objects.create(
             event=event,
             name=request.data.get('name'),
@@ -1392,22 +1430,22 @@ class TeamCreateView(APIView):
 
 class InviteCreateView(APIView):
     permission_classes = [IsAuthenticated, IsParticipant]
-    
+
     def post(self, request, slug, id):
         team = Team.objects.get(id=id, event__slug=slug)
-        
+
         if not TeamMember.objects.filter(team=team, user=request.user, role_in_team='captain').exists():
             return Response(
                 {'error': {'code': 'forbidden_role', 'message': 'Only the captain can create invites.'}},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        
+
         if team.members.count() >= 4:
             return Response(
                 {'error': {'code': 'conflict', 'message': 'Team is full (4 members).'}},
                 status=status.HTTP_409_CONFLICT,
             )
-        
+
         invite, token = TeamInvite.create(team, request.user)
         invite_url = f'{request.scheme}://{request.get_host()}/teams/join?token={token}'
         return Response(
@@ -1418,12 +1456,12 @@ class InviteCreateView(APIView):
 
 class JoinTeamView(APIView):
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
         import hashlib
         token = request.data.get('token', '')
         token_hash = hashlib.sha256(token.encode()).hexdigest()
-        
+
         try:
             invite = TeamInvite.objects.select_related('team__event').get(token_hash=token_hash)
         except TeamInvite.DoesNotExist:
@@ -1431,24 +1469,24 @@ class JoinTeamView(APIView):
                 {'error': {'code': 'gone', 'message': 'Invalid invite token.'}},
                 status=status.HTTP_410_GONE,
             )
-        
+
         from django.utils import timezone
         if invite.consumed_at or invite.expires_at < timezone.now():
             return Response(
                 {'error': {'code': 'gone', 'message': 'Invite expired or consumed.'}},
                 status=status.HTTP_410_GONE,
             )
-        
+
         team = invite.team
         if team.members.count() >= 4:
             return Response(
                 {'error': {'code': 'conflict', 'message': 'Team is full.'}},
                 status=status.HTTP_409_CONFLICT,
             )
-        
+
         if TeamMember.objects.filter(user=request.user, team__event=team.event).exists():
             return Response({'id': str(team.id), 'name': team.name})
-        
+
         TeamMember.objects.create(team=team, user=request.user, role_in_team='member')
         invite.consumed_at = timezone.now()
         invite.consumed_by = request.user
@@ -1457,7 +1495,6 @@ class JoinTeamView(APIView):
         return Response({'id': str(team.id), 'name': team.name})
 ```
 
----
 
 ## Part 6 — Submissions App (apps/submissions)
 
@@ -1481,7 +1518,7 @@ class Submission(models.Model):
         ('locked', 'Locked'),
         ('withdrawn', 'Withdrawn'),
     ]
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     team = models.OneToOneField(Team, on_delete=models.CASCADE, related_name='submission')
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='submissions')
@@ -1500,7 +1537,7 @@ class Submission(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     search_vector = SearchVectorField(null=True)
-    
+
     class Meta:
         db_table = 'submissions_submission'
         indexes = [
@@ -1517,7 +1554,7 @@ class SubmissionImage(models.Model):
     height = models.IntegerField()
     order = models.PositiveIntegerField(default=0)
     mime_type = models.CharField(max_length=50)
-    
+
     class Meta:
         db_table = 'submissions_submissionimage'
         ordering = ['order']
@@ -1526,7 +1563,7 @@ class SubmissionImage(models.Model):
 class TechTag(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=24, unique=True)
-    
+
     class Meta:
         db_table = 'submissions_techtag'
 
@@ -1534,7 +1571,7 @@ class TechTag(models.Model):
 class SubmissionTag(models.Model):
     submission = models.ForeignKey(Submission, on_delete=models.CASCADE)
     tag = models.ForeignKey(TechTag, on_delete=models.CASCADE)
-    
+
     class Meta:
         db_table = 'submissions_submissiontag'
         unique_together = ('submission', 'tag')
@@ -1550,7 +1587,7 @@ class CustomQuestion(models.Model):
         ('number', 'Number'),
         ('boolean', 'Boolean'),
     ]
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='custom_questions')
     prompt = models.CharField(max_length=200)
@@ -1558,7 +1595,7 @@ class CustomQuestion(models.Model):
     required = models.BooleanField(default=False)
     order = models.PositiveIntegerField(default=0)
     choices = models.JSONField(default=list, blank=True)  # for single/multi choice
-    
+
     class Meta:
         db_table = 'submissions_customquestion'
         ordering = ['order']
@@ -1571,7 +1608,7 @@ class CustomAnswer(models.Model):
     value_text = models.TextField(blank=True)
     value_number = models.DecimalField(max_digits=20, decimal_places=6, null=True, blank=True)
     value_bool = models.BooleanField(null=True, blank=True)
-    
+
     class Meta:
         db_table = 'submissions_customanswer'
         unique_together = ('submission', 'question')
@@ -1622,12 +1659,12 @@ from django.utils import timezone
 
 class SubmissionCreateView(APIView):
     permission_classes = [IsAuthenticated, IsParticipant]
-    
+
     def post(self, request, slug):
         event = Event.objects.get(slug=slug)
         team = TeamMember.objects.filter(user=request.user, team__event=event).first().team
         track = Track.objects.get(event=event, slug=request.data.get('track_slug'))
-        
+
         submission = Submission.objects.create(
             team=team,
             event=event,
@@ -1642,15 +1679,15 @@ class SubmissionCreateView(APIView):
 
 class SubmissionDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = SubmissionSerializer
-    
+
     def get_queryset(self):
         return Submission.objects.all()
-    
+
     def get_permissions(self):
         if self.request.method == 'GET':
             return [IsAuthenticated()]
         return [IsAuthenticated(), IsParticipant()]
-    
+
     def perform_update(self, serializer):
         if serializer.instance.status not in ('draft', 'submitted'):
             from rest_framework.exceptions import ValidationError
@@ -1660,17 +1697,17 @@ class SubmissionDetailView(generics.RetrieveUpdateAPIView):
 
 class SubmitSubmissionView(APIView):
     permission_classes = [IsAuthenticated, IsParticipant]
-    
+
     @deadline_gated('submissions_close_at')
     def post(self, request, slug, id):
         submission = Submission.objects.get(id=id, event__slug=slug)
-        
+
         if submission.status != 'draft':
             return Response(
                 {'error': {'code': 'gone', 'message': 'Already submitted.'}},
                 status=status.HTTP_410_GONE,
             )
-        
+
         # Validate required custom answers
         questions = CustomQuestion.objects.filter(event=submission.event, required=True)
         answered_question_ids = set(
@@ -1682,7 +1719,7 @@ class SubmitSubmissionView(APIView):
                 {'error': {'code': 'validation_failed', 'message': 'Required answers missing.', 'detail': {'questions': [str(q.id) for q in missing]}}},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
-        
+
         submission.status = 'submitted'
         submission.submitted_at = timezone.now()
         submission.save()
@@ -1705,26 +1742,26 @@ from .serializers import SubmissionSerializer
 
 class GalleryView(APIView):
     permission_classes = [AllowAny]
-    
+
     def get(self, request, slug):
         event = Event.objects.get(slug=slug)
         qs = Submission.objects.filter(
             event=event,
             status='submitted',
         ).select_related('team', 'track')
-        
+
         q = request.query_params.get('q')
         if q:
             qs = qs.extra(
                 where=["search_vector @@ plainto_tsquery('english', %s)"],
                 params=[q],
             )
-        
+
         track = request.query_params.get('track')
         if track:
             track_slugs = track.split(',')
             qs = qs.filter(track__slug__in=track_slugs)
-        
+
         sort = request.query_params.get('sort', 'track')
         if sort == 'alpha':
             qs = qs.order_by('name')
@@ -1732,16 +1769,16 @@ class GalleryView(APIView):
             qs = qs.order_by('-submitted_at')
         else:
             qs = qs.order_by('track__order', 'name')
-        
+
         try:
             page = int(request.query_params.get('page', 1))
         except ValueError:
             page = 1
         page_size = 24
-        
+
         items = qs[(page-1)*page_size:page*page_size]
         total = qs.count()
-        
+
         return Response({
             'total': total,
             'page': page,
@@ -1749,6 +1786,7 @@ class GalleryView(APIView):
             'items': SubmissionSerializer(items, many=True).data,
         })
 ```
+
 
 ## Part 7 — Judging App (apps/judging)
 
@@ -1775,7 +1813,7 @@ class JudgeBatch(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
     reviews_per_project = models.IntegerField(default=3)
     projects_per_judge = models.IntegerField(default=4)
-    
+
     class Meta:
         db_table = 'judging_judgebatch'
 
@@ -1786,7 +1824,7 @@ class JudgeAssignment(models.Model):
     judge = models.ForeignKey(User, on_delete=models.CASCADE, related_name='judge_assignments')
     project = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name='judge_assignments')
     assigned_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         db_table = 'judging_judgeassignment'
         unique_together = ('batch', 'judge', 'project')
@@ -1805,7 +1843,7 @@ class JudgeInvite(models.Model):
     expires_at = models.DateTimeField()
     consumed_at = models.DateTimeField(null=True, blank=True)
     consumed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    
+
     class Meta:
         db_table = 'judging_judgeinvite'
 
@@ -1816,7 +1854,7 @@ class Score(models.Model):
     criterion = models.ForeignKey('events.RubricCriterion', on_delete=models.CASCADE)
     value = models.IntegerField()
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         db_table = 'judging_score'
         unique_together = ('assignment', 'criterion')
@@ -1829,7 +1867,7 @@ class Review(models.Model):
     submitted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         db_table = 'judging_review'
 ```
@@ -1855,7 +1893,7 @@ class AssignmentError(Exception):
 @transaction.atomic
 def run_assignment(event, seed, reviews_per_project=3, projects_per_judge=None, created_by=None):
     """Run the assignment algorithm.
-    
+
     Invariants:
       - Every project has exactly `reviews_per_project` assignments.
       - Every judge has <= ceil(reviews_per_project * projects / judges) assignments.
@@ -1867,19 +1905,19 @@ def run_assignment(event, seed, reviews_per_project=3, projects_per_judge=None, 
     judges = list(
         Membership.objects.filter(event=event, role='judge').select_related('user')
     )
-    
+
     if not projects or not judges:
         raise ValidationFailed('Need both projects and judges.')
-    
+
     n_projects = len(projects)
     n_judges = len(judges)
     target = n_projects * reviews_per_project
     per_judge_max = (target + n_judges - 1) // n_judges  # ceil
     n_tracks = event.tracks.count()
-    
+
     if projects_per_judge is None:
         projects_per_judge = per_judge_max
-    
+
     # Build COI map: judge -> set of team_ids they cannot review
     judge_team_blacklist = {
         m.user_id: set(
@@ -1887,22 +1925,22 @@ def run_assignment(event, seed, reviews_per_project=3, projects_per_judge=None, 
         )
         for m in judges
     }
-    
+
     # Try up to 10 times with different effective seeds
     for attempt in range(10):
         effective_seed = seed + attempt
         rng = random.Random(effective_seed)
-        
+
         # Sort projects by (track, name) for deterministic iteration
         sorted_projects = sorted(
             projects, key=lambda p: (p.track.order, p.name)
         )
-        
+
         # Greedy assignment
         judge_load = defaultdict(int)
         judge_tracks = defaultdict(set)
         assignments = []
-        
+
         success = True
         for project in sorted_projects:
             # Find candidate judges (not at max load, no COI)
@@ -1911,31 +1949,31 @@ def run_assignment(event, seed, reviews_per_project=3, projects_per_judge=None, 
                 if judge_load[m.user_id] < projects_per_judge
                 and project.team_id not in judge_team_blacklist.get(m.user_id, set())
             ]
-            
+
             if len(candidates) < reviews_per_project:
                 success = False
                 break
-            
+
             # Sort candidates by current load (prefer less-loaded), then by track diversity
             candidates.sort(key=lambda j: (judge_load[j], -len(judge_tracks[j])))
-            
+
             # Pick top reviews_per_project
             chosen = candidates[:reviews_per_project]
             for judge_id in chosen:
                 assignments.append((judge_id, project.id))
                 judge_load[judge_id] += 1
                 judge_tracks[judge_id].add(project.track_id)
-        
+
         if not success:
             continue
-        
+
         # Verify track spread invariant: each judge covers at least n_tracks - 1
         # (skip this if there are too few projects to satisfy it)
         if n_tracks > 1:
             min_tracks = min(len(tracks) for tracks in judge_tracks.values())
             if min_tracks < n_tracks - 1 and n_projects >= n_tracks - 1:
                 continue  # retry with different seed
-        
+
         # All invariants pass. Persist.
         batch = JudgeBatch.objects.create(
             event=event,
@@ -1948,7 +1986,7 @@ def run_assignment(event, seed, reviews_per_project=3, projects_per_judge=None, 
             JudgeAssignment(batch=batch, judge_id=judge_id, project_id=project_id)
             for judge_id, project_id in assignments
         ])
-        
+
         return {
             'batch_id': str(batch.id),
             'n_assignments': len(assignments),
@@ -1957,7 +1995,7 @@ def run_assignment(event, seed, reviews_per_project=3, projects_per_judge=None, 
             ],
             'seed_used': effective_seed,
         }
-    
+
     raise AssignmentError('Could not produce a valid assignment after 10 retries.')
 
 
@@ -1968,18 +2006,18 @@ def is_connected(event):
     )
     if not edges:
         return False
-    
+
     # BFS from any node
     nodes = set()
     for j, p in edges:
         nodes.add(('j', j))
         nodes.add(('p', p))
-    
+
     adj = defaultdict(set)
     for j, p in edges:
         adj[('j', j)].add(('p', p))
         adj[('p', p)].add(('j', j))
-    
+
     start = next(iter(nodes))
     visited = {start}
     queue = [start]
@@ -1989,7 +2027,7 @@ def is_connected(event):
             if neighbor not in visited:
                 visited.add(neighbor)
                 queue.append(neighbor)
-    
+
     return len(visited) == len(nodes)
 ```
 
@@ -2031,15 +2069,15 @@ class IsAssignedJudge(BasePermission):
 
 class IsOwnJudge(BasePermission):
     """The graded cell. Denies if the cookie's judge doesn't match the URL's judge param."""
-    
+
     def has_permission(self, request, view):
         judge_param = request.query_params.get('judge')
         if not judge_param:
             return True  # no judge param means "my own scores"
-        
+
         if not hasattr(request, 'session_obj') or not request.session_obj:
             return False
-        
+
         # The judge is identified by the user; the param is the user identifier
         # We compare request.user.id (or email) to judge_param
         cookie_judge = str(request.user.id)
@@ -2073,11 +2111,11 @@ from django.utils import timezone
 
 class BatchInviteView(APIView):
     permission_classes = [IsAuthenticated, IsOrganizer]
-    
+
     def post(self, request, slug):
         event = Event.objects.get(slug=slug)
         emails = request.data.get('emails', [])
-        
+
         for email in emails:
             from apps.accounts.models import User
             user, _ = User.objects.get_or_create(
@@ -2088,20 +2126,20 @@ class BatchInviteView(APIView):
                 user=user, event=event,
                 defaults={'role': 'judge', 'created_by': request.user},
             )
-        
+
         audit_log(request.user, 'judge.invited_bulk', event, payload={'count': len(emails)}, request=request)
         return Response({'invited': len(emails)})
 
 
 class AssignmentRunView(APIView):
     permission_classes = [IsAuthenticated, IsOrganizer]
-    
+
     def post(self, request, slug):
         event = Event.objects.get(slug=slug)
         seed = request.data.get('seed', 42)
         reviews_per_project = request.data.get('reviews_per_project', 3)
         projects_per_judge = request.data.get('projects_per_judge')
-        
+
         result = run_assignment(
             event=event,
             seed=seed,
@@ -2115,27 +2153,27 @@ class AssignmentRunView(APIView):
 
 class MyBatchView(APIView):
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request, slug):
         if not request.user.is_authenticated:
             return Response(status=403)
-        
+
         event = Event.objects.get(slug=slug)
         if not Membership.objects.filter(user=request.user, event=event, role='judge').exists():
             return Response(status=403)
-        
+
         # 403 if judging is not yet open
         if timezone.now() < event.judging_open_at:
             return Response(
                 {'error': {'code': 'deadline_not_open', 'message': 'Judging not yet open.'}},
                 status=403,
             )
-        
+
         assignments = JudgeAssignment.objects.filter(
             judge=request.user,
             batch__event=event,
         ).select_related('project__team', 'project__track')
-        
+
         projects_data = []
         for a in assignments:
             review = getattr(a, 'review', None)
@@ -2147,7 +2185,7 @@ class MyBatchView(APIView):
                 'submitted': a.project.status == 'submitted',
                 'reviewed': review is not None and review.submitted_at is not None,
             })
-        
+
         scored = sum(1 for p in projects_data if p['reviewed'])
         return Response({
             'projects': projects_data,
@@ -2158,13 +2196,13 @@ class MyBatchView(APIView):
 class JudgeScoresView(APIView):
     """The spec route. Returns the authenticated judge's own scores."""
     permission_classes = [IsAuthenticated, IsOwnJudge]
-    
+
     def get(self, request):
         if not Membership.objects.filter(
             user=request.user, role='judge'
         ).exists():
             return Response(status=403)
-        
+
         # Determine which judge's scores to return
         judge_param = request.query_params.get('judge')
         if judge_param:
@@ -2174,12 +2212,12 @@ class JudgeScoresView(APIView):
             target_judge_id = request.user.id
         else:
             target_judge_id = request.user.id
-        
+
         assignments = JudgeAssignment.objects.filter(judge_id=target_judge_id)
         scores = Score.objects.filter(
             assignment__in=assignments
         ).select_related('criterion', 'assignment__project')
-        
+
         return Response({
             'judge_id': str(target_judge_id),
             'scores': [
@@ -2195,13 +2233,13 @@ class JudgeScoresView(APIView):
 
 class ScoreSaveView(APIView):
     permission_classes = [IsAuthenticated, IsAssignedJudge]
-    
+
     @deadline_gated('judging_close_at')
     def put(self, request, slug, project_id):
         assignment = JudgeAssignment.objects.get(
             judge=request.user, project_id=project_id,
         )
-        
+
         scores_data = request.data.get('scores', [])
         for s in scores_data:
             Score.objects.update_or_create(
@@ -2209,26 +2247,26 @@ class ScoreSaveView(APIView):
                 criterion_id=s['criterion_id'],
                 defaults={'value': s['value']},
             )
-        
+
         # Save comment if present
         comment = request.data.get('comment', '')
         if comment:
             review, _ = Review.objects.get_or_create(assignment=assignment)
             review.comment = comment
             review.save()
-        
+
         return Response({'saved': True})
 
 
 class ScoreSubmitView(APIView):
     permission_classes = [IsAuthenticated, IsAssignedJudge]
-    
+
     @deadline_gated('judging_close_at')
     def post(self, request, slug, project_id):
         assignment = JudgeAssignment.objects.get(
             judge=request.user, project_id=project_id,
         )
-        
+
         # Validate all required criteria have scores
         from apps.events.models import RubricCriterion
         required_criteria = RubricCriterion.objects.filter(rubric__event__slug=slug)
@@ -2239,12 +2277,12 @@ class ScoreSubmitView(APIView):
                 {'error': {'code': 'validation_failed', 'message': 'Required criteria missing.', 'detail': {'criteria': missing}}},
                 status=422,
             )
-        
+
         review, _ = Review.objects.get_or_create(assignment=assignment)
         review.submitted_at = timezone.now()
         review.save()
         audit_log(request.user, 'review.submitted', assignment, request=request)
-        
+
         return Response({'submitted_at': review.submitted_at.isoformat()})
 ```
 
@@ -2275,7 +2313,6 @@ urlpatterns = [
 ]
 ```
 
----
 
 ## Part 8 — Voting App (apps/voting)
 
@@ -2301,7 +2338,7 @@ class Vote(models.Model):
     votes = models.IntegerField(default=1)  # quadratic: n; simple: 1
     created_at = models.DateTimeField(auto_now_add=True)
     retracted_at = models.DateTimeField(null=True, blank=True)
-    
+
     class Meta:
         db_table = 'voting_vote'
         unique_together = ('event', 'project', 'voter_key')
@@ -2312,7 +2349,7 @@ class VoteBudget(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE)
     voter_key = models.CharField(max_length=64)
     spent_credits = models.IntegerField(default=0)
-    
+
     class Meta:
         db_table = 'voting_votebudget'
         unique_together = ('event', 'voter_key')
@@ -2320,14 +2357,14 @@ class VoteBudget(models.Model):
 
 class VoteAudit(models.Model):
     ACTION_CHOICES = [('cast', 'Cast'), ('retract', 'Retract')]
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     vote = models.ForeignKey(Vote, on_delete=models.CASCADE, related_name='audit')
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
     at = models.DateTimeField(auto_now_add=True)
     ip = models.GenericIPAddressField(null=True)
     user_agent = models.CharField(max_length=255, blank=True)
-    
+
     class Meta:
         db_table = 'voting_voteaudit'
 ```
@@ -2360,12 +2397,12 @@ def _voter_key(request, event):
 
 class VoteView(APIView):
     permission_classes = [AllowAny]
-    
+
     @deadline_gated('judging_close_at')  # voting opens when judging closes
     def post(self, request, slug, id):
         event = Event.objects.get(slug=slug)
         project = Submission.objects.get(id=id, event=event)
-        
+
         # Self-vote check
         if request.user.is_authenticated:
             from apps.teams.models import TeamMember
@@ -2374,10 +2411,10 @@ class VoteView(APIView):
                     {'error': {'code': 'forbidden_role', 'message': 'Cannot vote on your own team project.'}},
                     status=403,
                 )
-        
+
         voter_key = _voter_key(request, event)
         n_votes = int(request.data.get('votes', 1))
-        
+
         # Validate based on mode
         if event.voting_mode == 'quadratic':
             cost = n_votes ** 2
@@ -2389,7 +2426,7 @@ class VoteView(APIView):
                 )
             budget.spent_credits += cost
             budget.save()
-        
+
         vote, created = Vote.objects.update_or_create(
             event=event, project=project, voter_key=voter_key,
             defaults={
@@ -2398,42 +2435,42 @@ class VoteView(APIView):
                 'retracted_at': None,
             },
         )
-        
+
         VoteAudit.objects.create(
             vote=vote, action='cast',
             ip=request.META.get('REMOTE_ADDR'),
             user_agent=request.headers.get('User-Agent', '')[:255],
         )
         audit_log(request.user if request.user.is_authenticated else None, 'vote.cast', vote, request=request)
-        
+
         return Response({'vote_id': str(vote.id), 'votes': n_votes})
-    
+
     @deadline_gated('submissions_close_at')
     def delete(self, request, slug, id):
         event = Event.objects.get(slug=slug)
         project = Submission.objects.get(id=id, event=event)
         voter_key = _voter_key(request, event)
-        
+
         try:
             vote = Vote.objects.get(event=event, project=project, voter_key=voter_key)
         except Vote.DoesNotExist:
             return Response(status=404)
-        
+
         if event.voting_mode == 'quadratic':
             cost = vote.votes ** 2
             budget = VoteBudget.objects.get(event=event, voter_key=voter_key)
             budget.spent_credits -= cost
             budget.save()
-        
+
         vote.retracted_at = timezone.now()
         vote.save()
-        
+
         VoteAudit.objects.create(
             vote=vote, action='retract',
             ip=request.META.get('REMOTE_ADDR'),
             user_agent=request.headers.get('User-Agent', '')[:255],
         )
-        
+
         return Response({'retracted': True})
 ```
 
@@ -2454,7 +2491,7 @@ from apps.events.models import Event
 
 class AuditEvent(models.Model):
     RESULT_CHOICES = [('success', 'Success'), ('denied', 'Denied'), ('error', 'Error')]
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     event = models.ForeignKey(Event, on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_events')
     actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_events')
@@ -2466,7 +2503,7 @@ class AuditEvent(models.Model):
     user_agent = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     result = models.CharField(max_length=10, choices=RESULT_CHOICES, default='success')
-    
+
     class Meta:
         db_table = 'audit_auditevent'
         indexes = [
@@ -2548,6 +2585,7 @@ class Migration(migrations.Migration):
     ]
 ```
 
+
 ## Part 10 — Normalization App (apps/normalization)
 
 ### 10.1 The fit algorithm
@@ -2575,7 +2613,7 @@ class FitResult:
 
 def normalize(scores: list) -> FitResult:
     """Fit the two-way additive model by alternating means.
-    
+
     scores: list of dicts with keys: project_id, judge_id, value
     """
     # Build sparse matrices
@@ -2584,7 +2622,7 @@ def normalize(scores: list) -> FitResult:
     judge_projects = defaultdict(set)
     projects = set()
     judges = set()
-    
+
     for s in scores:
         key = (s['project_id'], s['judge_id'])
         if key in cells:
@@ -2595,7 +2633,7 @@ def normalize(scores: list) -> FitResult:
         judge_projects[s['judge_id']].add(s['project_id'])
         projects.add(s['project_id'])
         judges.add(s['judge_id'])
-    
+
     # Verify connectivity
     if not _is_connected(project_judges, judge_projects):
         return FitResult(
@@ -2603,12 +2641,12 @@ def normalize(scores: list) -> FitResult:
             raw_sigma=0.0, normalized_sigma=0.0,
             is_connected=False, iterations=0, scores=[], biases=[],
         )
-    
+
     # Initialize
     grand_mean = sum(cells.values()) / len(cells)
     b = {j: 0.0 for j in judges}
     q = {p: 0.0 for p in projects}
-    
+
     # Iterate
     max_iter = 1000
     for iteration in range(1, max_iter + 1):
@@ -2617,17 +2655,17 @@ def normalize(scores: list) -> FitResult:
         for p in projects:
             js = project_judges[p]
             new_q[p] = sum(cells[(p, j)] - b[j] for j in js) / len(js)
-        
+
         # Update b: for each judge, mean of (value - q) over their projects
         new_b = {}
         for j in judges:
             ps = judge_projects[j]
             new_b[j] = sum(cells[(p, j)] - new_q[p] for p in ps) / len(ps)
-        
+
         # Recentre: b sums to 0
         b_mean = sum(new_b.values()) / len(new_b)
         new_b = {j: v - b_mean for j, v in new_b.items()}
-        
+
         # Convergence check
         max_change = max(
             abs(new_q[p] - q[p]) for p in projects
@@ -2635,38 +2673,38 @@ def normalize(scores: list) -> FitResult:
         max_change = max(max_change, max(
             abs(new_b[j] - b[j]) for j in judges
         ) if judges else 0.0)
-        
+
         q = new_q
         b = new_b
-        
+
         if max_change < 1e-9:
             break
-    
+
     # Compute raw means
     raw_means = {}
     for p in projects:
         js = project_judges[p]
         raw_means[p] = sum(cells[(p, j)] for j in js) / len(js)
-    
+
     # Compute normalized scores
     normalized = {p: q[p] + grand_mean for p in projects}
-    
+
     # Compute leverage
     total_reviews = sum(len(js) for js in project_judges.values())
     leverage = {j: len(judge_projects[j]) / total_reviews for j in judges}
-    
+
     # Compute sigmas
     raw_vals = list(raw_means.values())
     norm_vals = list(normalized.values())
     raw_sigma = _std(raw_vals)
     normalized_sigma = _std(norm_vals)
-    
+
     # Compute ranks
     raw_ranked = sorted(projects, key=lambda p: -raw_means[p])
     norm_ranked = sorted(projects, key=lambda p: -normalized[p])
     raw_rank = {p: i + 1 for i, p in enumerate(raw_ranked)}
     norm_rank = {p: i + 1 for i, p in enumerate(norm_ranked)}
-    
+
     return FitResult(
         q=q, b=b, leverage=leverage,
         raw_means=raw_means,
@@ -2700,12 +2738,12 @@ def _is_connected(project_judges, judge_projects) -> bool:
     """BFS in the bipartite graph."""
     if not project_judges:
         return False
-    
+
     start = next(iter(project_judges))
     visited_p = {start}
     visited_j = set()
     queue = [('p', start)]
-    
+
     while queue:
         kind, node = queue.pop(0)
         if kind == 'p':
@@ -2718,7 +2756,7 @@ def _is_connected(project_judges, judge_projects) -> bool:
                 if p not in visited_p:
                     visited_p.add(p)
                     queue.append(('p', p))
-    
+
     return len(visited_p) == len(project_judges) and len(visited_j) == len(judge_projects)
 
 
@@ -2750,7 +2788,7 @@ def generate_proof(run: NormalizationRun, result) -> str:
     lines.append(f'is_connected: {run.is_connected}')
     lines.append(f'iterations: {result.iterations}')
     lines.append('')
-    
+
     # Rank movement (top 10 by |delta|)
     lines.append('Rank movement (top 10 by |delta|):')
     lines.append('project_id  raw_rank  adj_rank  delta')
@@ -2760,7 +2798,7 @@ def generate_proof(run: NormalizationRun, result) -> str:
         arrow = '▲' if delta < 0 else '▼' if delta > 0 else '='
         lines.append(f"{s['project_id']}  {s['rank_before']}  {s['rank_after']}  {arrow} {abs(delta)}")
     lines.append('')
-    
+
     # Zero-variance raters
     zero_var = [b for b in result.biases if b['leverage'] < 1e-9 and b['n_reviews'] > 0]
     if zero_var:
@@ -2768,13 +2806,13 @@ def generate_proof(run: NormalizationRun, result) -> str:
         for b in zero_var:
             lines.append(f"  {b['judge_id']}: leverage=0.00, n_reviews={b['n_reviews']} - no ranking signal")
         lines.append('')
-    
+
     lines.append('Method:')
     lines.append('y_ij = mu + b_j + q_i + epsilon_ij')
     lines.append('fit: alternating means until convergence (max change < 1e-9)')
     lines.append('connectivity: required; reported')
     lines.append('z-score: rejected (divides by zero on sigma=0 raters)')
-    
+
     return '\n'.join(lines)
 ```
 
@@ -2798,11 +2836,11 @@ from apps.audit.helpers import log as audit_log
 
 class NormalizeView(APIView):
     permission_classes = [IsOrganizer]
-    
+
     @transaction.atomic
     def post(self, request, slug):
         event = Event.objects.get(slug=slug)
-        
+
         # Load scores
         scores = list(
             Score.objects.filter(assignment__batch__event=event)
@@ -2811,7 +2849,7 @@ class NormalizeView(APIView):
                 'assignment__project_id', 'assignment__judge_id', 'value'
             )
         )
-        
+
         # Dedupe by (project, judge): keep the last
         seen = {}
         for s in scores:
@@ -2821,7 +2859,7 @@ class NormalizeView(APIView):
             {'project_id': str(k[0]), 'judge_id': str(k[1]), 'value': v}
             for k, v in seen.items()
         ]
-        
+
         # Fit
         result = normalize(deduped)
         if not result.is_connected:
@@ -2829,7 +2867,7 @@ class NormalizeView(APIView):
                 {'error': {'code': 'disconnected_graph', 'message': 'Bipartite graph is disconnected.'}},
                 status=422,
             )
-        
+
         # Persist
         run = NormalizationRun.objects.create(
             event=event,
@@ -2861,7 +2899,7 @@ class NormalizeView(APIView):
             )
             for b in result.biases
         ])
-        
+
         # Generate proof
         proof = generate_proof(run, result)
         # Save to a file the organizer can download
@@ -2871,7 +2909,7 @@ class NormalizeView(APIView):
             ContentFile(proof.encode()),
             save=True,
         )
-        
+
         audit_log(request.user, 'normalization.run', run, request=request)
         return Response({
             'run_id': str(run.id),
@@ -2899,10 +2937,10 @@ def test_normalization_recovers_quality():
     n_projects = 40
     n_judges = 30
     reviews_per_project = 3
-    
+
     true_q = {f'p{i}': random.gauss(3, 1) for i in range(n_projects)}
     true_b = {f'j{i}': random.gauss(0, 0.5) for i in range(n_judges)}
-    
+
     # Each judge reviews 4 projects
     scores = []
     for p_idx in range(n_projects):
@@ -2914,16 +2952,16 @@ def test_normalization_recovers_quality():
                 'judge_id': f'j{j_idx}',
                 'value': value,
             })
-    
+
     result = normalize(scores)
-    
+
     assert result.is_connected
     assert result.iterations < 100
-    
+
     # Recovered q should correlate with true_q
     true_q_vals = [true_q[p] for p in sorted(true_q)]
-    recovered_q_vals = [result.q[p] for p in sorted(true_q)]
-    
+    recovered_q_vals = [result.q[p] for p in sorted(result.q)]
+
     # Pearson correlation
     n = len(true_q_vals)
     mean_t = sum(true_q_vals) / n
@@ -2932,7 +2970,7 @@ def test_normalization_recovers_quality():
     var_t = sum((t - mean_t) ** 2 for t in true_q_vals) / n
     var_r = sum((r - mean_r) ** 2 for r in recovered_q_vals) / n
     correlation = cov / ((var_t * var_r) ** 0.5)
-    
+
     assert correlation > 0.95
 
 
@@ -2988,7 +3026,6 @@ urlpatterns = [
 ]
 ```
 
----
 
 ## Part 11 — Pairwise App (apps/pairwise)
 
@@ -3010,7 +3047,7 @@ class PairwiseRun(models.Model):
     method = models.CharField(max_length=50, default='bradley_terry_mm')
     params = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         db_table = 'pairwise_pairwiserun'
 
@@ -3023,7 +3060,7 @@ class PairwiseComparison(models.Model):
     right_project = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name='pairwise_right')
     winner = models.CharField(max_length=10, choices=[('left', 'Left'), ('right', 'Right')])
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         db_table = 'pairwise_pairwisecomparison'
         unique_together = ('judge', 'event', 'left_project', 'right_project')
@@ -3035,7 +3072,7 @@ class PairwiseRating(models.Model):
     project = models.ForeignKey(Submission, on_delete=models.CASCADE)
     theta = models.FloatField()
     stderr = models.FloatField()
-    
+
     class Meta:
         db_table = 'pairwise_pairwiserating'
         unique_together = ('run', 'project')
@@ -3051,7 +3088,7 @@ from collections import defaultdict
 
 def fit_bt(comparisons: list) -> dict:
     """Fit Bradley-Terry by MM algorithm.
-    
+
     comparisons: list of dicts with keys: left, right, winner (left/right)
     Returns: dict mapping project_id -> {theta, stderr}
     """
@@ -3059,7 +3096,7 @@ def fit_bt(comparisons: list) -> dict:
     wins = defaultdict(int)  # project -> total wins
     losses = defaultdict(int)  # project -> total losses
     n_ij = defaultdict(lambda: defaultdict(int))  # n_ij[winner][loser] = count
-    
+
     for c in comparisons:
         l, r, w = c['left'], c['right'], c['winner']
         projects.add(l)
@@ -3072,7 +3109,7 @@ def fit_bt(comparisons: list) -> dict:
             wins[r] += 1
             losses[l] += 1
             n_ij[r][l] += 1
-    
+
     # Initialize p with weak prior: half-win / half-loss against phantom
     phantom_w = 0.5
     phantom_l = 0.5
@@ -3086,7 +3123,7 @@ def fit_bt(comparisons: list) -> dict:
             p[proj] = wins[proj] + phantom_w  # undefeated
         else:
             p[proj] = (wins[proj] + phantom_w) / (losses[proj] + phantom_l)
-    
+
     # Iterate
     for iteration in range(1000):
         new_p = {}
@@ -3099,27 +3136,27 @@ def fit_bt(comparisons: list) -> dict:
                 denom += n_ij[i][j] / (p[i] + p[j])
                 denom += n_ij[j][i] / (p[j] + p[i])  # both directions
             new_p[i] = w_i / denom if denom > 0 else 1.0
-        
+
         # Renormalize
         total = sum(new_p.values())
         new_p = {k: v / total for k, v in new_p.items()}
-        
+
         # Convergence
         max_change = max(abs(new_p[i] - p[i]) for i in projects) if projects else 0.0
         p = new_p
         if max_change < 1e-9:
             break
-    
+
     # theta = log(p)
     theta = {proj: _log(p[proj]) for proj in projects}
-    
+
     # stderr: approximation via Fisher information
     # For simplicity: 1/sqrt(wins + losses)
     stderr = {}
     for proj in projects:
         n = wins[proj] + losses[proj]
         stderr[proj] = 1.0 / (n + 1) ** 0.5  # rough
-    
+
     return {'theta': theta, 'stderr': stderr, 'iterations': iteration + 1}
 
 
@@ -3143,7 +3180,7 @@ def next_pair(judge_id, event, current_theta):
     """Pick the next pair for a judge, by information value."""
     from apps.judging.models import JudgeAssignment
     from apps.submissions.models import Submission
-    
+
     projects = list(
         Submission.objects.filter(
             event=event,
@@ -3151,33 +3188,33 @@ def next_pair(judge_id, event, current_theta):
             judge_assignments__judge_id=judge_id,
         ).distinct()
     )
-    
+
     if len(projects) < 2:
         return None
-    
+
     # Get existing comparisons by this judge
     from .models import PairwiseComparison
     existing = PairwiseComparison.objects.filter(judge_id=judge_id, event=event)
     seen_pairs = {(c.left_project_id, c.right_project_id) for c in existing}
-    
+
     candidates = []
     for i in range(len(projects)):
         for j in range(i + 1, len(projects)):
             p1, p2 = projects[i], projects[j]
             if (p1.id, p2.id) in seen_pairs or (p2.id, p1.id) in seen_pairs:
                 continue
-            
+
             # Information value: uncertainty * novelty
             theta1 = current_theta.get(str(p1.id), 0.0)
             theta2 = current_theta.get(str(p2.id), 0.0)
             predicted_p1 = 1.0 / (1.0 + math.exp(-(theta1 - theta2)))
             uncertainty = 1.0 - abs(predicted_p1 - 0.5) * 2  # 1 when uncertain, 0 when certain
-            
+
             candidates.append((uncertainty, p1, p2))
-    
+
     if not candidates:
         return None
-    
+
     candidates.sort(key=lambda c: -c[0])
     _, p1, p2 = candidates[0]
     return (p1, p2)
@@ -3203,22 +3240,22 @@ from apps.events.decorators import deadline_gated
 
 class PairwiseNextView(APIView):
     permission_classes = [IsAuthenticated, IsJudge]
-    
+
     @deadline_gated('judging_close_at')
     def get(self, request, slug):
         event = Event.objects.get(slug=slug)
-        
+
         # Get current theta from latest run (or default)
         theta = {}
         latest_run = PairwiseRun.objects.filter(event=event).order_by('-created_at').first()
         if latest_run:
             for r in latest_run.ratings.all():
                 theta[str(r.project_id)] = r.theta
-        
+
         pair = next_pair(request.user.id, event, theta)
         if not pair:
             return Response({'done': True})
-        
+
         p1, p2 = pair
         return Response({
             'left': {'id': str(p1.id), 'name': p1.name, 'tagline': p1.tagline, 'thumbnail_url': p1.thumbnail_path},
@@ -3228,7 +3265,7 @@ class PairwiseNextView(APIView):
 
 class PairwiseAnswerView(APIView):
     permission_classes = [IsAuthenticated, IsJudge]
-    
+
     @deadline_gated('judging_close_at')
     def post(self, request, slug, id):
         comp = PairwiseComparison.objects.get(id=id, judge=request.user)
@@ -3239,7 +3276,7 @@ class PairwiseAnswerView(APIView):
 
 class PairwiseRankingView(APIView):
     permission_classes = [IsAuthenticated, IsOrganizer]
-    
+
     def post(self, request, slug):
         event = Event.objects.get(slug=slug)
         comparisons = list(
@@ -3255,9 +3292,9 @@ class PairwiseRankingView(APIView):
             }
             for c in comparisons
         ]
-        
+
         result = fit_bt(comparisons)
-        
+
         run = PairwiseRun.objects.create(event=event, method='bradley_terry_mm')
         PairwiseRating.objects.bulk_create([
             PairwiseRating(
@@ -3271,7 +3308,7 @@ class PairwiseRankingView(APIView):
                 zip(result['theta'].values(), result['stderr'].values()),
             )
         ])
-        
+
         # Ranking
         ranking = sorted(result['theta'].items(), key=lambda x: -x[1])
         return Response({
@@ -3284,6 +3321,7 @@ class PairwiseRankingView(APIView):
             ],
         })
 ```
+
 
 ## Part 12 — API App (apps/api)
 
@@ -3309,10 +3347,10 @@ class Webhook(models.Model):
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
-    
+
     class Meta:
         db_table = 'api_webhook'
-    
+
     @classmethod
     def create(cls, event, url, events, created_by):
         secret = secrets.token_urlsafe(32)
@@ -3335,7 +3373,7 @@ class WebhookDelivery(models.Model):
     status_code = models.IntegerField(default=0)
     response_body = models.TextField(blank=True)
     next_retry_at = models.DateTimeField(null=True, blank=True)
-    
+
     class Meta:
         db_table = 'api_webhookdelivery'
 
@@ -3346,14 +3384,14 @@ class SigningKey(models.Model):
     private_key = models.BinaryField()  # stored only in production via .env
     created_at = models.DateTimeField(auto_now_add=True)
     retired_at = models.DateTimeField(null=True, blank=True)
-    
+
     class Meta:
         db_table = 'api_signingkey'
 
 
 class Certificate(models.Model):
     KIND_CHOICES = [('participant', 'Participant'), ('judge', 'Judge'), ('organizer', 'Organizer')]
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='certificates')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -3362,7 +3400,7 @@ class Certificate(models.Model):
     signature = models.BinaryField()
     public_key = models.ForeignKey(SigningKey, on_delete=models.PROTECT)
     generated_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         db_table = 'api_certificate'
 ```
@@ -3377,56 +3415,56 @@ from rest_framework.response import Response
 from rest_framework import status
 
 
-class Hack HamsterError(Exception):
+class HackHamsterError(Exception):
     code = 'error'
     message = 'An error occurred.'
     status_code = 400
-    
+
     def __init__(self, message=None, detail=None):
         if message:
             self.message = message
         self.detail = detail
 
 
-class ForbiddenRole(Hack HamsterError):
+class ForbiddenRole(HackHamsterError):
     code = 'forbidden_role'
     message = 'You do not have permission to do that.'
     status_code = 403
 
 
-class DeadlinePassed(Hack HamsterError):
+class DeadlinePassed(HackHamsterError):
     code = 'deadline_passed'
     message = 'The deadline has passed.'
     status_code = 422
 
 
-class ValidationFailed(Hack HamsterError):
+class ValidationFailed(HackHamsterError):
     code = 'validation_failed'
     message = 'Validation failed.'
     status_code = 422
 
 
-class RateLimited(Hack HamsterError):
+class RateLimited(HackHamsterError):
     code = 'rate_limited'
     message = 'Too many requests.'
     status_code = 429
-    
+
     def __init__(self, retry_after=60):
         self.retry_after = retry_after
 
 
 def custom_exception_handler(exc, context):
-    if isinstance(exc, Hack HamsterError):
+    if isinstance(exc, HackHamsterError):
         body = {'error': {'code': exc.code, 'message': exc.message, 'detail': exc.detail}}
         response = Response(body, status=exc.status_code)
         if isinstance(exc, RateLimited):
             response['Retry-After'] = str(exc.retry_after)
         return response
-    
+
     response = drf_default(exc, context)
     if response is None:
         return None
-    
+
     # Wrap DRF default errors
     detail = response.data
     if isinstance(detail, dict) and 'detail' in detail:
@@ -3439,7 +3477,7 @@ def custom_exception_handler(exc, context):
     if isinstance(detail, list):
         body = {'error': {'code': 'validation_failed', 'message': 'Validation failed.', 'detail': {'errors': detail}}}
         return Response(body, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-    
+
     return response
 
 
@@ -3481,11 +3519,11 @@ def readyz(request):
     plan = executor.migration_plan(executor.loader.graph.leaf_nodes())
     if plan:
         return JsonResponse({'status': 'migrations_pending'}, status=503)
-    
+
     # Check seed
     if not Event.objects.filter(slug='sample-hack-2026').exists():
         return JsonResponse({'status': 'seed_pending'}, status=503)
-    
+
     return JsonResponse({'status': 'ready', 'migrations_applied': True, 'seed_loaded': True})
 
 
@@ -3514,10 +3552,10 @@ def widget_view(request):
     bundle_path = os.path.join(settings.BASE_DIR, 'web', 'widget.bundle.js')
     if not os.path.exists(bundle_path):
         bundle_path = os.path.join(settings.BASE_DIR, 'static', 'widget.bundle.js')
-    
+
     if not os.path.exists(bundle_path):
         return JsonResponse({'error': {'code': 'not_found', 'message': 'Widget not built.'}}, status=404)
-    
+
     with open(bundle_path, 'rb') as f:
         content = f.read()
     from django.http import HttpResponse
@@ -3565,17 +3603,9 @@ urlpatterns = [
 
 ### 12.6 The seed_fixtures command
 
-The kickoff deck (slide 7) says: *"Seed from the fixture event's own
-`submissions_close_date`. One of the checks depends on it."* Concretely: T1 check 3
-("POST `{submit}` as participant after deadline → 4xx") passes iff the seeded event's
-`submissions_close_at` is in the UTC past at the moment `make accept` runs. The seed
-command is *transparent* — it reads the field verbatim from `fixtures.json`. The
-fixtures author is responsible for shipping a past date. If a future date ships, T1
-fails; this is the contract, not a bug.
+The kickoff deck (slide 7) says: *"Seed from the fixture event's own `submissions_close_date`. One of the checks depends on it."* Concretely: T1 check 3 ("POST `{submit}` as participant after deadline → 4xx") passes iff the seeded event's `submissions_close_at` is in the UTC past at the moment `make accept` runs. The seed command is *transparent* — it reads the field verbatim from `fixtures.json`. The fixtures author is responsible for shipping a past date. If a future date ships, T1 fails; this is the contract, not a bug.
 
-The model field is `submissions_close_at` (`_at`, not the deck's prose `_date`). The
-JSON key is `submissions_close_at`. Do not "fix" the JSON to match the deck's prose —
-the deck is informal here, the code is the contract.
+The model field is `submissions_close_at` (`_at`, not the deck's prose `_date`). The JSON key is `submissions_close_at`. Do not "fix" the JSON to match the deck's prose — the deck is informal here, the code is the contract.
 
 ```python
 # apps/events/management/commands/seed_fixtures.py
@@ -3592,18 +3622,18 @@ from apps.accounts.models import User
 
 class Command(BaseCommand):
     help = 'Load fixtures.json into the database.'
-    
+
     def add_arguments(self, parser):
         parser.add_argument('--path', default='fixtures.json')
-    
+
     def handle(self, *args, **options):
         path = Path(options['path'])
         if not path.exists():
             path = Path('/app/fixtures.json')
-        
+
         with open(path) as f:
             data = json.load(f)
-        
+
         # Event
         event, _ = Event.objects.update_or_create(
             slug=data['event']['slug'],
@@ -3618,7 +3648,7 @@ class Command(BaseCommand):
                 'created_by_id': None,
             },
         )
-        
+
         # Tracks
         track_map = {}
         for t in data.get('tracks', []):
@@ -3627,7 +3657,7 @@ class Command(BaseCommand):
                 defaults={'name': t['name'], 'description': t.get('description', ''), 'order': t.get('order', 0)},
             )
             track_map[t['slug']] = track
-        
+
         # Rubric
         rubric, _ = Rubric.objects.update_or_create(
             event=event, defaults={'name': 'Default'},
@@ -3642,7 +3672,7 @@ class Command(BaseCommand):
                 max=c.get('max', 5),
                 order=i,
             )
-        
+
         # Judges
         judge_map = {}
         for j in data.get('judges', []):
@@ -3655,7 +3685,7 @@ class Command(BaseCommand):
                 defaults={'role': 'judge'},
             )
             judge_map[j['id']] = user
-        
+
         # Teams and projects
         project_map = {}
         for p in data.get('projects', []):
@@ -3679,7 +3709,7 @@ class Command(BaseCommand):
                     defaults={'is_active': True},
                 )
                 TeamMember.objects.get_or_create(team=team, user=member)
-            
+
             submission, _ = Submission.objects.update_or_create(
                 team=team,
                 defaults={
@@ -3694,7 +3724,7 @@ class Command(BaseCommand):
                 },
             )
             project_map[p['id']] = submission
-        
+
         # Scores
         if data.get('scores'):
             # Create a default batch
@@ -3702,9 +3732,9 @@ class Command(BaseCommand):
                 event=event,
                 defaults={'seed': 1, 'created_by_id': None, 'reviews_per_project': 3, 'projects_per_judge': 4},
             )
-            
+
             Score.objects.filter(assignment__batch=batch).delete()
-            
+
             # Build a simple assignment for the seed data
             seen = set()
             for s in data['scores']:
@@ -3712,7 +3742,7 @@ class Command(BaseCommand):
                 if key in seen:
                     continue  # dedupe
                 seen.add(key)
-                
+
                 assignment, _ = JudgeAssignment.objects.get_or_create(
                     batch=batch,
                     judge=judge_map[s['judge']],
@@ -3727,7 +3757,7 @@ class Command(BaseCommand):
                         criterion=criterion,
                         defaults={'value': int(value)},
                     )
-        
+
         self.stdout.write(self.style.SUCCESS(f'Loaded fixtures: {len(data.get("projects", []))} projects'))
 ```
 
@@ -3750,17 +3780,17 @@ from apps.events.models import Event
 
 class CSVExportView(APIView):
     permission_classes = [IsOrganizer]
-    
+
     def get(self, request, slug):
         event = Event.objects.get(slug=slug)
-        
+
         class Echo:
             """File-like object that just yields what it's written."""
             def write(self, value):
                 return value
-        
+
         writer = csv.writer(Echo())
-        
+
         def rows():
             # Header
             yield writer.writerow([
@@ -3770,7 +3800,7 @@ class CSVExportView(APIView):
                 'comment', 'submitted_at',
                 'raw_mean', 'normalized_score', 'rank',
             ])
-            
+
             scores = (
                 Score.objects
                 .filter(assignment__batch__event=event)
@@ -3782,12 +3812,12 @@ class CSVExportView(APIView):
                     'assignment__review',
                 )
             )
-            
+
             from collections import defaultdict
             project_scores = defaultdict(list)
             for s in scores:
                 project_scores[s.assignment.project_id].append(s)
-            
+
             # Get latest normalization if available
             from apps.normalization.models import NormalizationRun, NormalizedScore
             latest_run = NormalizationRun.objects.filter(event=event).order_by('-created_at').first()
@@ -3795,12 +3825,12 @@ class CSVExportView(APIView):
             if latest_run:
                 for ns in NormalizedScore.objects.filter(run=latest_run):
                     norm_scores[ns.project_id] = (ns.adjusted, ns.rank_after)
-            
+
             for s in scores:
                 project = s.assignment.project
                 review = getattr(s.assignment, 'review', None)
                 norm_score, rank = norm_scores.get(project.id, ('', ''))
-                
+
                 yield writer.writerow([
                     str(project.id),
                     project.name,
@@ -3816,7 +3846,7 @@ class CSVExportView(APIView):
                     norm_score,
                     rank,
                 ])
-            
+
             # Footer
             yield writer.writerow([
                 f'# Export generated at {event.open_at}',
@@ -3833,7 +3863,7 @@ class CSVExportView(APIView):
                 '',
                 '',
             ])
-        
+
         response = StreamingHttpResponse(rows(), content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="export-{event.slug}.csv"'
         return response
@@ -3857,19 +3887,19 @@ ROLE_ENDPOINTS = [
     ('visitor', 'GET', '/api/events/sample-hack-2026/gallery', 200),
     ('visitor', 'GET', '/api/judge/scores', 401),
     ('visitor', 'GET', '/api/judge/scores?judge=judge_a', 401),
-    
+
     ('participant', 'GET', '/api/events/sample-hack-2026/gallery', 200),
     ('participant', 'GET', '/api/judge/scores', 403),
     ('participant', 'GET', '/api/judge/scores?judge=judge_a', 403),
-    
+
     ('judge_a', 'GET', '/api/judge/scores', 200),
     ('judge_b', 'GET', '/api/judge/scores', 200),  # own scores
     ('judge_b', 'GET', '/api/judge/scores?judge=judge_a', 403),  # THE graded cell
-    
+
     ('organizer', 'GET', '/api/judge/scores', 200),
     ('organizer', 'GET', '/api/judge/scores?judge=judge_a', 200),
     ('organizer', 'GET', '/api/events/sample-hack-2026/export.csv', 200),
-    
+
     ('admin', 'GET', '/api/judge/scores', 200),
     ('admin', 'GET', '/api/judge/scores?judge=judge_a', 200),
     ('admin', 'GET', '/api/admin/dump', 200),
@@ -3883,7 +3913,7 @@ def test_role_isolation_matrix(role, method, path, expected_status, client, seed
     if role != 'visitor':
         session_cookie = seed_data['cookies'][role]
         client.cookies['session'] = session_cookie
-    
+
     response = getattr(client, method.lower())(path)
     assert response.status_code == expected_status, \
         f"{method} {path} as {role}: expected {expected_status}, got {response.status_code}"
@@ -3905,10 +3935,10 @@ from django.contrib.sessions.backends.db import SessionStore
 def seed_data(db):
     """Create the five pre-baked users and return their session tokens."""
     event = Event.objects.get(slug='sample-hack-2026')
-    
+
     users = {}
     cookies = {}
-    
+
     for role, email, name in [
         ('organizer', 'organizer@test.local', 'Organizer'),
         ('judge_a', 'tomas.varga@example.org', 'Judge A'),
@@ -3922,27 +3952,27 @@ def seed_data(db):
         )
         user.set_password('hack-hamster123')
         user.save()
-        
+
         Membership.objects.get_or_create(
             user=user, event=event,
             defaults={'role': role},
         )
-        
+
         session = SessionStore()
         session['_auth_user_id'] = str(user.id)
         session['_auth_user_backend'] = 'django.contrib.auth.backends.ModelBackend'
         session.save()
-        
+
         from apps.accounts.models import Session as AppSession
         AppSession.objects.create(
             user=user,
             token_hash='_test_' + role,
             expires_at=session.expire_date,
         )
-        
+
         users[role] = user
         cookies[role] = session.session_key
-    
+
     return {'users': users, 'cookies': cookies, 'event': event}
 ```
 
@@ -3961,7 +3991,7 @@ from django.contrib.sessions.backends.db import SessionStore
 
 class Command(BaseCommand):
     help = 'Generate role-isolation-matrix.txt from real HTTP calls.'
-    
+
     def handle(self, *args, **options):
         event = Event.objects.get(slug='sample-hack-2026')
         lines = [
@@ -3972,7 +4002,7 @@ class Command(BaseCommand):
             'role          endpoint                                              expected  actual',
             '-' * 90,
         ]
-        
+
         endpoints = [
             ('visitor', 'GET', '/api/events/sample-hack-2026/gallery'),
             ('visitor', 'GET', '/api/judge/scores'),
@@ -3984,9 +4014,9 @@ class Command(BaseCommand):
             ('organizer', 'GET', '/api/judge/scores'),
             ('organizer', 'GET', '/api/events/sample-hack-2026/export.csv'),
         ]
-        
+
         # ... iterate, make real HTTP calls, write status codes
-        
+
         matrix = '\n'.join(lines)
         with open('role-isolation-matrix.txt', 'w') as f:
             f.write(matrix)
@@ -3999,8 +4029,7 @@ class Command(BaseCommand):
 
 ### 15.1 The file
 
-This is the committed file at the repo root (abridged — the `[auth]` values
-are real hex tokens, not placeholders):
+This is the committed file at the repo root (abridged — the `[auth]` values are real hex tokens, not placeholders):
 
 ```toml
 [portal]
@@ -4028,12 +4057,7 @@ csv_export   = "/api/csv_export"
 
 ### 15.2 How the [auth] block is populated
 
-It is not a manual step. `import_fixtures` seeds the demo sessions with
-DETERMINISTIC tokens — `HMAC-SHA256(DJANGO_SECRET_KEY,
-"hack-hamster-2026-demo-session:{label}:{email}")`, derived from the role label and
-the seeded user's email (never a database PK, which fresh volumes would
-change) — so the committed `.hack-hamster.toml` is valid after any
-`docker compose up` and on any fresh database volume:
+It is not a manual step. `import_fixtures` seeds the demo sessions with DETERMINISTIC tokens — `HMAC-SHA256(DJANGO_SECRET_KEY, "hack-hamster-2026-demo-session:{label}:{email}")`, derived from the role label and the seeded user's email (never a database PK, which fresh volumes would change) — so the committed `.hack-hamster.toml` is valid after any `docker compose up` and on any fresh database volume:
 
 ```bash
 # 1. Bring up the portal (entrypoint runs migrate + import_fixtures)
@@ -4043,10 +4067,7 @@ docker compose up
 python3 acceptance.py .hack-hamster.toml        # or the official run.py
 ```
 
-`import_fixtures` still prints the headers ("Stable demo session cookies
-(deterministic — they match the committed .hack-hamster.toml)") for the one case
-that needs them: if you changed `DJANGO_SECRET_KEY`, copy the newly printed
-values into `.hack-hamster.toml`.
+`import_fixtures` still prints the headers ("Stable demo session cookies (deterministic — they match the committed .hack-hamster.toml)") for the one case that needs them: if you changed `DJANGO_SECRET_KEY`, copy the newly printed values into `.hack-hamster.toml`.
 
 ### 15.3 The run.py script (provided by spec)
 
@@ -4110,3 +4131,13 @@ Plus:
 /api/schema/redoc/       GET
 ```
 
+---
+
+## Related docs
+
+- [`README.md`](../README.md) · [`ARCHITECTURE.md`](../ARCHITECTURE.md) — pitch and system diagram.
+- [`docs/PRD.md`](PRD.md) · [`docs/TRD.md`](TRD.md) — what and how, this is the typed-out version.
+- [`docs/DATA-MODEL.md`](../DATA-MODEL.md) · [`docs/JUDGING.md`](../JUDGING.md) — schema and rubric semantics.
+- [`docs/DEPLOY.md`](DEPLOY.md) — what runs the `web` and `db` containers described here.
+- [`docs/RUNBOOK.md`](RUNBOOK.md) — what to do when this stack pages you.
+- [`docs/BACKUP-DR.md`](BACKUP-DR.md) — the `pg_dump` flow that protects the `audit_auditevent` rows this doc references.
