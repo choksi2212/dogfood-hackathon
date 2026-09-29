@@ -1,5 +1,6 @@
 from django.conf import settings
 from rest_framework import status
+from rest_framework.parsers import FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -80,6 +81,14 @@ class LoginView(APIView):
     """
 
     permission_classes = [AllowAny]
+    # The API-wide parser default is JSON-only (see REST_FRAMEWORK in
+    # config/settings.py) so junk content types fail fast with 415.
+    # Login is the one endpoint that standard form posts genuinely hit —
+    # curl -d, fetch with URLSearchParams, an HTML form fallback — so it
+    # opts in to FormParser alongside JSON (issue #19). JSON stays the
+    # documented primary format; the opt-in is deliberately local to
+    # this view, not global.
+    parser_classes = [JSONParser, FormParser]
 
     def post(self, request):
         email = (request.data.get("email") or "").lower()
