@@ -3,6 +3,7 @@
 T1 (G2):
   /healthz                          liveness (G1)
   /api/gallery                      public, returns submitted projects
+  /api/events/<slug>/gallery         public, same gallery scoped to one event (#17)
   /api/events/<slug>/submit         participant, deadline-gated
 
 T2 (G3):
@@ -15,7 +16,8 @@ G4 (normalization):
 
 G5 (voting):
   /api/events/<slug>/submissions/<id>/vote  cast/retract
-  /api/events/<slug>/votes/results          organizer, per-project tally
+  /api/events/<slug>/votes/results          live tally — organizers always,
+                                             any session after results_at
   /api/events/<slug>/audit-log              organizer, human-readable trail
 
 G6 (pairwise):

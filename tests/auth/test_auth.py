@@ -23,6 +23,7 @@ import gc
 import hashlib
 import secrets
 from datetime import timedelta
+from urllib.parse import urlencode
 
 import pytest
 from django.test import override_settings
@@ -338,6 +339,74 @@ def test_login_with_unknown_email_returns_401(client):
     )
     assert resp.status_code == 401
     assert resp.json()["error"]["code"] == "not_authenticated"
+
+
+# ---------------------------------------------------------------------------
+# 7b. Login content types — regression for issue #19: form-encoded POSTs
+#     used to be rejected with 415 because the API-wide parser default is
+#     JSON-only and LoginView did not opt in to FormParser.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "content_type",
+    ["application/json", "application/x-www-form-urlencoded"],
+    ids=["json", "form-encoded"],
+)
+def test_login_accepts_json_and_form_encoded(participant, client, content_type):
+    """POST /api/login works for BOTH content types (issue #19).
+
+    JSON remains the documented primary, but a standard form-encoded
+    body — curl -d, fetch with URLSearchParams, an HTML form fallback —
+    must no longer die with 415 Unsupported Media Type before the
+    credentials are even read.
+    """
+    creds = {"email": "participant@test.local", "password": "hack-hamster-dev-password"}
+    if content_type == "application/json":
+        payload = creds
+    else:
+        # The Django test client str()-ifies a dict for non-JSON,
+        # non-multipart content types, so a true form body — what
+        # curl -d / a browser actually sends — must be urlencoded here.
+        payload = urlencode(creds)
+    resp = client.post("/api/login", data=payload, content_type=content_type)
+    assert resp.status_code == 200, resp.content
+    assert "session" in resp.cookies
+
+    # The minted cookie authenticates as the same user.
+    c = client_class_with_cookie(resp.cookies["session"].value)
+    me = c.get("/api/me")
+    assert me.status_code == 200
+    assert me.json()["email"] == "participant@test.local"
+
+
+@pytest.mark.django_db
+def test_login_form_encoded_rejects_wrong_password(participant, client):
+    """Form-encoded bodies are actually parsed, not merely tolerated:
+    bad credentials still get the documented 401 envelope (issue #19)."""
+    resp = client.post(
+        "/api/login",
+        data=urlencode(
+            {"email": "participant@test.local", "password": "definitely-not-it"}
+        ),
+        content_type="application/x-www-form-urlencoded",
+    )
+    assert resp.status_code == 401
+    assert resp.json()["error"]["code"] == "not_authenticated"
+
+
+@pytest.mark.django_db
+def test_login_still_rejects_unsupported_media_types(participant, client):
+    """The opt-in is narrow: only JSON and form-encoded are accepted.
+    Anything else (e.g. text/plain) keeps the documented 415, so the
+    API-wide fail-fast policy is not weakened by this fix."""
+    resp = client.post(
+        "/api/login",
+        data="email=participant@test.local&password=hack-hamster-dev-password",
+        content_type="text/plain",
+    )
+    assert resp.status_code == 415
 
 
 # ---------------------------------------------------------------------------

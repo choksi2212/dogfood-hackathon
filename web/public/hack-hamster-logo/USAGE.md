@@ -114,7 +114,7 @@ Leave at least one wordmark cap height of clear space around general-purpose loc
 - **Widget:** `widget-header-dark` and `widget-header-light`, 112 × 24. The visible mark is 24px high and the outlined wordmark uses Geist 500 at 14px. This compact production exception intentionally differs from the canonical 2.4 × ratio. `widget-header-dark-4x` is 448 × 96 for rendering at 112 × 24.
 - **Certificate:** `certificate-header.svg` fixes `width="240pt"` and `height="280pt"`, with viewBox `0 0 240 280`. Preserve its intrinsic **240pt wide × 280pt high** print size to obtain a **40mm mark width** and **24pt wordmark**. The 2400 × 2800 PNG carries 720dpi metadata for the same physical dimensions. This fixed-size production exception intentionally differs from the canonical stacked width ratio. Use the SVG for print.
 - **Social card:** `github-social-card`, 1280 × 640, with the dark background.
-- **Review sheets:** `hack-hamster-family`, 1920 × 3100; `construction`, 1920 × 1760; `production-formats`, 1920 × 1600. These are proof sheets, not replacement logo assets.
+- **Review sheets:** `hack-hamster-family`, 1920 × 2800; `construction`, 1920 × 1760; `production-formats`, 1920 × 1600. These are proof sheets, not replacement logo assets.
 
 ## Pre-flight checklist
 

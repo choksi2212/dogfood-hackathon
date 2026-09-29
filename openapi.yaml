@@ -439,6 +439,73 @@ paths:
           description: Malformed cursor or sort/cursor mismatch
         '429':
           description: Rate limited
+  /api/events/{slug}/gallery:
+    get:
+      summary: Public gallery of one event's submitted projects
+      description: |
+        Event-scoped variant of `/api/gallery` (issue #17). Same
+        envelope, sort modes, and cursor pagination — but only
+        submissions belonging to the event are returned. Public, no
+        auth. An unknown event slug 404s.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Event slug, e.g. `sample-hack-2026`
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [track, alpha, newest]
+        - name: after
+          in: query
+          schema:
+            type: string
+          description: Cursor from a previous response's `next` field
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: Opt into offset pagination (legacy)
+      responses:
+        '200':
+          description: Event-scoped list of submissions
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - title: Cursor response
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Submission'
+                      next:
+                        type: string
+                        nullable: true
+                      page_size:
+                        type: integer
+                  - title: Offset response (?page=N)
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Submission'
+                      total:
+                        type: integer
+                      page:
+                        type: integer
+                      page_size:
+                        type: integer
+        '404':
+          description: Event not found
+        '429':
+          description: Rate limited
   /api/submissions/{id}:
     get:
       summary: Single submission detail (public read)
@@ -504,6 +571,19 @@ paths:
                   format: email
                 password:
                   type: string
+          application/x-www-form-urlencoded:
+            description: >
+              Also accepted (issue #19) so standard form posts work:
+              curl -d, fetch with URLSearchParams, an HTML form
+              fallback. JSON remains the primary format.
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
       responses:
         '200':
           description: Authenticated; session cookie set
@@ -512,7 +592,7 @@ paths:
         '429':
           description: Rate limited
         '415':
-          description: "Unsupported media type \u2014 request body must be JSON"
+          description: "Unsupported media type \u2014 body must be JSON or form-urlencoded"
   /api/logout:
     post:
       summary: End the current session
@@ -1018,7 +1098,13 @@ paths:
           description: Unauthenticated
   /api/events/{slug}/votes/results:
     get:
-      summary: Organizer-only tally of live votes per project
+      summary: Live vote tally per project
+      description: |
+        Organizers (and admins) always receive the tally. Any other
+        signed-in session receives it once the results window has
+        opened — `now >= results_at` (FR-230/FR-231: before
+        `results_at` non-organizers get 403, after it any session gets
+        200). The payload's `results_visible` mirrors the same state.
       security:
       - cookie: []
       parameters:
@@ -1035,7 +1121,7 @@ paths:
         '401':
           description: Unauthenticated
         '403':
-          description: Not an organizer of this event
+          description: Non-organizer request before results_at (results not published yet)
   /api/events/{slug}/audit-log:
     get:
       summary: Organizer-only human-readable audit trail
@@ -1262,6 +1348,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Certificate'
+        '400':
+          description: Signature does not verify (tamper detected)
         '404':
           description: Not found
         '429':

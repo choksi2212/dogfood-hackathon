@@ -263,6 +263,7 @@ def test_spec_endpoints_have_documented_methods():
         ("/api/judge/peer-scores", "GET", {403, 401}),
         ("/api/csv_export", "GET", {200, 401, 403}),
         ("/api/certificates/{public_id}", "GET", {200, 404}),
+        ("/api/certificates/judges/{public_id}", "GET", {200, 404}),
         ("/widget.js", "GET", {200}),
         ("/api/widget/gallery", "GET", {200}),
         ("/api/webhooks", "GET", {200, 401, 403}),

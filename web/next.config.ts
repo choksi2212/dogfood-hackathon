@@ -19,6 +19,17 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         destination: `${API_INTERNAL_URL}/api/:path*`,
       },
+      // Embeddable widget script (issue #13): Django serves /widget.js at
+      // the project root (apps/widget/views.py) and nginx already proxies
+      // it in the all-in-one build (nginx-all-in-one.conf). But when
+      // Next.js is the public surface — the deployed portal fronts this
+      // app directly — the embed URL must be rewritten to Django too, or
+      // it falls through to Next's 404 HTML page and breaks every
+      // third-party <script src=".../widget.js"> with a SyntaxError.
+      {
+        source: "/widget.js",
+        destination: `${API_INTERNAL_URL}/widget.js`,
+      },
     ];
   },
 };

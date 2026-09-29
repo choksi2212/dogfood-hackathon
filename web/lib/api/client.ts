@@ -46,11 +46,18 @@ const API_BASE =
 
 // widget.js is meant to be <script>-embedded on third-party sites, so
 // unlike everything else here it needs a URL the *browser* can reach
-// directly — not the server-only API_INTERNAL_URL, and not proxied
-// through next.config.ts either, since the whole point is other sites
-// loading it cross-origin (it ships its own CORS: * for that reason).
+// directly — not the server-only API_INTERNAL_URL. In the browser, the
+// page's own origin IS that URL: the public portal serves /widget.js
+// from this origin (next.config.ts proxies it to Django, mirroring the
+// nginx all-in-one build), and it ships CORS: * for cross-origin reads.
+// NEXT_PUBLIC_WIDGET_BASE still overrides this for exotic topologies;
+// on the server (SSR prerender) window is unavailable, so fall back to
+// the nginx all-in-one origin until hydration corrects the snippet.
 const WIDGET_BASE =
-  process.env.NEXT_PUBLIC_WIDGET_BASE ?? "http://localhost:8000";
+  process.env.NEXT_PUBLIC_WIDGET_BASE ??
+  (typeof window === "undefined"
+    ? "http://localhost:8000"
+    : window.location.origin);
 
 function cookieInit(cookieHeader?: string): RequestInit | undefined {
   return cookieHeader ? { headers: { Cookie: cookieHeader } } : undefined;

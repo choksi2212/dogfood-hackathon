@@ -48,6 +48,16 @@ export default async function DashboardLayout({
   // /pairwise, applied here too.
   const groups: NavGroup[] = [
     {
+      label: "Home",
+      items: [
+        {
+          href: "/dashboard",
+          label: "My dashboard",
+          icon: "layoutDashboard",
+        },
+      ],
+    },
+    {
       label: "Explore",
       items: [{ href: "/gallery", label: "Project gallery", icon: "gallery" }],
     },
@@ -80,7 +90,7 @@ export default async function DashboardLayout({
     groups.push({
       label: "Organizer",
       items: [
-        { href: "/organizer", label: "Dashboard", icon: "layoutDashboard" },
+        { href: "/organizer", label: "Event overview", icon: "layoutDashboard" },
         {
           href: "/organizer/results",
           label: "Results & audit",
