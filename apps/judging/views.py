@@ -704,7 +704,7 @@ class CSVAuditView(_OrganizerEventCSV):
         for e in events:
             yield [
                 e.created_at.isoformat() if e.created_at else "",
-                e.actor_email or "",
+                e.actor.email if e.actor else "",
                 e.action,
                 e.target_type,
                 e.target_id or "",

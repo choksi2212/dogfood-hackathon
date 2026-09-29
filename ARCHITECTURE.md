@@ -5,7 +5,7 @@
 **Team:** Manas (`choksi2212`) + Mihir (`Mihir-Rabari`)
 **Repo:** `https://github.com/choksi2212/dogfood-hackathon`
 **Spec:** `https://hackhamster.com/spec`
-**Stack:** Django 5 + DRF + PostgreSQL 16 + Next.js 15, all in `docker compose up`
+**Stack:** Django 5 + DRF + PostgreSQL (apt-packaged, 17 on current Debian bookworm images) + Next.js 15, all in one container via `docker compose up`
 **Companion docs:** [PRD](HACK HAMSTER-PRD.md), [TRD](HACK HAMSTER-TRD.md), [Backend Impl](HACK HAMSTER-BACKEND-IMPL.md)
 
 > PRD says *what*. TRD says *how*. This doc says *how the how is shaped*. Backend impl says *exactly what to type*.
@@ -106,7 +106,7 @@ flowchart LR
                             │       │
                   ┌─────────▼─┐   ┌─▼─────────┐
                   │  Django   │   │ Next.js   │
-                  │  (gunicorn)│   │ (server)  │
+                  │ (runserver)│   │ (server)  │
                   └─────┬─────┘   └───────────┘
                         │
                   ┌─────▼─────┐
@@ -137,11 +137,11 @@ flowchart LR
 
 **Postgres (1 process):**
 - The only persistent data store.
-- No published port; reached via the internal Docker network on `db:5432`.
+- No published port; reached via the internal Docker network on `127.0.0.1:5432`.
 
 ### 2.3 The internal network
 
-- `db:5432` — Postgres
+- `127.0.0.1:5432` — Postgres
 - `backend:8000` — Django
 - `web:3000` — Next.js
 - `nginx` is the only one with an exposed port.
@@ -167,7 +167,7 @@ flowchart LR
 ```
 Browser → nginx → gunicorn → Django middleware chain → URL resolver → view →
   permission classes → view body → ORM → Postgres → response serialization →
-  gunicorn → nginx → Browser
+  runserver → nginx → Browser
 ```
 
 ### 3.2 The middleware chain
