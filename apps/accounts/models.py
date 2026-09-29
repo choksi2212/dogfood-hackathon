@@ -21,7 +21,7 @@ def _deterministic_session_token(label: str, email: str) -> str:
     acceptance-suite cookies printed by ``import_fixtures`` are identical
     on every boot and across fresh databases: a judge can
     ``docker compose up`` and immediately run the official checker with
-    the committed ``.hack-hamster.toml``, no copy-paste step. Compromising
+    the committed ``.dogfood.toml``, no copy-paste step. Compromising
     SECRET_KEY forges these exactly as it forges any Django session —
     same trust boundary — and real user logins keep drawing random
     tokens, so this weakens nothing.
@@ -121,7 +121,7 @@ class UserUserPermissions(models.Model):
 class Session(models.Model):
     """Server-side session record. The cookie holds an opaque token; we
     store only its SHA-256 hash. The plain token is printed by the seed
-    script and handed to the checker via .hack-hamster.toml."""
+    script and handed to the checker via .dogfood.toml."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sessions")

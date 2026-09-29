@@ -18,9 +18,9 @@ What it does:
      so at least one is recognizable to the acceptance suite's "known
      fixture title" check.
   7. Creates 4 Sessions (one per pre-baked user) and prints 4 header lines
-     in a .hack-hamster.toml-friendly format.
+     in a .dogfood.toml-friendly format.
 
-Output: prints a HEADER block to stdout. Capture it into .hack-hamster.toml's
+Output: prints a HEADER block to stdout. Capture it into .dogfood.toml's
 [auth] block.
 """
 
@@ -258,7 +258,7 @@ class Command(BaseCommand):
         self.stdout.write("# HACK HAMSTER seed_fixtures output")
         self.stdout.write(f"# event_slug = {event_slug}")
         self.stdout.write(f"# known_title = {known_title}")
-        self.stdout.write("# Paste the lines below into the [auth] block of .hack-hamster.toml:")
+        self.stdout.write("# Paste the lines below into the [auth] block of .dogfood.toml:")
         self.stdout.write("")
         for label in ("organizer", "judge_a", "judge_b", "judge_c", "participant"):
             self.stdout.write(f'{label.upper()}_HEADER = "Cookie: session={headers[label]}"')

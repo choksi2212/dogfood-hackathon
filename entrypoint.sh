@@ -24,7 +24,7 @@ python manage.py migrate --noinput
 # official fixtures.json automatically so a bare `docker compose up`
 # is enough. Every boot re-imports (idempotent — see import_fixtures).
 # The five demo session cookies are DETERMINISTIC (HMAC of
-# DJANGO_SECRET_KEY + label + email), so the committed .hack-hamster.toml
+# DJANGO_SECRET_KEY + label + email), so the committed .dogfood.toml
 # is valid on every boot and on every fresh database volume — the
 # acceptance checker passes with no manual step. Set SKIP_SEED=1 to
 # skip (e.g. CI runs that seed explicitly at a chosen point instead).
