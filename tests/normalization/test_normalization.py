@@ -376,11 +376,13 @@ class TestNegativeBias:
         # Identifiability: the two biases are mirror images.
         assert result.b["j_harsh"] == pytest.approx(-result.b["j_easy"], abs=1e-9)
 
-    def test_harsh_judge_lowers_adjusted_relative_to_raw(self):
-        """For every project rated by j_harsh, the de-biased adjusted
-        score is pulled UP relative to raw_mean (because b_harsh < 0
-        contributes positively to q_i). The harsh rating no longer
-        drags the project down."""
+    def test_balanced_coverage_adjusted_equals_raw(self):
+        """On perfectly balanced coverage (both judges rate both projects),
+        the per-judge bias cancels inside the raw mean, so the fit
+        returns q_i == raw_mean and the adjusted score is unchanged.
+
+        (The old assertion `adjusted > raw_mean` held only via the
+        `adjusted = q + grand_mean` double-add — issue #97.)"""
         scores = [
             _score("p1", "j_harsh", 1.0),
             _score("p1", "j_easy", 5.0),
@@ -392,10 +394,11 @@ class TestNegativeBias:
         # raw_mean = 3.0 for both projects.
         assert per["p1"]["raw_mean"] == pytest.approx(3.0)
         assert per["p2"]["raw_mean"] == pytest.approx(3.0)
-        # The adjusted score is q + grand_mean, where q absorbs the
-        # positive contribution from b_harsh < 0. adjusted > raw_mean.
-        assert per["p1"]["adjusted"] > per["p1"]["raw_mean"]
-        assert per["p2"]["adjusted"] > per["p2"]["raw_mean"]
+        # q absorbs the level (Σb = 0), so adjusted == raw here — the
+        # harsh rating no longer drags the project down, but it does
+        # not inflate it either.
+        assert per["p1"]["adjusted"] == pytest.approx(3.0)
+        assert per["p2"]["adjusted"] == pytest.approx(3.0)
 
     def test_harsh_judge_bias_magnitude_is_bounded_by_spread(self):
         """With only two judges at the extremes (1 and 5), the bias
@@ -602,15 +605,20 @@ class TestUnbalancedBipartiteMovesRanks:
         assert biases["jA"] < -0.5, f"judge A should have negative bias (harsh rater); " f"got {biases['jA']!r}"
         assert biases["jB"] > 0.0, f"judge B should have positive bias (lenient rater); " f"got {biases['jB']!r}"
 
-        # Sanity: every project's adjusted mean differs from its raw
-        # mean. On balanced coverage this would be False (no movement).
-        for pid in raw_means:
+        # Sanity: projects rated ONLY by the lenient judge (jB) must be
+        # shifted down by the fit (adjusted != raw); projects rated by
+        # both judges keep adjusted == raw (bias cancels). On balanced
+        # coverage nothing would move — this design is unbalanced by
+        # construction.
+        for pid in ("p3", "p4"):
             assert adj_means[pid] != raw_means[pid], (
-                f"{pid}: normalization should have shifted the score "
-                f"({raw_means[pid]} -> {adj_means[pid]}); if unchanged, "
-                "this test is degenerate (balanced coverage) and should "
-                "be revised"
+                f"{pid}: rated only by the lenient judge; normalization "
+                f"should have shifted it ({raw_means[pid]} -> {adj_means[pid]})"
             )
+        # And at least one project must actually change rank — that is
+        # the point of the proof artifact's rank_movement column.
+        movements = [s["rank_before"] - s["rank_after"] for s in result.scores]
+        assert any(m != 0 for m in movements), "expected non-zero rank movement on unbalanced data"
 
     def test_demo_fixture_is_balanced(self):
         """Document why ``normalization-proof.txt`` shows zero rank

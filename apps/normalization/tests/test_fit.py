@@ -152,12 +152,17 @@ class TestNormalizationFit(unittest.TestCase):
         self.assertEqual(result.normalized_sigma, 0.0)
 
     def test_normalization_sigma_shrinks_on_biased_judges(self):
-        """When one judge is systematically harsher than another and the
-        design is INCOMPLETE (not every judge reviews every project),
-        the raw sigma over project means is inflated by that single
-        rater's bias. After the additive fit absorbs the judge bias,
-        the sigma over project qualities shrinks. This is the FIG. 03
-        story."""
+        """One judge is systematically harsher than another and the design
+        is INCOMPLETE (not every judge reviews every project).
+
+        Under the corrected math (adjusted = q_i, issue #97) this
+        synthetic design has biases that cancel inside every project's
+        raw mean: j_low and j_high rate ALL projects with symmetric
+        (-0.5/+0.5) biases, and j_mid rates a subset with b=0. So
+        q_i equals the raw mean exactly — sigma is UNCHANGED (the old
+        test passed only on 1e-16 float noise from the `+mu` double
+        add). What must still hold: the biases are recovered exactly,
+        in opposite directions."""
         scores = []
         # Incomplete design: p1..p10 each rated by j_low + j_high, but
         # only p1..p5 are also rated by j_mid. Different projects have
@@ -188,15 +193,18 @@ class TestNormalizationFit(unittest.TestCase):
         result = normalize(scores)
 
         self.assertTrue(result.is_connected)
-        # Normalized sigma must be strictly smaller than raw sigma.
-        self.assertLess(
+        # Biases are recovered exactly and point in opposite directions.
+        self.assertAlmostEqual(result.b["j_high"], 0.5, places=9)
+        self.assertAlmostEqual(result.b["j_low"], -0.5, places=9)
+        self.assertAlmostEqual(result.b["j_mid"], 0.0, places=9)
+        # Symmetric biases cancel inside every raw mean, so the fit
+        # changes nothing here: sigma is preserved (not inflated).
+        self.assertAlmostEqual(
             result.normalized_sigma,
             result.raw_sigma,
-            msg=(f"raw={result.raw_sigma}, " f"normalized={result.normalized_sigma}"),
+            places=9,
+            msg=(f"raw={result.raw_sigma}, normalized={result.normalized_sigma}"),
         )
-        # And the judges' biases point in opposite directions.
-        self.assertGreater(result.b["j_high"], 0)
-        self.assertLess(result.b["j_low"], 0)
 
     def test_normalization_recenters_judge_bias_to_zero(self):
         """Identifiability constraint: sum(b) = 0 after each iteration."""

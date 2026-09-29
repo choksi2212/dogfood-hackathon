@@ -112,7 +112,11 @@ def normalize(scores: list[dict[str, Any]]) -> FitResult:
     b: dict[str, float] = {j: 0.0 for j in judges}
     q: dict[str, float] = {p: 0.0 for p in projects}
 
-    max_iter = 1000
+    # The official fixture graph is sparse and unbalanced; it needs
+    # ~1500–2000 alternating-means sweeps to reach 1e-9. The old cap of
+    # 1000 shipped every proof from an unconverged fit (#99). 10_000
+    # still bounds degenerate data while letting real data converge.
+    max_iter = 10000
     iterations = 0
     for it in range(1, max_iter + 1):
         iterations = it
@@ -148,7 +152,11 @@ def normalize(scores: list[dict[str, Any]]) -> FitResult:
         js = project_judges[p]
         raw_means[p] = sum(cells[(p, j)] for j in js) / len(js)
 
-    normalized: dict[str, float] = {p: q[p] + grand_mean for p in projects}
+    # The alternating-means loop solves y = b + q under Σb = 0, so the
+    # converged q_i is level-inclusive (balanced case: q_i = raw project
+    # mean exactly). Adding the grand mean here would double-count μ —
+    # JUDGING.md §3.4 documents adjusted_i = q_i as the on-scale score.
+    normalized: dict[str, float] = {p: q[p] for p in projects}
 
     # Leverage = share of total reviews. A judge with zero variance gets
     # `leverage = 0` regardless of n_reviews, because they carry no

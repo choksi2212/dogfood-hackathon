@@ -55,24 +55,28 @@ class NormalizeView(APIView):
             )
         )
 
-        # Aggregate weighted score per (project, judge), keeping the
-        # last value when duplicates exist (defensive — Score has
-        # unique_together on (assignment, criterion) but a defensive
-        # dedup at the (project, judge) level costs nothing).
-        weighted: dict[tuple[str, str], float] = {}
+        # Aggregate weighted score per (project, judge): the weighted
+        # MEAN across criteria, sum(w_c * s_c) / sum(w_c) — matching
+        # JUDGING.md §2.1 (`raw_{p,j} = Σ_c w_c · s_{p,j,c}`) when all
+        # criteria are scored (Σ w_c = 1). Keeping the last value when
+        # duplicate rows exist (defensive — Score has unique_together
+        # on (assignment, criterion)).
+        weighted_sums: dict[tuple[str, str], float] = {}
+        weight_sums: dict[tuple[str, str], float] = {}
         for row in scores_qs:
             project_id = str(row["assignment__project_id"])
             judge_id = str(row["assignment__judge_id"])
-            value = float(row["value"]) * float(row["criterion__weight"])
-            weighted[(project_id, judge_id)] = value
+            key = (project_id, judge_id)
+            weighted_sums[key] = weighted_sums.get(key, 0.0) + float(row["value"]) * float(row["criterion__weight"])
+            weight_sums[key] = weight_sums.get(key, 0.0) + float(row["criterion__weight"])
 
         deduped = [
             {
                 "project_id": project_id,
                 "judge_id": judge_id,
-                "value": value,
+                "value": weighted_sums[(project_id, judge_id)] / weight_sums[(project_id, judge_id)],
             }
-            for (project_id, judge_id), value in weighted.items()
+            for (project_id, judge_id) in weighted_sums
         ]
 
         result = normalize(deduped)

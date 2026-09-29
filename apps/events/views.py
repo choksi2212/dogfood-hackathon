@@ -13,6 +13,7 @@ from .serializers import (
     RubricSerializer,
     TrackSerializer,
 )
+from apps.judging.models import Score
 
 
 class EventCreateView(APIView):
@@ -65,11 +66,15 @@ class RubricView(APIView):
     POST — organizer-only — replaces the rubric wholesale. Weights must
     sum to 1.0 (with a small epsilon for floating point); existing rows
     are deleted before the new set is inserted (no soft-delete history).
+    Each criterion must carry a positive weight (JUDGING.md §8.4).
 
-    Prize structure, judging window, voting mode and pairwise toggle
-    live on ``EventDetailView``, which is organizer-only — this endpoint
-    intentionally excludes them so the rubric surface can be safely
-    exposed to participants without leaking the rest.
+    If any score has been recorded against the current rubric, the
+    replace is REFUSED with 409 — deleting a RubricCriterion cascades
+    every Score row that references it (issue #98), which silently
+    wipes judging data while the progress dashboard keeps claiming the
+    reviews are in. Re-linking by criterion name is unsafe (weights
+    changed meaning); the honest contract is "rubric locked while
+    scores exist".
     """
 
     def get_permissions(self):
@@ -109,6 +114,42 @@ class RubricView(APIView):
                     }
                 },
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
+        # Negative / zero weights must not pass (JUDGING.md §8.4: the
+        # portal enforces positive weights summing to 1). Validated
+        # BEFORE any delete so a bad payload can never destroy the
+        # existing rubric. RubricCriterion.clean() can't be used here —
+        # it sums only *saved* siblings, so the first criterion of a
+        # fresh rubric would always fail the sum check.
+        for c in criteria_data:
+            weight = Decimal(str(c.get("weight", 0)))
+            if weight <= 0:
+                return Response(
+                    {
+                        "error": {
+                            "code": "validation_failed",
+                            "message": f"Criterion weight must be positive (got {weight}).",
+                        }
+                    },
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+
+        # Refuse to destroy scores: the FK cascade would delete every
+        # Score row wired to the old criteria (issue #98).
+        if Score.objects.filter(assignment__batch__event=event).exists():
+            return Response(
+                {
+                    "error": {
+                        "code": "rubric_locked",
+                        "message": (
+                            "Scores exist against this event's rubric; replacing "
+                            "it would cascade-delete every score. Clear scores "
+                            "first or create a new event."
+                        ),
+                    }
+                },
+                status=status.HTTP_409_CONFLICT,
             )
 
         Rubric.objects.filter(event=event).delete()

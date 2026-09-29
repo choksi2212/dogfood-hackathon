@@ -186,3 +186,100 @@ def test_rubric_post_weight_mismatch_422(auth_client, sample_event):
         content_type="application/json",
     )
     assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# POST guard rails (issue #98): negative weights and score-destroying
+# replaces must both be refused BEFORE any destructive write.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_rubric_post_negative_weight_422(auth_client, sample_event):
+    """Weights must be positive, not merely sum to 1.0 — `-0.5 + 1.5`
+    passes the sum check but a negative weight inverts a criterion's
+    contribution. Must be rejected before the existing rubric is
+    touched (previously `RubricCriterion.objects.create()` bypassed
+    `clean()` and accepted it)."""
+    from apps.events.models import RubricCriterion
+
+    client = auth_client["organizer"]
+    before = list(RubricCriterion.objects.filter(rubric__event=sample_event).values_list("name", flat=True))
+
+    resp = client.post(
+        f"/api/events/{sample_event.slug}/rubric",
+        data=json.dumps(
+            {
+                "name": "Bad",
+                "criteria": [
+                    {"name": "A", "weight": "-0.500", "min": 1, "max": 5, "order": 0},
+                    {"name": "B", "weight": "1.500", "min": 1, "max": 5, "order": 1},
+                ],
+            }
+        ),
+        content_type="application/json",
+    )
+    assert resp.status_code == 422
+    assert resp.json()["error"]["code"] == "validation_failed"
+    # The old rubric must survive a rejected payload untouched.
+    after = list(RubricCriterion.objects.filter(rubric__event=sample_event).values_list("name", flat=True))
+    assert after == before
+
+
+@pytest.mark.django_db
+def test_rubric_post_locked_409_when_scores_exist(auth_client, sample_event, sample_submission, organizer, judge_a):
+    """Replacing a rubric cascades RubricCriterion -> Score (FK
+    CASCADE); with scores recorded, the POST must refuse with a clean
+    409 instead of silently wiping every score cell (issue #98: live
+    repro went 369 score cells -> 0 while the progress dashboard kept
+    reporting 123/123 reviewed)."""
+    from apps.events.models import RubricCriterion
+    from apps.judging.models import JudgeAssignment, JudgeBatch, Score
+
+    batch = JudgeBatch.objects.create(event=sample_event, seed=0, created_by=organizer)
+    assignment = JudgeAssignment.objects.create(batch=batch, judge=judge_a, project=sample_submission)
+    criterion = RubricCriterion.objects.filter(rubric__event=sample_event).first()
+    Score.objects.create(assignment=assignment, criterion=criterion, value=4)
+
+    client = auth_client["organizer"]
+    resp = client.post(
+        f"/api/events/{sample_event.slug}/rubric",
+        data=json.dumps(
+            {
+                "name": "Updated",
+                "criteria": [
+                    {"name": "A", "weight": "0.500", "min": 1, "max": 5, "order": 0},
+                    {"name": "B", "weight": "0.500", "min": 1, "max": 5, "order": 1},
+                ],
+            }
+        ),
+        content_type="application/json",
+    )
+    assert resp.status_code == 409
+    body = resp.json()
+    assert body["error"]["code"] == "rubric_locked"
+    # The score row AND the original rubric both survive the refusal.
+    assert Score.objects.filter(assignment=assignment).count() == 1
+    assert RubricCriterion.objects.filter(rubric__event=sample_event).count() == 3
+
+
+@pytest.mark.django_db
+def test_rubric_post_still_replaces_when_no_scores(auth_client, sample_event):
+    """Without scores, the wholesale replace keeps working (the happy
+    path the config-layer differentiator relies on)."""
+    client = auth_client["organizer"]
+    resp = client.post(
+        f"/api/events/{sample_event.slug}/rubric",
+        data=json.dumps(
+            {
+                "name": "Updated",
+                "criteria": [
+                    {"name": "A", "weight": "0.500", "min": 1, "max": 5, "order": 0},
+                    {"name": "B", "weight": "0.500", "min": 1, "max": 5, "order": 1},
+                ],
+            }
+        ),
+        content_type="application/json",
+    )
+    assert resp.status_code == 201
+    assert {c["name"] for c in resp.json()["criteria"]} == {"A", "B"}

@@ -1,101 +1,392 @@
-DOGFOOD normalization proof
+HACK HAMSTER normalization proof
 event: sample-hack-2026
 method: two-way additive, alternating means
-created_at: 2026-09-26T19:17:59.224875+00:00
-raw_sigma: 0.20
-normalized_sigma: 0.20
+created_at: 2026-09-29T17:17:10.106104+00:00
+raw_sigma: 0.36
+normalized_sigma: 0.63
 is_connected: True
-convergence_iterations: 2
-n_reviews: 30
+convergence_iterations: 1806
+n_reviews: 123
 
 Rank movement (top 10 by |delta|):
 project_id  raw_rank  adj_rank  delta
-b3e85fe9-e560-48d5-b144-275cff7b7317  2  2  = 0
-02b6cdd5-cf4d-4f8c-a35a-25639d052076  9  9  = 0
-4b4aae1e-059b-4e66-a261-5f798138b171  3  3  = 0
-d8ed4761-b7b7-466f-9af8-72a94fa01a10  5  5  = 0
-6baeadb5-933d-416e-966a-9be288773f38  10  10  = 0
-fa865be8-3a1e-4a0d-a0df-a83f639a0f02  1  1  = 0
-00f8d512-a818-462e-af4b-6c47812fef40  6  6  = 0
-246085e6-1c5f-4854-8d8e-9c69dbc4490e  4  4  = 0
-35db643c-b7db-4fde-99c9-d268db93d597  7  7  = 0
-add55ab4-4634-4c57-95b2-268e7103c496  8  8  = 0
+prj_05  39  20  ▲ 19
+prj_28  27  10  ▲ 17
+prj_35  22  38  ▼ 16
+prj_04  11  26  ▼ 15
+prj_41  25  12  ▲ 13
+prj_01  28  18  ▲ 10
+prj_19  12  21  ▼ 9
+prj_22  37  28  ▲ 9
+prj_13  30  39  ▼ 9
+prj_37  5  13  ▼ 8
 
 per-project:
-  project_id: 00f8d512-a818-462e-af4b-6c47812fef40
-    raw_mean: 0.667
-    adjusted: 1.367
-    rank_before: 6
-    rank_after: 6
-    rank_movement: 0
-  project_id: 02b6cdd5-cf4d-4f8c-a35a-25639d052076
-    raw_mean: 0.417
-    adjusted: 1.117
+  project_id: prj_01
+    raw_mean: 3.444
+    adjusted: 3.448
+    rank_before: 28
+    rank_after: 18
+    rank_movement: 10
+  project_id: prj_02
+    raw_mean: 3.556
+    adjusted: 3.436
+    rank_before: 15
+    rank_after: 19
+    rank_movement: -4
+  project_id: prj_03
+    raw_mean: 3.334
+    adjusted: 3.208
+    rank_before: 31
+    rank_after: 29
+    rank_movement: 2
+  project_id: prj_04
+    raw_mean: 3.777
+    adjusted: 3.255
+    rank_before: 11
+    rank_after: 26
+    rank_movement: -15
+  project_id: prj_05
+    raw_mean: 2.889
+    adjusted: 3.414
+    rank_before: 39
+    rank_after: 20
+    rank_movement: 19
+  project_id: prj_06
+    raw_mean: 3.111
+    adjusted: 2.858
+    rank_before: 36
+    rank_after: 35
+    rank_movement: 1
+  project_id: prj_08
+    raw_mean: 3.800
+    adjusted: 4.398
     rank_before: 9
-    rank_after: 9
-    rank_movement: 0
-  project_id: 246085e6-1c5f-4854-8d8e-9c69dbc4490e
-    raw_mean: 0.833
-    adjusted: 1.533
-    rank_before: 4
-    rank_after: 4
-    rank_movement: 0
-  project_id: 35db643c-b7db-4fde-99c9-d268db93d597
-    raw_mean: 0.667
-    adjusted: 1.367
-    rank_before: 7
-    rank_after: 7
-    rank_movement: 0
-  project_id: 4b4aae1e-059b-4e66-a261-5f798138b171
-    raw_mean: 0.833
-    adjusted: 1.533
+    rank_after: 6
+    rank_movement: 3
+  project_id: prj_09
+    raw_mean: 3.555
+    adjusted: 3.557
+    rank_before: 18
+    rank_after: 16
+    rank_movement: 2
+  project_id: prj_10
+    raw_mean: 4.167
+    adjusted: 3.837
     rank_before: 3
-    rank_after: 3
-    rank_movement: 0
-  project_id: 6baeadb5-933d-416e-966a-9be288773f38
-    raw_mean: 0.417
-    adjusted: 1.117
-    rank_before: 10
-    rank_after: 10
-    rank_movement: 0
-  project_id: add55ab4-4634-4c57-95b2-268e7103c496
-    raw_mean: 0.583
-    adjusted: 1.283
-    rank_before: 8
-    rank_after: 8
-    rank_movement: 0
-  project_id: b3e85fe9-e560-48d5-b144-275cff7b7317
-    raw_mean: 0.917
-    adjusted: 1.617
-    rank_before: 2
-    rank_after: 2
-    rank_movement: 0
-  project_id: d8ed4761-b7b7-466f-9af8-72a94fa01a10
-    raw_mean: 0.667
-    adjusted: 1.367
-    rank_before: 5
-    rank_after: 5
-    rank_movement: 0
-  project_id: fa865be8-3a1e-4a0d-a0df-a83f639a0f02
-    raw_mean: 1.000
-    adjusted: 1.700
+    rank_after: 9
+    rank_movement: -6
+  project_id: prj_11
+    raw_mean: 4.334
+    adjusted: 4.817
     rank_before: 1
     rank_after: 1
     rank_movement: 0
+  project_id: prj_12
+    raw_mean: 3.445
+    adjusted: 3.243
+    rank_before: 24
+    rank_after: 27
+    rank_movement: -3
+  project_id: prj_13
+    raw_mean: 3.334
+    adjusted: 2.327
+    rank_before: 30
+    rank_after: 39
+    rank_movement: -9
+  project_id: prj_14
+    raw_mean: 3.400
+    adjusted: 3.067
+    rank_before: 29
+    rank_after: 33
+    rank_movement: -4
+  project_id: prj_15
+    raw_mean: 3.667
+    adjusted: 4.255
+    rank_before: 13
+    rank_after: 7
+    rank_movement: 6
+  project_id: prj_16
+    raw_mean: 4.000
+    adjusted: 4.654
+    rank_before: 7
+    rank_after: 3
+    rank_movement: 4
+  project_id: prj_17
+    raw_mean: 3.555
+    adjusted: 3.558
+    rank_before: 17
+    rank_after: 15
+    rank_movement: 2
+  project_id: prj_18
+    raw_mean: 3.500
+    adjusted: 3.279
+    rank_before: 19
+    rank_after: 25
+    rank_movement: -6
+  project_id: prj_19
+    raw_mean: 3.667
+    adjusted: 3.391
+    rank_before: 12
+    rank_after: 21
+    rank_movement: -9
+  project_id: prj_20
+    raw_mean: 3.223
+    adjusted: 3.081
+    rank_before: 33
+    rank_after: 32
+    rank_movement: 1
+  project_id: prj_21
+    raw_mean: 3.889
+    adjusted: 4.414
+    rank_before: 8
+    rank_after: 4
+    rank_movement: 4
+  project_id: prj_22
+    raw_mean: 3.110
+    adjusted: 3.235
+    rank_before: 37
+    rank_after: 28
+    rank_movement: 9
+  project_id: prj_23
+    raw_mean: 2.889
+    adjusted: 2.748
+    rank_before: 40
+    rank_after: 36
+    rank_movement: 4
+  project_id: prj_24
+    raw_mean: 3.500
+    adjusted: 3.571
+    rank_before: 20
+    rank_after: 14
+    rank_movement: 6
+  project_id: prj_25
+    raw_mean: 4.111
+    adjusted: 4.747
+    rank_before: 4
+    rank_after: 2
+    rank_movement: 2
+  project_id: prj_26
+    raw_mean: 3.221
+    adjusted: 2.192
+    rank_before: 34
+    rank_after: 40
+    rank_movement: -6
+  project_id: prj_27
+    raw_mean: 3.444
+    adjusted: 3.303
+    rank_before: 26
+    rank_after: 24
+    rank_movement: 2
+  project_id: prj_28
+    raw_mean: 3.444
+    adjusted: 3.790
+    rank_before: 27
+    rank_after: 10
+    rank_movement: 17
+  project_id: prj_29
+    raw_mean: 3.333
+    adjusted: 3.138
+    rank_before: 32
+    rank_after: 31
+    rank_movement: 1
+  project_id: prj_30
+    raw_mean: 3.111
+    adjusted: 2.909
+    rank_before: 35
+    rank_after: 34
+    rank_movement: 1
+  project_id: prj_31
+    raw_mean: 3.556
+    adjusted: 3.303
+    rank_before: 16
+    rank_after: 23
+    rank_movement: -7
+  project_id: prj_32
+    raw_mean: 3.445
+    adjusted: 3.193
+    rank_before: 23
+    rank_after: 30
+    rank_movement: -7
+  project_id: prj_33
+    raw_mean: 4.000
+    adjusted: 3.748
+    rank_before: 6
+    rank_after: 11
+    rank_movement: -5
+  project_id: prj_34
+    raw_mean: 4.334
+    adjusted: 4.192
+    rank_before: 2
+    rank_after: 8
+    rank_movement: -6
+  project_id: prj_35
+    raw_mean: 3.467
+    adjusted: 2.450
+    rank_before: 22
+    rank_after: 38
+    rank_movement: -16
+  project_id: prj_36
+    raw_mean: 3.666
+    adjusted: 3.525
+    rank_before: 14
+    rank_after: 17
+    rank_movement: -3
+  project_id: prj_37
+    raw_mean: 4.083
+    adjusted: 3.649
+    rank_before: 5
+    rank_after: 13
+    rank_movement: -8
+  project_id: prj_38
+    raw_mean: 3.778
+    adjusted: 4.413
+    rank_before: 10
+    rank_after: 5
+    rank_movement: 5
+  project_id: prj_39
+    raw_mean: 3.499
+    adjusted: 3.364
+    rank_before: 21
+    rank_after: 22
+    rank_movement: -1
+  project_id: prj_40
+    raw_mean: 3.001
+    adjusted: 2.732
+    rank_before: 38
+    rank_after: 37
+    rank_movement: 1
+  project_id: prj_41
+    raw_mean: 3.445
+    adjusted: 3.690
+    rank_before: 25
+    rank_after: 12
+    rank_movement: 13
 
 per-judge:
-  judge_id: 16e43d6c-951d-4d0b-bf87-d2e7b053e47f
-    bias: -0.075
-    n_reviews: 10
-    leverage: 0.333
-  judge_id: 1d0619fc-c8d8-4b25-9677-d79b2193dbfc
-    bias: 0.050
-    n_reviews: 10
-    leverage: 0.333
-  judge_id: 2657d5e4-2c24-46d6-ae0f-f6123322a00b
-    bias: 0.025
-    n_reviews: 10
-    leverage: 0.333
+  judge_id: jdg_01
+    bias: -1.690
+    n_reviews: 1
+    leverage: 0.008
+  judge_id: jdg_02
+    bias: -0.026
+    n_reviews: 6
+    leverage: 0.049
+  judge_id: jdg_03
+    bias: 0.885
+    n_reviews: 2
+    leverage: 0.016
+  judge_id: jdg_04
+    bias: 0.271
+    n_reviews: 4
+    leverage: 0.033
+  judge_id: jdg_05
+    bias: 1.112
+    n_reviews: 2
+    leverage: 0.016
+  judge_id: jdg_06
+    bias: 1.120
+    n_reviews: 3
+    leverage: 0.024
+  judge_id: jdg_07
+    bias: 0.498
+    n_reviews: 3
+    leverage: 0.000
+  judge_id: jdg_08
+    bias: -0.723
+    n_reviews: 3
+    leverage: 0.024
+  judge_id: jdg_09
+    bias: 0.219
+    n_reviews: 5
+    leverage: 0.041
+  judge_id: jdg_10
+    bias: -1.214
+    n_reviews: 3
+    leverage: 0.024
+  judge_id: jdg_11
+    bias: 0.788
+    n_reviews: 6
+    leverage: 0.049
+  judge_id: jdg_12
+    bias: -0.062
+    n_reviews: 2
+    leverage: 0.016
+  judge_id: jdg_13
+    bias: 0.037
+    n_reviews: 3
+    leverage: 0.024
+  judge_id: jdg_14
+    bias: -0.073
+    n_reviews: 3
+    leverage: 0.024
+  judge_id: jdg_15
+    bias: 0.608
+    n_reviews: 6
+    leverage: 0.049
+  judge_id: jdg_16
+    bias: -0.654
+    n_reviews: 6
+    leverage: 0.049
+  judge_id: jdg_17
+    bias: 1.179
+    n_reviews: 2
+    leverage: 0.016
+  judge_id: jdg_18
+    bias: -0.097
+    n_reviews: 3
+    leverage: 0.024
+  judge_id: jdg_19
+    bias: -0.045
+    n_reviews: 3
+    leverage: 0.024
+  judge_id: jdg_20
+    bias: -0.236
+    n_reviews: 6
+    leverage: 0.049
+  judge_id: jdg_21
+    bias: 0.056
+    n_reviews: 3
+    leverage: 0.024
+  judge_id: jdg_22
+    bias: 0.509
+    n_reviews: 5
+    leverage: 0.041
+  judge_id: jdg_23
+    bias: -1.065
+    n_reviews: 1
+    leverage: 0.008
+  judge_id: jdg_24
+    bias: 0.171
+    n_reviews: 11
+    leverage: 0.089
+  judge_id: jdg_25
+    bias: -0.895
+    n_reviews: 5
+    leverage: 0.041
+  judge_id: jdg_26
+    bias: 0.367
+    n_reviews: 9
+    leverage: 0.073
+  judge_id: jdg_27
+    bias: -0.558
+    n_reviews: 2
+    leverage: 0.016
+  judge_id: jdg_28
+    bias: -0.176
+    n_reviews: 2
+    leverage: 0.016
+  judge_id: jdg_29
+    bias: 0.053
+    n_reviews: 9
+    leverage: 0.073
+  judge_id: jdg_30
+    bias: -0.359
+    n_reviews: 4
+    leverage: 0.033
+
+Zero-variance raters:
+  jdg_07: leverage=0.00, n_reviews=3 - no ranking signal
 
 Method:
 y_ij = mu + b_j + q_i + epsilon_ij
