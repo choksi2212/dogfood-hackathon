@@ -19,6 +19,13 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "false").lower() == "true"
 ALLOWED_HOSTS = [
     h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,web").split(",") if h.strip()
 ]
+# Unsafe requests (login, votes, submissions) arrive at Django with the
+# browser-facing origin — the Next.js proxy and share tunnels both surface
+# the app on a different origin than Django itself, so trusted origins must
+# be configurable per deployment.
+CSRF_TRUSTED_ORIGINS = [
+    o.strip() for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()
+]
 
 # --- Apps --------------------------------------------------------------------
 
