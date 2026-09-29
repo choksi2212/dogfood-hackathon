@@ -99,7 +99,7 @@ class Command(BaseCommand):
             fixture = json.load(f)
 
         with transaction.atomic():
-            organizer = self._ensure_user("organizer@test.local", "Olivia Organizer")
+            organizer = self._ensure_user("organizer@test.local", "Olivia Organizer", demo=True)
             event = self._import_event(fixture["event"], options["event_slug"], organizer)
             Membership.objects.update_or_create(
                 user=organizer, event=event, defaults={"role": "organizer", "created_by": organizer}
@@ -206,25 +206,40 @@ class Command(BaseCommand):
 
     # -- people -------------------------------------------------------------
 
-    def _ensure_user(self, email, name):
+    def _ensure_user(self, email, name, demo=False):
         user, created = User.objects.get_or_create(email=email, defaults={"username": email, "name": name, "is_active": True})
         user.username = email
         user.name = name
         user.is_active = True
-        # Hash the seeded demo password only on first create. Re-importing
-        # the same fixtures (the bulk round-trip, docker reboots on a
-        # mounted volume, organizer re-imports) must not re-run PBKDF2 for
-        # every unchanged user — that turned a full import into a minute
-        # of CPU. The demo password never changes for existing users.
-        if created:
+        # Hash the seeded demo password on first create — and, for the
+        # demo accounts flagged demo=True, on *every* import. The
+        # non-demo path stays first-create-only: re-importing the same
+        # fixtures (the bulk round-trip, docker reboots on a mounted
+        # volume, organizer re-imports) must not re-run PBKDF2 for
+        # every unchanged fixture user — that turned a full import into
+        # a minute of CPU.
+        #
+        # The demo accounts are different: entrypoint.sh re-runs this
+        # command on every boot against whatever volume is mounted, so
+        # a database seeded before a DEMO_PASSWORD change (commit 3f80c8c
+        # rebranded it dogfood-dev-password -> hack-hamster-dev-password)
+        # must be re-healed on the next boot, not keep the stale hash
+        # forever — otherwise the README-documented demo login 401s on
+        # every aged deployment (issue #16).
+        if created or demo:
             user.set_password(DEMO_PASSWORD)
         user.save()
         return user
 
     def _import_judges(self, fixture_judges, event, organizer):
         judges_by_id = {}
+        # Only the three label-bound demo judges (DEMO_JUDGE_LABELS ->
+        # jdg_01/02/03) get the self-healing demo=True password refresh;
+        # the other ~27 fixture judges keep the first-create-only perf
+        # guard, since nothing documents a password for them.
+        demo_judge_ids = set(DEMO_JUDGE_LABELS.values())
         for j in fixture_judges:
-            user = self._ensure_user(j["email"], j["name"])
+            user = self._ensure_user(j["email"], j["name"], demo=j["id"] in demo_judge_ids)
             Membership.objects.update_or_create(user=user, event=event, defaults={"role": "judge", "created_by": organizer})
             judges_by_id[j["id"]] = user
         return judges_by_id
@@ -316,7 +331,7 @@ class Command(BaseCommand):
             )
 
     def _ensure_participant(self, event, teams_by_id, organizer):
-        participant = self._ensure_user("participant@test.local", "Pranav Participant")
+        participant = self._ensure_user("participant@test.local", "Pranav Participant", demo=True)
         Membership.objects.update_or_create(user=participant, event=event, defaults={"role": "participant", "created_by": organizer})
         first_team = next(iter(teams_by_id.values()))
         member, _ = TeamMember.objects.get_or_create(team=first_team, user=participant, defaults={"role_in_team": "member"})
