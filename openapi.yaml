@@ -1262,6 +1262,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Certificate'
+        '400':
+          description: Signature does not verify (tamper detected)
         '404':
           description: Not found
         '429':
